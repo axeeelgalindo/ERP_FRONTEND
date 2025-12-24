@@ -1,26 +1,50 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+:root{
+  --app-sb: 0px;         /* móvil cerrado por defecto */
+  --app-topbar: 3.25rem; /* topbar móvil */
 }
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@media (min-width: 1024px){
+  :root{
+    --app-sb: 5rem;      /* desktop: colapsado inicial */
+    --app-topbar: 0px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+html, body {
+   overflow-x: hidden;
+}
+
+/* Por defecto (login, etc.) sin padding extra */
+main{
+  padding-left: 0;
+  padding-top: 0;
+  transition: padding 300ms ease-in-out;
+}
+
+/* Cuando hay sidebar visible */
+body.has-sidebar main{
+  padding-left: var(--app-sb);
+  padding-top: var(--app-topbar);
+}
+
+@media (prefers-reduced-motion: reduce){
+  main{ transition: none; }
+}
+
+/* Ocultar sidebar y padding cuando el body tenga la bandera .no-sidebar */
+body.no-sidebar {
+  --app-sb: 0px !important;
+  --app-topbar: 0px !important;
+}
+
+/* Oculta el <aside> del sidebar */
+body.no-sidebar aside[aria-label="Barra lateral de navegación"] {
+  display: none !important;
+}
+
+/* Fuerza al main a ocupar todo el ancho/alto sin desplazamiento del layout */
+body.no-sidebar main {
+  padding-left: 0 !important;
+  padding-top: 0 !important;
 }
