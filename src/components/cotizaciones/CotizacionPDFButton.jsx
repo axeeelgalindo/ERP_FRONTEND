@@ -1,14 +1,11 @@
 "use client";
 
-import { Button } from "@mui/material";
+import { useState } from "react";
+import { Button, CircularProgress } from "@mui/material";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
-import jsPDF from "jspdf";
 
-/**
- * PDF estilo "Orden S00205" (similar al ejemplo)
- * Usa imágenes desde /public (recomendado: /iconbluein.png)
- */
 export default function CotizacionPDFButton({ cotizacion }) {
+  const [busy, setBusy] = useState(false);
   if (!cotizacion) return null;
 
   const clp = (v) =>
@@ -29,291 +26,365 @@ export default function CotizacionPDFButton({ cotizacion }) {
 
   const safe = (v) => String(v ?? "").trim();
 
+  const safeName = (s) =>
+    String(s || "")
+      .trim()
+      .replace(/[\\/:*?"<>|]+/g, "-")
+      .slice(0, 80);
+
   const loadImageDataURL = async (src) => {
-    const res = await fetch(src);
+    const res = await fetch(src, { cache: "force-cache" });
     if (!res.ok) throw new Error(`No se pudo cargar imagen: ${src}`);
     const blob = await res.blob();
     return await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(blob);
     });
   };
 
-  const generarPDF = async () => {
-    const doc = new jsPDF("p", "mm", "a4");
-    const W = 210;
-    const H = 270;
+  const generarPDF = async (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    if (busy) return;
 
-    // ===== Colores (muy parecidos al template) =====
-    const C = {
-      blue: [21, 101, 192],
-      lightBlue: [227, 242, 253],
-      card: [238, 246, 252],
-      grayHead: [245, 246, 248],
-      grayRow: [250, 250, 251],
-      text: [25, 25, 25],
-      muted: [90, 90, 90],
-      line: [210, 210, 210],
-    };
-
-    const mx = 14;
-
-    // ===== Franjas =====
-    doc.setFillColor(...C.lightBlue);
-    doc.rect(0, 0, W, 30, "F");
-    doc.rect(0, H - 26, W, 26, "F");
-
-    // ===== Logo =====
     try {
-      // Recomendado:
-      const logo = await loadImageDataURL("/Logo_blue.png");
-      doc.addImage(logo, "PNG", mx, 6.5, 46, 14);
+      setBusy(true);
 
-      // Si quieres probar logoblanco (ojo con fondo blanco):
-      // const logo = await loadImageDataURL("/logoblanco.png");
-      // doc.addImage(logo, "PNG", mx, 6.5, 46, 14);
-    } catch {
-      // no bloquea
-    }
+      const [{ jsPDF }, autoTableMod] = await Promise.all([
+        import("jspdf"),
+        import("jspdf-autotable"),
+      ]);
+      const autoTable = autoTableMod?.default || autoTableMod;
 
-    // ===== Slogan =====
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.setTextColor(...C.muted);
-    doc.text("Tecnología que impulsa, soluciones que transforman", mx, 24);
+      // ✅ Letter exacto como tu PDF wkhtmltopdf: 216 × 279 mm
+      const W = 216;
+      const H = 279;
+      const doc = new jsPDF({
+        orientation: "p",
+        unit: "mm",
+        format: [W, H],
+      });
 
-    // ===== Datos empresa derecha =====
-    doc.setTextColor(...C.text);
-    doc.setFontSize(8.5);
-    const rx = W - mx;
-    const ty = 10;
-    [
-      "Punta Arenas",
-      "Capitán Juan Guillermo 02233",
-      "Puerto Montt",
-      "Av. San Agustín S/N, La Paloma PC #38",
-      "RUT 78115957-3",
-    ].forEach((t, i) => doc.text(t, rx, ty + i * 4, { align: "right" }));
+      const mx = 14;
 
-    // ===== Cliente (izquierda) =====
-    doc.setFontSize(9);
-    doc.setTextColor(...C.text);
-    doc.text(safe(cotizacion?.cliente?.nombre) || "Cliente", mx, 44);
-    doc.setTextColor(...C.muted);
-    doc.setFontSize(8.5);
-    doc.text("Chile", mx, 48);
+      const C = {
+        blue: [21, 101, 192],
+        lightBlue: [227, 242, 253],
+        bar: [238, 246, 252],
+        text: [25, 25, 25],
+        muted: [100, 100, 100],
+        line: [220, 224, 230],
+        white: [255, 255, 255],
+      };
 
-    // ===== Número de orden =====
-    const numero = cotizacion?.numero != null ? String(cotizacion.numero) : safe(cotizacion?.id);
-    const numDoc = numero ? `S${numero.padStart(5, "0")}` : "S00000";
+      const numero =
+        cotizacion?.numero != null ? String(cotizacion.numero) : safe(cotizacion?.id);
+      const numDoc = numero ? `S${numero.padStart(5, "0")}` : "S00000";
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(15.5);
-    doc.setTextColor(...C.blue);
-    doc.text(`Número de orden ${numDoc}`, mx, 62);
+      // ===== Logo (cacheado) =====
+      let logo = null;
+      try {
+        logo = await loadImageDataURL("/Logo_blue.png");
+      } catch {
+        logo = null;
+      }
 
-    // ===== Cards =====
-    const cardY = 68;
-    const cardH = 12;
-    const gap = 2;
-    const cardW = (W - mx * 2 - gap) / 2;
+      /**
+       * ✅ Wave “real” tipo wkhtmltopdf
+       * - Pintamos banda celeste completa
+       * - Luego “recortamos” el borde con blanco (fondo)
+       */
+      const drawWaveBand = (yTop, height, invert = false) => {
+        // 1) Banda completa
+        doc.setFillColor(...C.lightBlue);
+        doc.rect(0, yTop, W, height, "F");
 
-    doc.setFillColor(...C.card);
-    doc.rect(mx, cardY, cardW, cardH, "F");
-    doc.rect(mx + cardW + gap, cardY, cardW, cardH, "F");
+        // 2) Wave (recorte blanco)
+        const amp = 6.5; // un pelín más notorio
+        const steps = 90;
 
-    doc.setFontSize(8.6);
-    doc.setTextColor(...C.blue);
-    doc.text("Fecha de la orden", mx + 3, cardY + 5);
-    doc.text("Vendedor", mx + cardW + gap + 3, cardY + 5);
+        // La curva vive cerca del borde:
+        // Header: recortamos desde la curva hacia ABAJO (borde inferior)
+        // Footer: recortamos desde la curva hacia ARRIBA (borde superior)
+        const yEdge = invert ? yTop : yTop + height;
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9.2);
-    doc.setTextColor(...C.text);
-    doc.text(fmtDate(cotizacion?.creada_en), mx + 3, cardY + 10);
-    doc.text(safe(cotizacion?.vendedor) || "-", mx + cardW + gap + 3, cardY + 10);
+        const points = [];
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const x = t * W;
 
-    // ===== Tabla =====
-    let y = 90;
+          // curva suave tipo “panza” (como tu PDF)
+          // (una sola onda, 0..PI)
+          const yCurve = yEdge - amp * Math.sin(t * Math.PI);
 
-    // Header tabla
-    doc.setFillColor(...C.grayHead);
-    doc.rect(mx, y, W - mx * 2, 9, "F");
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8.5);
-    doc.setTextColor(...C.muted);
-
-    const colDescX = mx + 2;
-    const colCantX = 122;
-    const colPUX = 153;
-    const colImpX = 181;
-    const colTotX = W - mx;
-
-    doc.text("Descripción", colDescX, y + 5);
-    doc.text("Cantidad", colCantX, y + 5, { align: "right" });
-    doc.text("Precio unitario", colPUX, y + 5, { align: "right" });
-    doc.text("Impuestos", colImpX, y + 5, { align: "right" });
-    doc.text("Importe", colTotX, y + 5, { align: "right" });
-
-    y += 12;
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(...C.text);
-
-    const items = Array.isArray(cotizacion?.items) ? cotizacion.items : [];
-
-    // Ajuste: si tus "items" vienen como servicios desde ventas, asegúrate de que
-    // el backend incluya items { include: { producto: true } } (ya lo tienes).
-    if (!items.length) {
-      doc.setTextColor(...C.muted);
-      doc.text("Esta cotización no tiene ítems.", mx, y);
-      y += 10;
-    } else {
-      items.forEach((it, idx) => {
-        if (y > 230) {
-          doc.addPage();
-          doc.setFillColor(...C.lightBlue);
-          doc.rect(0, 0, W, 18, "F");
-          doc.rect(0, H - 18, W, 18, "F");
-          y = 28;
+          points.push([x, yCurve]);
         }
 
-        // zebra
-        if (idx % 2 === 0) {
-          doc.setFillColor(...C.grayRow);
-          doc.rect(mx, y - 6, W - mx * 2, 10, "F");
+        doc.setFillColor(...C.white);
+        doc.setDrawColor(...C.white);
+        doc.setLineWidth(0);
+
+        if (!invert) {
+          // HEADER: recortar (blanco) desde el borde inferior hacia la curva
+          for (let i = 0; i < points.length - 1; i++) {
+            const [x1, y1] = points[i];
+            const [x2, y2] = points[i + 1];
+            doc.triangle(x1, yTop + height, x2, yTop + height, x1, y1, "F");
+            doc.triangle(x2, yTop + height, x2, y2, x1, y1, "F");
+          }
+        } else {
+          // FOOTER: recortar (blanco) desde el borde superior hacia la curva
+          for (let i = 0; i < points.length - 1; i++) {
+            const [x1, y1] = points[i];
+            const [x2, y2] = points[i + 1];
+            doc.triangle(x1, yTop, x2, yTop, x1, y1, "F");
+            doc.triangle(x2, yTop, x2, y2, x1, y1, "F");
+          }
         }
+      };
 
-        const nombre =
-          it.tipo === "PRODUCTO"
-            ? safe(it.producto?.nombre) || "Producto"
-            : safe(it.Item) || "Servicio";
+      // ===== Header / Footer por página =====
+      const HEADER_H = 28;
+      const FOOTER_H = 18;
 
+      const drawHeader = () => {
+        drawWaveBand(0, HEADER_H, false);
+
+        if (logo) doc.addImage(logo, "PNG", mx, 6.0, 44, 13.5);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.2);
+        doc.setTextColor(...C.muted);
+        doc.text("Tecnología que impulsa, soluciones que transforman", mx, 22.5);
+
+        doc.setFontSize(8.2);
         doc.setTextColor(...C.text);
-        doc.text(doc.splitTextToSize(nombre, 95), colDescX, y);
+        const rx = W - mx;
+        const ty = 7.8;
+        [
+          "Punta Arenas",
+          "Capitán Juan Guillermo 02233",
+          "Puerto Montt",
+          "Av. San Agustín S/N, La Paloma PC #38",
+          "RUT 78115957-3",
+        ].forEach((t, i) => doc.text(t, rx, ty + i * 3.7, { align: "right" }));
+      };
 
-        doc.text(String(it.cantidad ?? 0), colCantX, y, { align: "right" });
-        doc.text(clp(it.precioUnitario), colPUX, y, { align: "right" });
+      const drawFooter = (page, pages) => {
+        drawWaveBand(H - FOOTER_H, FOOTER_H, true);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.2);
+        doc.setTextColor(...C.text);
+        doc.text("administracion@blueinge.com", W / 2, H - 10.0, { align: "center" });
+
+        doc.setTextColor(...C.blue);
+        doc.text("https://blue-ingenieria.com/", W / 2, H - 6.0, { align: "center" });
 
         doc.setTextColor(...C.muted);
-        doc.text("IVA 19% Vta", colImpX, y, { align: "right" });
+        doc.setFontSize(7.4);
+        doc.text(`Página ${page} / ${pages}`, W / 2, H - 2.7, { align: "center" });
+      };
 
-        doc.setTextColor(...C.text);
-        doc.text(clp(it.total), colTotX, y, { align: "right" });
+      // ===== Página 1 temporal =====
+      drawHeader();
+      drawFooter(1, 1);
 
-        y += 7;
-
-        // descripción secundaria
-        const extra = safe(it.descripcion);
-        if (extra) {
-          doc.setTextColor(...C.muted);
-          doc.setFontSize(8.2);
-          doc.text(doc.splitTextToSize(extra, 180), colDescX, y);
-          doc.setFontSize(9);
-          y += 7;
-        }
-
-        y += 4;
-      });
-    }
-
-    // línea separadora
-    doc.setDrawColor(...C.line);
-    doc.line(mx, y, W - mx, y);
-    y += 10;
-
-    // ===== Totales (caja derecha) =====
-    const boxW = 78;
-    const boxX = W - mx - boxW;
-    const boxY = y;
-    const boxH = 28;
-
-    doc.setFillColor(...C.grayHead);
-    doc.rect(boxX, boxY, boxW, boxH, "F");
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(...C.muted);
-
-    doc.text("Subtotal", boxX + 6, boxY + 8);
-    doc.text(clp(cotizacion?.subtotal), boxX + boxW - 6, boxY + 8, { align: "right" });
-
-    doc.text("IVA 19%", boxX + 6, boxY + 16);
-    doc.text(clp(cotizacion?.iva), boxX + boxW - 6, boxY + 16, { align: "right" });
-
-    doc.setTextColor(...C.text);
-    doc.text("Total", boxX + 6, boxY + 24);
-    doc.text(clp(cotizacion?.total), boxX + boxW - 6, boxY + 24, { align: "right" });
-
-    y = boxY + boxH + 16;
-
-    // ===== Bloques inferiores (como tu pantallazo) =====
-    const descripcion = safe(cotizacion?.descripcion);
-    const terminos = safe(cotizacion?.terminos_condiciones);
-    const acuerdo = safe(cotizacion?.acuerdo_pago);
-
-    const blockTitle = (t) => {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
-      doc.setTextColor(...C.muted);
-      doc.text(t, mx, y);
-      y += 5;
+      // ===== Cliente (izq) =====
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
       doc.setTextColor(...C.text);
-    };
+      doc.text(safe(cotizacion?.cliente?.nombre) || "Cliente", mx, 42);
+      doc.setFontSize(8.3);
+      doc.setTextColor(...C.muted);
+      doc.text(safe(cotizacion?.cliente?.direccion) || "Chile", mx, 46);
 
-    const blockText = (t) => {
-      if (!t) {
+      // ===== Título =====
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(18);
+      doc.setTextColor(...C.blue);
+      doc.text(`Número de orden ${numDoc}`, mx, 58);
+
+      // ===== Barra info =====
+      const barY = 62;
+      doc.setFillColor(...C.bar);
+      doc.roundedRect(mx, barY, W - mx * 2, 12, 2.5, 2.5, "F");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.6);
+      doc.setTextColor(...C.blue);
+      doc.text("Fecha de la orden", mx + 4, barY + 5);
+      doc.text("Vendedor", mx + 92, barY + 5);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.2);
+      doc.setTextColor(...C.text);
+      doc.text(fmtDate(cotizacion?.creada_en), mx + 4, barY + 10);
+      doc.text(safe(cotizacion?.vendedor) || "-", mx + 92, barY + 10);
+
+      // ===== Tabla (sutil) =====
+      const items = Array.isArray(cotizacion?.items) ? cotizacion.items : [];
+
+      const body = items.length
+        ? items.map((it) => {
+            const nombre =
+              it.tipo === "PRODUCTO"
+                ? safe(it.producto?.nombre) || "Producto"
+                : safe(it.Item) || "Servicio";
+
+            const extra = safe(it.descripcion);
+            const desc = extra ? `${nombre}\n${extra}` : nombre;
+
+            const cantidad = Number(it.cantidad ?? 0);
+            const unidad = safe(it.unidad || it.unidades || "");
+            const cantidadTxt = unidad ? `${cantidad} ${unidad}` : `${cantidad}`;
+
+            const pu = Number(it.precioUnitario ?? 0);
+            const total = Number(it.total ?? 0);
+
+            return [desc, cantidadTxt, clp(pu), "IVA 19% Vta", clp(total)];
+          })
+        : [["Esta cotización no tiene ítems.", "", "", "", ""]];
+
+      autoTable(doc, {
+        startY: 82,
+        margin: { left: mx, right: mx, top: HEADER_H, bottom: FOOTER_H + 2 },
+        head: [["Descripción", "Cantidad", "Precio unitario", "Impuestos", "Importe"]],
+        body,
+        theme: "plain",
+        styles: {
+          font: "helvetica",
+          fontSize: 9.2,
+          textColor: C.text,
+          cellPadding: { top: 2.4, right: 2.2, bottom: 2.4, left: 2.2 },
+          valign: "top",
+        },
+        headStyles: { fontStyle: "normal", textColor: C.text },
+        columnStyles: {
+          0: { cellWidth: 92 },
+          1: { cellWidth: 30, halign: "right" },
+          2: { cellWidth: 32, halign: "right" },
+          3: { cellWidth: 28, halign: "right" },
+          4: { cellWidth: 20, halign: "right" },
+        },
+        didParseCell: (data) => {
+          data.cell.styles.lineWidth = 0.18;
+          data.cell.styles.lineColor = C.line;
+          if (data.section === "head") data.cell.styles.lineWidth = 0.25;
+        },
+      });
+
+      // ===== Totales =====
+      let y = (doc.lastAutoTable?.finalY ?? 160) + 6;
+
+      autoTable(doc, {
+        startY: y,
+        margin: { left: W - mx - 84, right: mx },
+        tableWidth: 84,
+        theme: "plain",
+        styles: {
+          font: "helvetica",
+          fontSize: 9.4,
+          cellPadding: { top: 2.6, right: 2.6, bottom: 2.6, left: 2.6 },
+          textColor: C.text,
+        },
+        body: [
+          ["Subtotal", clp(cotizacion?.subtotal)],
+          ["IVA 19%", clp(cotizacion?.iva)],
+          ["Total", clp(cotizacion?.total)],
+        ],
+        columnStyles: {
+          0: { cellWidth: 44, halign: "left", textColor: C.muted },
+          1: { cellWidth: 40, halign: "right" },
+        },
+        didParseCell: (data) => {
+          data.cell.styles.lineWidth = 0.18;
+          data.cell.styles.lineColor = C.line;
+          if (data.row.index === 2) {
+            data.cell.styles.fontStyle = "bold";
+            if (data.column.index === 0) data.cell.styles.textColor = C.blue;
+          }
+        },
+      });
+
+      // ===== Bloques inferiores =====
+      const blocksStartY = (doc.lastAutoTable?.finalY ?? y) + 10;
+      let yy = blocksStartY;
+
+      const bottomLimit = H - (FOOTER_H + 8);
+
+      const addBlock = (title, text) => {
+        const t = safe(text);
+        if (!t) return;
+
+        if (yy + 22 > bottomLimit) {
+          doc.addPage();
+          yy = HEADER_H + 18;
+        }
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
         doc.setTextColor(...C.muted);
-        doc.text("-", mx, y);
+        doc.text(title, mx, yy);
+        yy += 5;
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
         doc.setTextColor(...C.text);
-        y += 8;
-        return;
+
+        const lines = doc.splitTextToSize(t, W - mx * 2);
+        if (yy + lines.length * 4.1 + 4 > bottomLimit) {
+          doc.addPage();
+          yy = HEADER_H + 18;
+        }
+
+        doc.text(lines, mx, yy);
+        yy += lines.length * 4.1 + 6;
+      };
+
+      addBlock("Descripción", cotizacion?.descripcion);
+      addBlock("Términos y condiciones", cotizacion?.terminos_condiciones);
+      addBlock("Acuerdo de pago", cotizacion?.acuerdo_pago);
+
+      // ===== Redibujar header/footer con pageCount real =====
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let p = 1; p <= pageCount; p++) {
+        doc.setPage(p);
+        drawHeader();
+        drawFooter(p, pageCount);
       }
-      const lines = doc.splitTextToSize(t, 180);
-      doc.text(lines, mx, y);
-      y += lines.length * 4 + 6;
-    };
 
-    blockTitle("Descripción");
-    blockText(descripcion);
+      const fileName = `Orden_${numDoc}_${safeName(
+        cotizacion?.cliente?.nombre || cotizacion?.proyecto?.nombre || "cotizacion"
+      )}.pdf`;
 
-    blockTitle("Términos y condiciones");
-    blockText(terminos);
-
-    blockTitle("Acuerdo de pago");
-    blockText(acuerdo);
-
-    // ===== Footer =====
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...C.text);
-    doc.setFontSize(8.6);
-    doc.text("administracion@blueinge.com", W / 2, H - 14, { align: "center" });
-
-    doc.setTextColor(...C.blue);
-    doc.text("https://blue-ingenieria.com/", W / 2, H - 9, { align: "center" });
-
-    doc.setTextColor(...C.muted);
-    doc.setFontSize(7.8);
-    doc.text("Página 1 / 1", W / 2, H - 4, { align: "center" });
-
-    doc.save(`Orden_${numDoc}.pdf`);
+      doc.save(fileName);
+    } catch (err) {
+      console.error("❌ Error generando PDF:", err);
+      alert(err?.message || "Error generando PDF (revisa consola)");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <Button
       size="small"
       variant="outlined"
-      color="error"
-      startIcon={<PictureAsPdfIcon />}
+      startIcon={busy ? <CircularProgress size={16} /> : <PictureAsPdfIcon />}
       onClick={generarPDF}
+      disabled={busy}
+      sx={{
+        borderRadius: 2,
+        textTransform: "none",
+        fontWeight: 800,
+        px: 1.25,
+        minWidth: 92,
+      }}
     >
-      PDF
+      {busy ? "Generando..." : "PDF"}
     </Button>
   );
 }

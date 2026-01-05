@@ -106,7 +106,9 @@ export default function NuevaVentaDialog({
   }
 
   function getEmpleadoRut(emp) {
-    return emp?.rut ?? emp?.RUT ?? emp?.usuario?.rut ?? emp?.usuario?.RUT ?? null;
+    return (
+      emp?.rut ?? emp?.RUT ?? emp?.usuario?.rut ?? emp?.usuario?.RUT ?? null
+    );
   }
 
   function getHHRut(hh) {
@@ -156,7 +158,10 @@ export default function NuevaVentaDialog({
       const [resTipoItems, resTipoDias, resOV] = await Promise.all([
         fetch(`${API_URL}/ventas/tipoitems`, { headers, cache: "no-store" }),
         fetch(`${API_URL}/ventas/tipodias`, { headers, cache: "no-store" }),
-        fetch(`${API_URL}/ventas/ordenes-venta`, { headers, cache: "no-store" }),
+        fetch(`${API_URL}/ventas/ordenes-venta`, {
+          headers,
+          cache: "no-store",
+        }),
       ]);
 
       const [dataTipoItems, dataTipoDias, dataOV] = await Promise.all([
@@ -167,11 +172,15 @@ export default function NuevaVentaDialog({
 
       if (!resTipoItems.ok)
         throw new Error(
-          dataTipoItems?.error || dataTipoItems?.message || "Error cargando tipoItems"
+          dataTipoItems?.error ||
+            dataTipoItems?.message ||
+            "Error cargando tipoItems"
         );
       if (!resTipoDias.ok)
         throw new Error(
-          dataTipoDias?.error || dataTipoDias?.message || "Error cargando tipoDias"
+          dataTipoDias?.error ||
+            dataTipoDias?.message ||
+            "Error cargando tipoDias"
         );
       if (!resOV.ok)
         throw new Error(
@@ -189,7 +198,10 @@ export default function NuevaVentaDialog({
           headers,
           cache: "no-store",
         }),
-        fetch(`${API_URL}/compras/disponibles-venta`, { headers, cache: "no-store" }),
+        fetch(`${API_URL}/compras/disponibles-venta`, {
+          headers,
+          cache: "no-store",
+        }),
       ]);
 
       const [dataEmpleados, dataHH, dataCompraDisp] = await Promise.all([
@@ -200,7 +212,9 @@ export default function NuevaVentaDialog({
 
       if (!resEmpleados.ok)
         throw new Error(
-          dataEmpleados?.error || dataEmpleados?.message || "Error cargando empleados"
+          dataEmpleados?.error ||
+            dataEmpleados?.message ||
+            "Error cargando empleados"
         );
       if (!resHH.ok)
         throw new Error(dataHH?.error || dataHH?.message || "Error HHEmpleado");
@@ -258,7 +272,7 @@ export default function NuevaVentaDialog({
 
     (async () => {
       try {
-        const headers = makeHeaders(session);
+        const headers = makeHeaders(session, empresaIdFromToken);
         const resHH = await fetch(
           `${API_URL}/ventas/hh-empleados?anio=${anio}&mes=${mes}`,
           { headers, cache: "no-store" }
@@ -293,14 +307,17 @@ export default function NuevaVentaDialog({
     const idStr = String(empleadoId);
 
     const byId =
-      hhRegistros.find((hh) => String(getHHEmpleadoEmpleadoId(hh)) === idStr) || null;
+      hhRegistros.find((hh) => String(getHHEmpleadoEmpleadoId(hh)) === idStr) ||
+      null;
     if (byId) return byId;
 
     const emp = empleados.find((e) => String(e.id) === idStr);
     const empRut = normalizeRut(getEmpleadoRut(emp));
     if (!empRut) return null;
 
-    return hhRegistros.find((hh) => normalizeRut(getHHRut(hh)) === empRut) || null;
+    return (
+      hhRegistros.find((hh) => normalizeRut(getHHRut(hh)) === empRut) || null
+    );
   };
 
   // =========================
@@ -308,7 +325,9 @@ export default function NuevaVentaDialog({
   // =========================
   const preview = useMemo(() => {
     const contains = (s, sub) =>
-      String(s || "").toLowerCase().includes(String(sub).toLowerCase());
+      String(s || "")
+        .toLowerCase()
+        .includes(String(sub).toLowerCase());
 
     const lines = detalles.map((d) => {
       const cantidad = Number(d.cantidad) || 1;
@@ -317,7 +336,9 @@ export default function NuevaVentaDialog({
       const tipoItem = tipoItems.find((t) => t.id === d.tipoItemId) || null;
       const tipoDia = tipoDias.find((t) => t.id === d.tipoDiaId) || null;
 
-      const gananciaPct = tipoItem ? Number(tipoItem.porcentajeUtilidad || 0) : 0;
+      const gananciaPct = tipoItem
+        ? Number(tipoItem.porcentajeUtilidad || 0)
+        : 0;
 
       const tipoDiaNombre = tipoDia?.nombre || "";
       const isFinSemana = contains(tipoDiaNombre, "fin de semana");
@@ -334,7 +355,8 @@ export default function NuevaVentaDialog({
 
         costoTotal = costoHH * cantidad + cif;
 
-        const ventaUnit = costoHH * (gananciaPct / 100) + cif / cantidad + extraFijo;
+        const ventaUnit =
+          costoHH * (gananciaPct / 100) + cif / cantidad + extraFijo;
         const multGananciaFinSemana = isFinSemana ? 1 + gananciaPct / 100 : 1;
 
         ventaTotal = ventaUnit * cantidad * multGananciaFinSemana * (1 + alpha);
@@ -384,10 +406,13 @@ export default function NuevaVentaDialog({
         if (!d.empleadoId) return `Ítem #${i + 1}: Selecciona empleado.`;
         const hh = findHHForEmpleado(d.empleadoId);
         if (!hh) {
-          return `Ítem #${i + 1}: Falta HH del período para este empleado (${mes}/${anio}).`;
+          return `Ítem #${
+            i + 1
+          }: Falta HH del período para este empleado (${mes}/${anio}).`;
         }
       } else {
-        if (!d.compraId) return `Ítem #${i + 1}: Selecciona un detalle de compra.`;
+        if (!d.compraId)
+          return `Ítem #${i + 1}: Selecciona un detalle de compra.`;
       }
     }
 
@@ -440,14 +465,18 @@ export default function NuevaVentaDialog({
 
       const res = await fetch(`${API_URL}/ventas/add`, {
         method: "POST",
-        headers: makeHeaders(session),
+        headers: makeHeaders(session, empresaIdFromToken),
         body: JSON.stringify(payload),
       });
 
       const data = await safeJson(res);
       if (!res.ok) {
+        console.log("❌ create venta error", res.status, data, payload);
         throw new Error(
-          data?.detalle || data?.error || data?.message || "Error al crear venta"
+          data?.detalle ||
+            data?.error ||
+            data?.message ||
+            "Error al crear venta"
         );
       }
 
@@ -544,8 +573,18 @@ export default function NuevaVentaDialog({
               sx={{ minWidth: 160 }}
             >
               {[
-                "Enero","Febrero","Marzo","Abril","Mayo","Junio",
-                "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre",
+                "Enero",
+                "Febrero",
+                "Marzo",
+                "Abril",
+                "Mayo",
+                "Junio",
+                "Julio",
+                "Agosto",
+                "Septiembre",
+                "Octubre",
+                "Noviembre",
+                "Diciembre",
               ].map((m, idx) => (
                 <MenuItem key={idx + 1} value={String(idx + 1)}>
                   {m}
@@ -561,20 +600,32 @@ export default function NuevaVentaDialog({
           </Typography>
 
           {detalles.map((det, idx) => {
-            const hhSelected = det.modo === "HH" ? findHHForEmpleado(det.empleadoId) : null;
+            const hhSelected =
+              det.modo === "HH" ? findHHForEmpleado(det.empleadoId) : null;
 
-            const hhSelectedCostoHH = hhSelected?.costoHH != null ? Number(hhSelected.costoHH) : 0;
-            const hhSelectedCIF = hhSelected?.cif != null ? Number(hhSelected.cif) : 0;
+            const hhSelectedCostoHH =
+              hhSelected?.costoHH != null ? Number(hhSelected.costoHH) : 0;
+            const hhSelectedCIF =
+              hhSelected?.cif != null ? Number(hhSelected.cif) : 0;
 
             const faltaHH = det.modo === "HH" && det.empleadoId && !hhSelected;
 
             return (
               <Card key={idx} variant="outlined" sx={{ borderRadius: 2 }}>
                 <CardContent>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 1,
+                    }}
+                  >
                     <Typography fontWeight={700}>Ítem #{idx + 1}</Typography>
                     {detalles.length > 1 && (
-                      <IconButton onClick={() => removeDetalle(idx)} size="small">
+                      <IconButton
+                        onClick={() => removeDetalle(idx)}
+                        size="small"
+                      >
                         <DeleteIcon fontSize="small" />
                       </IconButton>
                     )}
@@ -592,7 +643,9 @@ export default function NuevaVentaDialog({
                       label="Descripción"
                       size="small"
                       value={det.descripcion}
-                      onChange={(e) => updateDetalle(idx, { descripcion: e.target.value })}
+                      onChange={(e) =>
+                        updateDetalle(idx, { descripcion: e.target.value })
+                      }
                       fullWidth
                     />
 
@@ -620,15 +673,19 @@ export default function NuevaVentaDialog({
                       label="Tipo ítem (margen)"
                       size="small"
                       value={det.tipoItemId}
-                      onChange={(e) => updateDetalle(idx, { tipoItemId: e.target.value })}
+                      onChange={(e) =>
+                        updateDetalle(idx, { tipoItemId: e.target.value })
+                      }
                       fullWidth
                     >
                       <MenuItem value="">(Selecciona)</MenuItem>
                       {tipoItems.map((t) => (
                         <MenuItem key={t.id} value={t.id}>
                           {t.nombre}
-                          {t.unidadItem?.nombre ? ` (${t.unidadItem.nombre})` : ""} —{" "}
-                          {t.porcentajeUtilidad ?? 0}%
+                          {t.unidadItem?.nombre
+                            ? ` (${t.unidadItem.nombre})`
+                            : ""}{" "}
+                          — {t.porcentajeUtilidad ?? 0}%
                         </MenuItem>
                       ))}
                     </TextField>
@@ -650,7 +707,9 @@ export default function NuevaVentaDialog({
                       label="Tipo día (opcional)"
                       size="small"
                       value={det.tipoDiaId}
-                      onChange={(e) => updateDetalle(idx, { tipoDiaId: e.target.value })}
+                      onChange={(e) =>
+                        updateDetalle(idx, { tipoDiaId: e.target.value })
+                      }
                       fullWidth
                       helperText="Si el nombre contiene 'fin de semana' o 'urgente', aplica extra fijo."
                     >
@@ -695,7 +754,13 @@ export default function NuevaVentaDialog({
                           ))}
                         </TextField>
 
-                        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 1,
+                          }}
+                        >
                           <TextField
                             label="Costo HH (según período)"
                             size="small"
@@ -755,7 +820,8 @@ export default function NuevaVentaDialog({
 
                   <Box sx={{ mt: 1.5 }}>
                     <Typography variant="caption" color="text.secondary">
-                      Preview ítem: costo {formatCLP(preview.lines[idx]?.costoTotal)} | venta{" "}
+                      Preview ítem: costo{" "}
+                      {formatCLP(preview.lines[idx]?.costoTotal)} | venta{" "}
                       {formatCLP(preview.lines[idx]?.ventaTotal)} | utilidad{" "}
                       {formatCLP(preview.lines[idx]?.utilidad)}{" "}
                       {preview.lines[idx]?.pct != null
@@ -768,7 +834,11 @@ export default function NuevaVentaDialog({
             );
           })}
 
-          <Button variant="outlined" startIcon={<AddIcon />} onClick={addDetalle}>
+          <Button
+            variant="outlined"
+            startIcon={<AddIcon />}
+            onClick={addDetalle}
+          >
             Agregar ítem
           </Button>
 
@@ -780,7 +850,8 @@ export default function NuevaVentaDialog({
                 Totales (preview)
               </Typography>
               <Typography fontWeight={700}>
-                Venta: {formatCLP(preview.total)} | Costo: {formatCLP(preview.costo)} | Utilidad:{" "}
+                Venta: {formatCLP(preview.total)} | Costo:{" "}
+                {formatCLP(preview.costo)} | Utilidad:{" "}
                 {formatCLP(preview.utilidad)}
               </Typography>
             </CardContent>

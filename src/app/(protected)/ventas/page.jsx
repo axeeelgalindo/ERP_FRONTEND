@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { Box, CircularProgress } from "@mui/material";
 import { useRouter } from "next/navigation";

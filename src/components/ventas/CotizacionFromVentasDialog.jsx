@@ -13,6 +13,7 @@ import {
   Stack,
   TextField,
 } from "@mui/material";
+
 import { makeHeaders } from "@/lib/api";
 import { safeJson } from "@/components/ventas/utils/safeJson";
 import { formatCLP } from "@/components/ventas/utils/money";
@@ -75,6 +76,8 @@ export default function CotizacionFromVentasDialog({
     (async () => {
       try {
         setErr("");
+
+        // ✅ IMPORTANTE: enviar empresaIdFromToken
         const headers = makeHeaders(session, empresaIdFromToken);
 
         const urlProy = new URL(`${API_URL}/proyectos`);
@@ -95,12 +98,20 @@ export default function CotizacionFromVentasDialog({
 
         if (!resProy.ok) {
           throw new Error(
-            jsonProy?.message || jsonProy?.msg || "Error al cargar proyectos"
+            jsonProy?.detalle ||
+              jsonProy?.error ||
+              jsonProy?.message ||
+              jsonProy?.msg ||
+              "Error al cargar proyectos"
           );
         }
         if (!resCli.ok) {
           throw new Error(
-            jsonCli?.message || jsonCli?.msg || "Error al cargar clientes"
+            jsonCli?.detalle ||
+              jsonCli?.error ||
+              jsonCli?.message ||
+              jsonCli?.msg ||
+              "Error al cargar clientes"
           );
         }
 
@@ -133,14 +144,29 @@ export default function CotizacionFromVentasDialog({
       setSaving(true);
       setErr("");
 
+      if (!session?.user) throw new Error("Sesión inválida");
       if (!cotProyectoId) throw new Error("Selecciona un proyecto");
       if (!cotVentaIds.length) throw new Error("Selecciona al menos 1 venta");
+
+      // ✅ validar cantidad
+      const cantidadNum =
+        cotCantidad === "" || cotCantidad == null ? null : Number(cotCantidad);
+
+      if (cantidadNum !== null) {
+        if (
+          !Number.isFinite(cantidadNum) ||
+          !Number.isInteger(cantidadNum) ||
+          cantidadNum <= 0
+        ) {
+          throw new Error("Cantidad debe ser un entero positivo");
+        }
+      }
 
       const payload = {
         proyecto_id: cotProyectoId,
         cliente_id: cotClienteId || null,
         descripcion: cotDescripcion || null,
-        cantidad: cotCantidad ? Number(cotCantidad) : null,
+        cantidad: cantidadNum,
         terminos_condiciones: cotTerminos || null,
         acuerdo_pago: cotAcuerdoPago || null,
         ventaIds: cotVentaIds,
@@ -148,7 +174,8 @@ export default function CotizacionFromVentasDialog({
 
       const res = await fetch(`${API_URL}/cotizaciones/add`, {
         method: "POST",
-        headers: makeHeaders(session),
+        // ✅ ESTE ES EL CAMBIO QUE TE FALTABA: mandar empresaIdFromToken
+        headers: makeHeaders(session, empresaIdFromToken),
         body: JSON.stringify(payload),
       });
 
@@ -227,6 +254,7 @@ export default function CotizacionFromVentasDialog({
             value={cotCantidad}
             onChange={(e) => setCotCantidad(e.target.value)}
             fullWidth
+            inputProps={{ min: 1, step: 1 }}
           />
 
           <TextField
@@ -256,7 +284,10 @@ export default function CotizacionFromVentasDialog({
             label="Ventas a incluir"
             size="small"
             value={cotVentaIds}
-            onChange={(e) => setCotVentaIds(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              setCotVentaIds(Array.isArray(value) ? value : [value]);
+            }}
             SelectProps={{ multiple: true }}
             fullWidth
             helperText="Se listan todas las ventas (puedes seleccionar más de una)."

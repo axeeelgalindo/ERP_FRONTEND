@@ -3,14 +3,29 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 
+import ImportComprasBar from "@/components/compras/ImportComprasBar";
+import ComprasTable from "@/components/compras/ComprasTable";
+import CreateCompraModal from "@/components/compras/CreateCompraModal";
+import StatsCards from "@/components/compras/StatsCards";
+
 const API = process.env.NEXT_PUBLIC_API_URL;
 
-function makeHeaders(session) {
+function makeHeadersJson(session) {
   const token = session?.user?.accessToken || "";
   const empresaId = session?.user?.empresaId ?? null;
 
   return {
     "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(empresaId ? { "x-empresa-id": String(empresaId) } : {}),
+  };
+}
+
+function makeHeadersMultipart(session) {
+  const token = session?.user?.accessToken || "";
+  const empresaId = session?.user?.empresaId ?? null;
+
+  return {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(empresaId ? { "x-empresa-id": String(empresaId) } : {}),
   };
@@ -24,23 +39,41 @@ async function jsonOrNull(res) {
   }
 }
 
-function calcTotal(items) {
-  return (items || []).reduce((acc, it) => {
-    const c = Number(it.cantidad || 0);
-    const p = Number(it.precio_unit || 0);
-    return acc + c * p;
-  }, 0);
+function toCLP(v) {
+  const n = Number(v ?? 0);
+  if (!Number.isFinite(n)) return "-";
+  return n.toLocaleString("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    maximumFractionDigits: 0,
+  });
 }
 
 export default function ComprasPage() {
   const { data: session, status } = useSession();
 
   // ===== Listado =====
-  const [data, setData] = useState(null);
-  const [err, setErr] = useState("");
+  const [bundle, setBundle] = useState(null); // {data, total, page, pageSize}
   const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
 
-  // ===== Lookups (selects) =====
+  // UI state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  // filtros UI
+  const [estadoFilter, setEstadoFilter] = useState("ALL");
+  const [q, setQ] = useState("");
+
+  // ===== Modal crear manual =====
+  const [openCreate, setOpenCreate] = useState(false);
+
+  // ===== Import CSV =====
+  const [importing, setImporting] = useState(false);
+  const [importErr, setImportErr] = useState("");
+  const [importResult, setImportResult] = useState(null);
+
+  // ===== Lookups (para crear manual) =====
   const [proveedores, setProveedores] = useState([]);
   const [proyectos, setProyectos] = useState([]);
   const [productos, setProductos] = useState([]);
@@ -48,25 +81,10 @@ export default function ComprasPage() {
   const [lookupsLoading, setLookupsLoading] = useState(false);
   const [lookupsErr, setLookupsErr] = useState("");
 
-  // ===== Form =====
-  const [creating, setCreating] = useState(false);
-  const [formErr, setFormErr] = useState("");
-  const [okMsg, setOkMsg] = useState("");
+  async function loadCompras(opts = {}) {
+    const p = opts.page ?? page;
+    const s = opts.pageSize ?? pageSize;
 
-  const [estado, setEstado] = useState("ORDEN_COMPRA");
-  const [proveedorId, setProveedorId] = useState(""); // select
-  const [proyectoId, setProyectoId] = useState("");   // select
-  const [cotizacionId, setCotizacionId] = useState(""); // texto (por ahora)
-
-  // cada item ahora usa producto_id desde select (cuid automatico)
-  const [items, setItems] = useState([
-    { producto_id: "", item: "", cantidad: 1, precio_unit: 0 },
-  ]);
-
-  const totalCalculado = useMemo(() => calcTotal(items), [items]);
-
-  // ===== Load listado =====
-  async function loadCompras() {
     if (status === "loading") return;
     if (!session) {
       setErr("No hay sesión. Inicia sesión para ver compras.");
@@ -77,25 +95,28 @@ export default function ComprasPage() {
       setLoading(true);
       setErr("");
 
-      const res = await fetch(`${API}/compras?page=1&pageSize=20`, {
-        headers: makeHeaders(session),
+      const res = await fetch(`${API}/compras?page=${p}&pageSize=${s}`, {
+        headers: makeHeadersJson(session),
       });
 
       const payload = await jsonOrNull(res);
       if (!res.ok) {
-        const msg = payload?.message || payload?.msg || "Error al cargar compras";
+        const msg =
+          payload?.message ||
+          payload?.msg ||
+          payload?.error ||
+          "Error al cargar compras";
         throw new Error(msg);
       }
 
-      setData(payload);
+      setBundle(payload);
     } catch (e) {
-      setErr(e.message || "Error");
+      setErr(e?.message || "Error");
     } finally {
       setLoading(false);
     }
   }
 
-  // ===== Load selects =====
   async function loadLookups() {
     if (status === "loading") return;
     if (!session) return;
@@ -104,11 +125,17 @@ export default function ComprasPage() {
       setLookupsLoading(true);
       setLookupsErr("");
 
-      // Intentamos con pageSize grande para tener selects útiles
+      // tu backend: pageSize <= 100
       const [rProv, rProy, rProd] = await Promise.all([
-        fetch(`${API}/proveedores?page=1&pageSize=200`, { headers: makeHeaders(session) }),
-        fetch(`${API}/proyectos?page=1&pageSize=200`, { headers: makeHeaders(session) }),
-        fetch(`${API}/productos?page=1&pageSize=200`, { headers: makeHeaders(session) }),
+        fetch(`${API}/proveedores?page=1&pageSize=100`, {
+          headers: makeHeadersJson(session),
+        }),
+        fetch(`${API}/proyectos?page=1&pageSize=100`, {
+          headers: makeHeadersJson(session),
+        }),
+        fetch(`${API}/productos?page=1&pageSize=100`, {
+          headers: makeHeadersJson(session),
+        }),
       ]);
 
       const [pProv, pProy, pProd] = await Promise.all([
@@ -117,25 +144,37 @@ export default function ComprasPage() {
         jsonOrNull(rProd),
       ]);
 
-      // si alguno falla, no matamos todo: solo avisamos
-      if (!rProv.ok) throw new Error(pProv?.message || pProv?.msg || "Error al cargar proveedores");
-      if (!rProy.ok) throw new Error(pProy?.message || pProy?.msg || "Error al cargar proyectos");
-      if (!rProd.ok) throw new Error(pProd?.message || pProd?.msg || "Error al cargar productos");
+      if (!rProv.ok)
+        throw new Error(
+          pProv?.message ||
+            pProv?.msg ||
+            pProv?.error ||
+            "Error al cargar proveedores"
+        );
+      if (!rProy.ok)
+        throw new Error(
+          pProy?.message ||
+            pProy?.msg ||
+            pProy?.error ||
+            "Error al cargar proyectos"
+        );
+      if (!rProd.ok)
+        throw new Error(
+          pProd?.message ||
+            pProd?.msg ||
+            pProd?.error ||
+            "Error al cargar productos"
+        );
 
-      // tus list endpoints suelen devolver {data:[...]} o directamente []
-      const provArr = Array.isArray(pProv) ? pProv : (pProv?.data || []);
-      const proyArr = Array.isArray(pProy) ? pProy : (pProy?.data || []);
-      const prodArr = Array.isArray(pProd) ? pProd : (pProd?.data || []);
+      const provArr = Array.isArray(pProv) ? pProv : pProv?.data || [];
+      const proyArr = Array.isArray(pProy) ? pProy : pProy?.data || [];
+      const prodArr = Array.isArray(pProd) ? pProd : pProd?.data || [];
 
       setProveedores(provArr);
       setProyectos(proyArr);
       setProductos(prodArr);
-
-      // defaults suaves si hay data
-      if (!proveedorId && provArr.length) setProveedorId(provArr[0].id);
-      if (!proyectoId && proyArr.length) setProyectoId(proyArr[0].id);
     } catch (e) {
-      setLookupsErr(e.message || "Error en lookups");
+      setLookupsErr(e?.message || "Error en lookups");
     } finally {
       setLookupsLoading(false);
     }
@@ -145,7 +184,7 @@ export default function ComprasPage() {
     let cancelled = false;
     (async () => {
       if (cancelled) return;
-      await Promise.all([loadCompras(), loadLookups()]);
+      await Promise.all([loadCompras({ page: 1, pageSize }), loadLookups()]);
     })();
     return () => {
       cancelled = true;
@@ -153,367 +192,242 @@ export default function ComprasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, status]);
 
-  function setItemField(index, key, value) {
-    setItems((prev) => {
-      const copy = [...prev];
-      copy[index] = { ...copy[index], [key]: value };
-      return copy;
+  // --- filtros client-side (rápido y útil para UX)
+  const rows = useMemo(() => {
+    const arr = bundle?.data || [];
+    const term = String(q || "")
+      .trim()
+      .toLowerCase();
+
+    return arr.filter((c) => {
+      if (estadoFilter !== "ALL" && String(c.estado) !== estadoFilter)
+        return false;
+      if (!term) return true;
+
+      const proveedorNombre = c?.proveedor?.nombre ?? "";
+      const rut = c?.rut_proveedor ?? c?.proveedor?.rut ?? "";
+      const razon = c?.razon_social ?? "";
+      const folio = c?.folio ?? "";
+      const tipoDoc = c?.tipo_doc ?? "";
+      const proyecto = c?.proyecto?.nombre ?? "";
+
+      const hay = [
+        proveedorNombre,
+        rut,
+        razon,
+        folio,
+        tipoDoc,
+        proyecto,
+        c?.numero ?? "",
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return hay.includes(term);
     });
+  }, [bundle, q, estadoFilter]);
+
+  // stats
+  const stats = useMemo(() => {
+    const totalReg = bundle?.total ?? 0;
+    const pageTotal = rows.reduce((acc, r) => acc + Number(r?.total ?? 0), 0);
+    return { totalReg, pageTotal };
+  }, [bundle, rows]);
+
+  async function handleRefresh() {
+    await Promise.all([loadCompras({ page, pageSize }), loadLookups()]);
   }
 
-  function addItem() {
-    setItems((prev) => [
-      ...prev,
-      { producto_id: "", item: "", cantidad: 1, precio_unit: 0 },
-    ]);
-  }
-
-  function removeItem(i) {
-    setItems((prev) => prev.filter((_, idx) => idx !== i));
-  }
-
-  async function handleCreate(e) {
-    e.preventDefault();
+  async function handleImportCSV(file) {
     if (!session) return;
 
     try {
-      setCreating(true);
-      setFormErr("");
-      setOkMsg("");
+      setImporting(true);
+      setImportErr("");
+      setImportResult(null);
 
-      const cleanItems = (items || [])
-        .map((it) => ({
-          // producto_id ya viene de select (cuid automático)
-          producto_id: it.producto_id?.trim() || undefined,
-          item: it.item?.trim() || undefined,
-          cantidad: Number(it.cantidad || 0),
-          precio_unit: Number(it.precio_unit || 0),
-        }))
-        .filter((it) => (it.producto_id || it.item) && it.cantidad > 0);
+      const fd = new FormData();
+      fd.append("file", file);
 
-      if (cleanItems.length === 0) {
-        setFormErr("Agrega al menos 1 ítem (elige un producto o escribe item), y cantidad > 0.");
-        return;
-      }
-
-      const body = {
-        estado,
-        proveedorId: proveedorId || undefined,
-        proyecto_id: proyectoId || undefined,
-        cotizacionId: cotizacionId.trim() || undefined,
-        items: cleanItems,
-        total: totalCalculado, // backend puede recalcular, esto es solo para test
-      };
-
-      const res = await fetch(`${API}/compras`, {
+      const res = await fetch(`${API}/compras/import-csv`, {
         method: "POST",
-        headers: makeHeaders(session),
-        body: JSON.stringify(body),
+        headers: makeHeadersMultipart(session),
+        body: fd,
       });
 
       const payload = await jsonOrNull(res);
       if (!res.ok) {
-        const msg = payload?.message || payload?.msg || "Error al crear compra";
+        const msg =
+          payload?.message ||
+          payload?.msg ||
+          payload?.error ||
+          payload?.detalle ||
+          "Error importando CSV";
         throw new Error(msg);
       }
 
-      setOkMsg(`Compra creada ✅ (N° ${payload?.numero ?? "-"} | ID ${payload?.id ?? "ok"})`);
+      setImportResult(payload);
 
-      // reset básico
-      setEstado("ORDEN_COMPRA");
-      setCotizacionId("");
-      setItems([{ producto_id: "", item: "", cantidad: 1, precio_unit: 0 }]);
-
-      await loadCompras();
-    } catch (e2) {
-      setFormErr(e2.message || "Error");
+      // refrescamos listado (volver a pág 1 para ver lo nuevo)
+      setPage(1);
+      await loadCompras({ page: 1, pageSize });
+      await loadLookups();
+    } catch (e) {
+      setImportErr(e?.message || "Error importando CSV");
     } finally {
-      setCreating(false);
+      setImporting(false);
     }
   }
 
   return (
-    <div className="p-6 space-y-8">
-      <div>
-        <h1 className="text-xl font-semibold">Compras</h1>
-        <p className="text-sm text-gray-500">
-          La <b>empresa</b> se asigna automáticamente por el token/scope del usuario (y opcionalmente con{" "}
-          <code>x-empresa-id</code>).
-        </p>
+    <div className="p-4 md:p-6 space-y-6">
+      {/* ===== Header ===== */}
+      <div className="rounded-2xl border bg-white shadow-sm">
+        <div className="p-4 md:p-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h1 className="text-lg md:text-xl font-semibold">Compras</h1>
+              <p className="mt-1 text-sm text-slate-500">
+                Importa el CSV RCV del SII y el sistema crea automáticamente
+                proveedores y compras.
+              </p>
+            </div>
 
-        <div className="mt-4 flex gap-2">
-          <button
-            className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
-            onClick={async () => {
-              await Promise.all([loadCompras(), loadLookups()]);
-            }}
-            disabled={loading || lookupsLoading}
-          >
-            {(loading || lookupsLoading) ? "Cargando…" : "Recargar"}
-          </button>
-        </div>
-
-        {err && (
-          <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            {err}
+            <StatsCards
+              totalRegistros={stats.totalReg}
+              totalPagina={stats.pageTotal}
+              page={bundle?.page ?? page}
+              pageSize={bundle?.pageSize ?? pageSize}
+              totalLabel={toCLP(stats.pageTotal)}
+            />
           </div>
-        )}
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              className="h-9 rounded-lg border px-3 text-sm hover:bg-slate-50 disabled:opacity-60"
+              onClick={handleRefresh}
+              disabled={loading || lookupsLoading}
+            >
+              {loading || lookupsLoading ? "Cargando…" : "Recargar"}
+            </button>
+
+            <button
+              className="h-9 rounded-lg bg-slate-900 px-3 text-sm text-white hover:opacity-90"
+              onClick={() => setOpenCreate(true)}
+            >
+              + Crear manual
+            </button>
+          </div>
+
+          {err && (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {err}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* ===== LOOKUPS STATUS ===== */}
-      {lookupsErr && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          {lookupsErr} (igual puedes crear compras con “item” texto libre)
+      {/* ===== Import (FULL WIDTH) ===== */}
+      <div className="rounded-2xl border bg-white shadow-sm">
+        <div className="px-4 md:px-5 py-4 border-b">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-base font-semibold">Importar RCV</h2>
+            <p className="text-sm text-slate-500">
+              Sube el CSV exportado desde el SII.
+            </p>
+          </div>
         </div>
-      )}
 
-      {/* ===== FORM CREATE ===== */}
-      <div className="rounded-md border p-4">
-        <h2 className="text-lg font-semibold">Crear compra</h2>
-        <p className="text-sm text-gray-500">
-          Proyecto / Proveedor / Productos se cargan automáticamente (si existen).
-        </p>
+        <div className="px-4 md:px-5 py-4">
+          <ImportComprasBar
+            importing={importing}
+            importErr={importErr}
+            importResult={importResult}
+            onClearResult={() => {
+              setImportErr("");
+              setImportResult(null);
+            }}
+            onImport={handleImportCSV}
+          />
+        </div>
+      </div>
 
-        <form onSubmit={handleCreate} className="mt-4 space-y-4">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+      {/* ===== Listado (FULL WIDTH) ===== */}
+      <div className="rounded-2xl border bg-white shadow-sm">
+        <div className="p-4 md:p-5 border-b">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <label className="text-sm font-medium">Estado</label>
-              <select
-                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                value={estado}
-                onChange={(e) => setEstado(e.target.value)}
-              >
-                <option value="ORDEN_COMPRA">ORDEN_COMPRA</option>
-                <option value="FACTURADA">FACTURADA</option>
-                <option value="PAGADA">PAGADA</option>
-              </select>
+              <h2 className="text-base font-semibold">Listado de compras</h2>
+              <p className="text-sm text-slate-500">
+                Documentos importados desde RCV (SII) + compras manuales.
+              </p>
+
+              {lookupsErr && (
+                <div className="mt-2 text-xs text-amber-700">{lookupsErr}</div>
+              )}
             </div>
 
-            <div>
-              <label className="text-sm font-medium">Proveedor (opcional)</label>
-              <select
-                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                value={proveedorId}
-                onChange={(e) => setProveedorId(e.target.value)}
-                disabled={lookupsLoading || proveedores.length === 0}
-              >
-                <option value="">
-                  {proveedores.length ? "— Sin proveedor —" : "No hay proveedores"}
-                </option>
-                {proveedores.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre} {p.rut ? `(${p.rut})` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <div className="flex flex-col gap-2 md:flex-row md:items-center">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">Estado</span>
+                <select
+                  className="h-9 rounded-lg border px-2 text-sm bg-white"
+                  value={estadoFilter}
+                  onChange={(e) => setEstadoFilter(e.target.value)}
+                >
+                  <option value="ALL">Todos</option>
+                  <option value="ORDEN_COMPRA">ORDEN_COMPRA</option>
+                  <option value="FACTURADA">FACTURADA</option>
+                  <option value="PAGADA">PAGADA</option>
+                </select>
+              </div>
 
-            <div>
-              <label className="text-sm font-medium">Proyecto (opcional)</label>
-              <select
-                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                value={proyectoId}
-                onChange={(e) => setProyectoId(e.target.value)}
-                disabled={lookupsLoading || proyectos.length === 0}
-              >
-                <option value="">
-                  {proyectos.length ? "— Sin proyecto —" : "No hay proyectos"}
-                </option>
-                {proyectos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">Cotización (opcional)</label>
               <input
-                className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                value={cotizacionId}
-                onChange={(e) => setCotizacionId(e.target.value)}
-                placeholder="cuid cotizacion (por ahora manual)"
+                className="h-9 w-full md:w-96 rounded-lg border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-200"
+                placeholder="Buscar por proveedor, RUT, folio, tipo doc, proyecto…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
               />
             </div>
           </div>
+        </div>
 
-          <div className="rounded-md border p-3">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold">Items</div>
-              <button
-                type="button"
-                className="rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50"
-                onClick={addItem}
-              >
-                + Agregar item
-              </button>
-            </div>
-
-            <div className="mt-3 space-y-3">
-              {items.map((it, i) => (
-                <div key={i} className="grid grid-cols-1 gap-2 md:grid-cols-12 items-end">
-                  {/* Producto select (cuid automático) */}
-                  <div className="md:col-span-4">
-                    <label className="text-xs text-gray-600">Producto (opcional)</label>
-                    <select
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                      value={it.producto_id}
-                      onChange={(e) => setItemField(i, "producto_id", e.target.value)}
-                      disabled={lookupsLoading || productos.length === 0}
-                      title={productos.length ? "Selecciona un producto" : "No hay productos"}
-                    >
-                      <option value="">
-                        {productos.length ? "— Sin producto —" : "No hay productos"}
-                      </option>
-                      {productos.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.nombre} {p.sku ? `(${p.sku})` : ""}
-                        </option>
-                      ))}
-                    </select>
-
-                    <div className="mt-1 text-[11px] text-gray-500">
-                      ID (cuid) se asigna automáticamente al seleccionar.
-                    </div>
-                  </div>
-
-                  {/* Texto libre alternativo */}
-                  <div className="md:col-span-3">
-                    <label className="text-xs text-gray-600">Item (texto libre, opcional)</label>
-                    <input
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                      value={it.item}
-                      onChange={(e) => setItemField(i, "item", e.target.value)}
-                      placeholder="Ej: Flete, Tornillos..."
-                    />
-                    <div className="mt-1 text-[11px] text-gray-500">
-                      Usa esto si no seleccionas producto.
-                    </div>
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="text-xs text-gray-600">Cantidad</label>
-                    <input
-                      type="number"
-                      min="0"
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                      value={it.cantidad}
-                      onChange={(e) => setItemField(i, "cantidad", e.target.value)}
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="text-xs text-gray-600">Precio unit</label>
-                    <input
-                      type="number"
-                      min="0"
-                      className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
-                      value={it.precio_unit}
-                      onChange={(e) => setItemField(i, "precio_unit", e.target.value)}
-                    />
-                  </div>
-
-                  <div className="md:col-span-1 flex gap-2 md:justify-end">
-                    <button
-                      type="button"
-                      className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
-                      onClick={() => removeItem(i)}
-                      disabled={items.length === 1}
-                      title={items.length === 1 ? "Debe existir al menos 1 item" : "Eliminar item"}
-                    >
-                      🗑️
-                    </button>
-                  </div>
-
-                  <div className="md:col-span-12 text-xs text-gray-500">
-                    Subtotal:{" "}
-                    <b>
-                      {(Number(it.cantidad || 0) * Number(it.precio_unit || 0)).toLocaleString("es-CL")}
-                    </b>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-3 flex items-center justify-between border-t pt-3">
-              <div className="text-sm text-gray-600">
-                Total calculado:{" "}
-                <b className="text-gray-900">{totalCalculado.toLocaleString("es-CL")}</b>
-              </div>
-
-              <button
-                type="submit"
-                className="rounded-md bg-black px-4 py-2 text-sm text-white hover:opacity-90 disabled:opacity-60"
-                disabled={creating || !session}
-              >
-                {creating ? "Creando..." : "Crear compra"}
-              </button>
-            </div>
-          </div>
-
-          {formErr && (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              {formErr}
-            </div>
-          )}
-          {okMsg && (
-            <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700">
-              {okMsg}
-            </div>
-          )}
-        </form>
+        <ComprasTable
+          rows={rows}
+          loading={loading}
+          total={bundle?.total ?? 0}
+          page={bundle?.page ?? page}
+          pageSize={bundle?.pageSize ?? pageSize}
+          onPageChange={(p) => {
+            setPage(p);
+            loadCompras({ page: p });
+          }}
+          onPageSizeChange={(s) => {
+            setPageSize(s);
+            setPage(1);
+            loadCompras({ page: 1, pageSize: s });
+          }}
+        />
       </div>
 
-      {/* ===== LISTADO ===== */}
-      {loading && <div className="text-sm">Cargando listado…</div>}
-
-      {data && (
-        <div>
-          <div className="text-sm text-gray-600">
-            Total: <b>{data.total ?? 0}</b> · Página: <b>{data.page ?? 1}</b>
-          </div>
-
-          <div className="mt-3 overflow-auto rounded-md border">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 py-2 text-left">N°</th>
-                  <th className="px-3 py-2 text-left">Estado</th>
-                  <th className="px-3 py-2 text-left">Proyecto</th>
-                  <th className="px-3 py-2 text-left">Proveedor</th>
-                  <th className="px-3 py-2 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(data.data || []).map((c) => (
-                  <tr key={c.id} className="border-t">
-                    <td className="px-3 py-2">{c.numero ?? "-"}</td>
-                    <td className="px-3 py-2">{c.estado ?? "-"}</td>
-                    <td className="px-3 py-2">{c.proyecto?.nombre ?? "-"}</td>
-                    <td className="px-3 py-2">{c.proveedor?.nombre ?? "-"}</td>
-                    <td className="px-3 py-2 text-right">
-                      {typeof c.total === "number" ? c.total.toLocaleString("es-CL") : c.total ?? "-"}
-                    </td>
-                  </tr>
-                ))}
-
-                {(!data.data || data.data.length === 0) && (
-                  <tr>
-                    <td className="px-3 py-6 text-center text-gray-500" colSpan={5}>
-                      Sin compras
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <pre className="mt-4 rounded-md border bg-gray-50 p-3 text-xs overflow-auto">
-            {JSON.stringify(data, null, 2)}
-          </pre>
-        </div>
-      )}
+      {/* ===== MODAL CREAR MANUAL ===== */}
+      <CreateCompraModal
+        open={openCreate}
+        onClose={() => setOpenCreate(false)}
+        session={session}
+        apiBase={API}
+        makeHeadersJson={makeHeadersJson}
+        onCreated={async () => {
+          setOpenCreate(false);
+          await loadCompras({ page: 1, pageSize });
+        }}
+        lookups={{
+          proveedores,
+          proyectos,
+          productos,
+          loading: lookupsLoading,
+        }}
+      />
     </div>
   );
 }
