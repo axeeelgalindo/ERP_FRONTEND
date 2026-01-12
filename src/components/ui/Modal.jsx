@@ -1,59 +1,79 @@
 // src/components/ui/Modal.jsx
 "use client";
 
-import { useEffect, useState } from "react";
-import ReactDOM from "react-dom";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 export default function Modal({ open, onClose, title, children }) {
   const [mounted, setMounted] = useState(false);
+  const [portalEl, setPortalEl] = useState(null);
+
+  // id único por instancia (estable)
+  const portalId = useMemo(
+    () => `modal-portal-${Math.random().toString(36).slice(2)}`,
+    []
+  );
 
   useEffect(() => {
     setMounted(true);
-    return () => setMounted(false);
-  }, []);
 
-  // mientras carga en el cliente, no renderizamos nada
-  if (!mounted || !open) return null;
+    // crear contenedor propio para el portal
+    const el = document.createElement("div");
+    el.setAttribute("id", portalId);
+    document.body.appendChild(el);
+    setPortalEl(el);
+
+    return () => {
+      // cleanup seguro (evita parentNode null)
+      try {
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+      } catch {
+        // no-op
+      }
+      setMounted(false);
+      setPortalEl(null);
+    };
+  }, [portalId]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
+
+  if (!mounted || !open || !portalEl) return null;
 
   const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) {
-      onClose?.();
-    }
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === "Escape") {
-      onClose?.();
-    }
+    if (e.target === e.currentTarget) onClose?.();
   };
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-999 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-      onClick={handleBackdropClick}
-      onKeyDown={handleKeyDown}
-      tabIndex={-1}
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4"
+      onMouseDown={handleBackdropClick}
     >
-      <div className="mx-4 w-full max-w-3xl rounded-2xl bg-white shadow-xl">
-        {/* header */}
-        <div className="flex items-center justify-between border-b px-6 py-4">
-          <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
+      <div className="w-full max-w-xl rounded-2xl bg-white shadow-xl border border-gray-200 overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
           <button
             type="button"
             onClick={() => onClose?.()}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+            className="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
+            aria-label="Cerrar"
           >
-            <span className="sr-only">Cerrar</span>
-            ×
+            ✕
           </button>
         </div>
 
-        {/* body */}
-        <div className="px-6 py-4">{children}</div>
+        <div className="px-5 py-4">{children}</div>
       </div>
     </div>
   );
 
-  // portal al body (sin tocar parentNode a mano)
-  return ReactDOM.createPortal(modalContent, document.body);
+  return createPortal(modalContent, portalEl);
 }

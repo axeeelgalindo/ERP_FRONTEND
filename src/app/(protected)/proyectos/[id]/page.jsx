@@ -9,7 +9,14 @@ import ProyectoGanttSection from "@/components/proyectos/ProyectoGanttSection";
 import ProyectoVentasSection from "@/components/proyectos/ProyectoVentasSection";
 import ProyectoTareasEquipoSection from "@/components/proyectos/ProyectoTareasEquipoSection";
 
-// Construye filas para el Gantt: tarea 1, 1.1, 1.2, tarea 2, 2.1, etc.
+/**
+ * Construye filas para el Gantt:
+ * 1
+ * 1.1
+ * 1.2
+ * 2
+ * 2.1
+ */
 function buildGanttRows(tareas) {
   if (!Array.isArray(tareas)) return [];
 
@@ -18,12 +25,17 @@ function buildGanttRows(tareas) {
   tareas.forEach((t, idx) => {
     const numeroPadre = `${idx + 1}`;
 
-    // Subtareas (detalles). Usa el nombre de relación que realmente venga.
-    const detalles = t.detalles || t.detalle || t.tareasDetalle || [];
+    const detalles = Array.isArray(t.detalles)
+      ? t.detalles
+      : Array.isArray(t.detalle)
+      ? t.detalle
+      : Array.isArray(t.tareasDetalle)
+      ? t.tareasDetalle
+      : [];
 
-    // === RANGO PARA LA TAREA PADRE (usando subtareas si existen) ===
-    let tareaStart = t.fecha_inicio_plan;
-    let tareaEnd = t.fecha_fin_plan;
+    // === rango de la tarea padre ===
+    let tareaStart = t.fecha_inicio_plan ?? null;
+    let tareaEnd = t.fecha_fin_plan ?? null;
 
     if (detalles.length > 0) {
       let min = null;
@@ -47,7 +59,7 @@ function buildGanttRows(tareas) {
       }
     }
 
-    // Fila de la tarea principal (ya con rango ajustado)
+    // === fila tarea padre ===
     rows.push({
       ...t,
       fecha_inicio_plan: tareaStart,
@@ -56,30 +68,30 @@ function buildGanttRows(tareas) {
       isDetalle: false,
     });
 
-    // === FILAS DE SUBTAREAS ===
+    // === filas subtareas ===
     detalles.forEach((d, jdx) => {
-      // Si no hay avance numérico, lo inferimos por estado
-      const avanceInferido =
+      const estado = d.estado ?? "pendiente";
+      const avance =
         typeof d.avance === "number"
           ? d.avance
-          : d.estado === "completada"
+          : estado === "completa"
           ? 100
-          : d.estado === "en_progreso"
+          : estado === "en_progreso"
           ? 50
           : 0;
 
       rows.push({
         id: d.id,
         tarea_id: d.tarea_id ?? t.id,
-        nombre: d.nombre || d.titulo, // usamos titulo del detalle
+        nombre: d.nombre || d.titulo,
         descripcion: d.descripcion ?? null,
         responsable: d.responsable ?? null,
-        fecha_inicio_plan: d.fecha_inicio_plan,
-        fecha_fin_plan: d.fecha_fin_plan,
-        avance: avanceInferido,
-        estado: d.estado ?? "pendiente",
+        fecha_inicio_plan: d.fecha_inicio_plan ?? null,
+        fecha_fin_plan: d.fecha_fin_plan ?? null,
+        avance,
+        estado,
         es_hito: d.es_hito ?? false,
-        numero: `${numeroPadre}.${jdx + 1}`, // 1.1, 1.2, 2.1, etc.
+        numero: `${numeroPadre}.${jdx + 1}`,
         isDetalle: true,
       });
     });
@@ -89,11 +101,12 @@ function buildGanttRows(tareas) {
 }
 
 export default async function ProyectoDetailPage({ params }) {
-  // ⚠️ En Next 15 params es una promesa
+  // ⚠️ Next 15: params es Promise
   const { id } = await params;
 
   let data;
   try {
+    // 👉 si no hay sesión / token / empresa => serverApi REDIRIGE A /login
     data = await serverApi(`/proyectos/${id}`);
   } catch (err) {
     console.error("Error cargando proyecto", err);
@@ -107,6 +120,7 @@ export default async function ProyectoDetailPage({ params }) {
 
   const fin = metrics.financiero ?? {};
   const tareasMetrics = metrics.tareas ?? {};
+
   const clientePrincipal =
     metrics.clientePrincipal ?? proyecto.ventas?.[0]?.cliente ?? null;
 
@@ -114,7 +128,6 @@ export default async function ProyectoDetailPage({ params }) {
   const tareasList = proyecto.tareas ?? [];
   const miembros = proyecto.miembros ?? [];
 
-  // 👉 aquí armamos las filas del Gantt con tareas + subtareas numeradas
   const tareasGantt = buildGanttRows(tareasList);
 
   return (
@@ -129,7 +142,6 @@ export default async function ProyectoDetailPage({ params }) {
         clientePrincipal={clientePrincipal}
       />
 
-      {/* Gantt: recibe las tareas ya "aplanadas" (tarea + subtareas) */}
       {tareasGantt.length > 0 && (
         <ProyectoGanttSection
           tareas={tareasGantt}

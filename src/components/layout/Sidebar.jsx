@@ -105,8 +105,8 @@ export default function Sidebar() {
         roles: ["master", "admin"],
       },
       {
-        href: "/ventas",
-        label: "Ventas",
+        href: "/costeos",
+        label: "Costeos",
         Icon: FileText,
         roles: ["master", "admin"],
       },

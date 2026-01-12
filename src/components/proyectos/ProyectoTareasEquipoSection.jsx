@@ -22,6 +22,7 @@ import {
   Button,
   Collapse,
   CircularProgress,
+  Stack,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
@@ -34,6 +35,7 @@ import ReplayIcon from "@mui/icons-material/Replay";
 import dayjs from "dayjs";
 
 import AddTareaModal from "./tareas/AddTareaButton";
+import ImportJiraCsvButton from "./tareas/ImportJiraCsvButton"; // ✅ NUEVO
 import Modal from "@/components/ui/Modal";
 import { makeHeaders } from "@/lib/api";
 
@@ -261,22 +263,34 @@ export default function ProyectoTareasEquipoSection({
           title="Tareas del proyecto"
           subheader="Planificación, responsables y avance"
           action={
-            <Button
-              variant="contained"
-              size="small"
-              startIcon={<AddIcon />}
-              onClick={handleAddClick}
-            >
-              Agregar tarea
-            </Button>
+            // ✅ NUEVO: Importar Jira + Agregar tarea
+            <Stack direction="row" spacing={1} alignItems="center">
+              <ImportJiraCsvButton
+                proyectoId={proyectoId}
+                onDone={() => {
+                  // refresca para ver las nuevas tareas/subtareas importadas
+                  router.refresh();
+                }}
+              />
+
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={handleAddClick}
+              >
+                Agregar tarea
+              </Button>
+            </Stack>
           }
         />
+
         <CardContent sx={{ p: 0 }}>
           {tareasOrdenadas.length === 0 ? (
             <Box sx={{ p: 3 }}>
               <Typography variant="body2" color="text.secondary">
                 Aún no hay tareas para este proyecto. Usa el botón
-                <strong> “Agregar tarea”</strong> para comenzar la planificación.
+                <strong> “Agregar tarea”</strong> o <strong>“Importar Jira (CSV)”</strong>.
               </Typography>
             </Box>
           ) : (
@@ -583,7 +597,11 @@ export default function ProyectoTareasEquipoSection({
       </Card>
 
       {/* Modal de confirmación para iniciar/finalizar/resetear subtarea */}
-      <Modal open={confirmState.open} onClose={handleCloseConfirmModal} title={confirmTitle}>
+      <Modal
+        open={confirmState.open}
+        onClose={handleCloseConfirmModal}
+        title={confirmTitle}
+      >
         <div className="space-y-4">
           {confirmState.detalle && (
             <>

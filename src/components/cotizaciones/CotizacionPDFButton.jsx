@@ -58,7 +58,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
       ]);
       const autoTable = autoTableMod?.default || autoTableMod;
 
-      // ✅ Letter exacto como tu PDF wkhtmltopdf: 216 × 279 mm
+      // ✅ Letter exacto: 216 × 279 mm
       const W = 216;
       const H = 279;
       const doc = new jsPDF({
@@ -80,10 +80,16 @@ export default function CotizacionPDFButton({ cotizacion }) {
       };
 
       const numero =
-        cotizacion?.numero != null ? String(cotizacion.numero) : safe(cotizacion?.id);
+        cotizacion?.numero != null
+          ? String(cotizacion.numero)
+          : safe(cotizacion?.id);
+
       const numDoc = numero ? `S${numero.padStart(5, "0")}` : "S00000";
 
-      // ===== Logo (cacheado) =====
+      // ✅ título correcto
+      const docTitle = `Cotización ${numDoc}`;
+
+      // ===== Logo =====
       let logo = null;
       try {
         logo = await loadImageDataURL("/Logo_blue.png");
@@ -92,33 +98,21 @@ export default function CotizacionPDFButton({ cotizacion }) {
       }
 
       /**
-       * ✅ Wave “real” tipo wkhtmltopdf
-       * - Pintamos banda celeste completa
-       * - Luego “recortamos” el borde con blanco (fondo)
+       * Wave “real” tipo wkhtmltopdf
        */
       const drawWaveBand = (yTop, height, invert = false) => {
-        // 1) Banda completa
         doc.setFillColor(...C.lightBlue);
         doc.rect(0, yTop, W, height, "F");
 
-        // 2) Wave (recorte blanco)
-        const amp = 6.5; // un pelín más notorio
+        const amp = 6.5;
         const steps = 90;
-
-        // La curva vive cerca del borde:
-        // Header: recortamos desde la curva hacia ABAJO (borde inferior)
-        // Footer: recortamos desde la curva hacia ARRIBA (borde superior)
         const yEdge = invert ? yTop : yTop + height;
 
         const points = [];
         for (let i = 0; i <= steps; i++) {
           const t = i / steps;
           const x = t * W;
-
-          // curva suave tipo “panza” (como tu PDF)
-          // (una sola onda, 0..PI)
           const yCurve = yEdge - amp * Math.sin(t * Math.PI);
-
           points.push([x, yCurve]);
         }
 
@@ -127,7 +121,6 @@ export default function CotizacionPDFButton({ cotizacion }) {
         doc.setLineWidth(0);
 
         if (!invert) {
-          // HEADER: recortar (blanco) desde el borde inferior hacia la curva
           for (let i = 0; i < points.length - 1; i++) {
             const [x1, y1] = points[i];
             const [x2, y2] = points[i + 1];
@@ -135,7 +128,6 @@ export default function CotizacionPDFButton({ cotizacion }) {
             doc.triangle(x2, yTop + height, x2, y2, x1, y1, "F");
           }
         } else {
-          // FOOTER: recortar (blanco) desde el borde superior hacia la curva
           for (let i = 0; i < points.length - 1; i++) {
             const [x1, y1] = points[i];
             const [x2, y2] = points[i + 1];
@@ -145,7 +137,6 @@ export default function CotizacionPDFButton({ cotizacion }) {
         }
       };
 
-      // ===== Header / Footer por página =====
       const HEADER_H = 28;
       const FOOTER_H = 18;
 
@@ -178,21 +169,27 @@ export default function CotizacionPDFButton({ cotizacion }) {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8.2);
         doc.setTextColor(...C.text);
-        doc.text("administracion@blueinge.com", W / 2, H - 10.0, { align: "center" });
+        doc.text("administracion@blueinge.com", W / 2, H - 10.0, {
+          align: "center",
+        });
 
         doc.setTextColor(...C.blue);
-        doc.text("https://blue-ingenieria.com/", W / 2, H - 6.0, { align: "center" });
+        doc.text("https://blue-ingenieria.com/", W / 2, H - 6.0, {
+          align: "center",
+        });
 
         doc.setTextColor(...C.muted);
         doc.setFontSize(7.4);
-        doc.text(`Página ${page} / ${pages}`, W / 2, H - 2.7, { align: "center" });
+        doc.text(`Página ${page} / ${pages}`, W / 2, H - 2.7, {
+          align: "center",
+        });
       };
 
-      // ===== Página 1 temporal =====
+      // ===== Página 1 =====
       drawHeader();
       drawFooter(1, 1);
 
-      // ===== Cliente (izq) =====
+      // ===== Cliente =====
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
       doc.setTextColor(...C.text);
@@ -205,7 +202,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(18);
       doc.setTextColor(...C.blue);
-      doc.text(`Número de orden ${numDoc}`, mx, 58);
+      doc.text(docTitle, mx, 58);
 
       // ===== Barra info =====
       const barY = 62;
@@ -215,7 +212,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8.6);
       doc.setTextColor(...C.blue);
-      doc.text("Fecha de la orden", mx + 4, barY + 5);
+      doc.text("Fecha", mx + 4, barY + 5);
       doc.text("Vendedor", mx + 92, barY + 5);
 
       doc.setFont("helvetica", "normal");
@@ -224,35 +221,29 @@ export default function CotizacionPDFButton({ cotizacion }) {
       doc.text(fmtDate(cotizacion?.creada_en), mx + 4, barY + 10);
       doc.text(safe(cotizacion?.vendedor) || "-", mx + 92, barY + 10);
 
-      // ===== Tabla (sutil) =====
-      const items = Array.isArray(cotizacion?.items) ? cotizacion.items : [];
+      // =========================
+      // ✅ TABLA: GLosas (lo que pediste)
+      // =========================
+      const glosas = Array.isArray(cotizacion?.glosas) ? cotizacion.glosas : [];
 
-      const body = items.length
-        ? items.map((it) => {
-            const nombre =
-              it.tipo === "PRODUCTO"
-                ? safe(it.producto?.nombre) || "Producto"
-                : safe(it.Item) || "Servicio";
-
-            const extra = safe(it.descripcion);
-            const desc = extra ? `${nombre}\n${extra}` : nombre;
-
-            const cantidad = Number(it.cantidad ?? 0);
-            const unidad = safe(it.unidad || it.unidades || "");
-            const cantidadTxt = unidad ? `${cantidad} ${unidad}` : `${cantidad}`;
-
-            const pu = Number(it.precioUnitario ?? 0);
-            const total = Number(it.total ?? 0);
-
-            return [desc, cantidadTxt, clp(pu), "IVA 19% Vta", clp(total)];
-          })
-        : [["Esta cotización no tiene ítems.", "", "", "", ""]];
+      const glosasBody = glosas.length
+        ? glosas
+            .slice()
+            .sort((a, b) => Number(a?.orden ?? 0) - Number(b?.orden ?? 0))
+            .map((g) => [
+              safe(g.descripcion) || "—",
+              "1",
+              clp(Number(g.monto ?? 0)),
+              "IVA 19% Vta",
+              clp(Number(g.monto ?? 0)),
+            ])
+        : [["Esta cotización no tiene glosas.", "", "", "", ""]];
 
       autoTable(doc, {
         startY: 82,
         margin: { left: mx, right: mx, top: HEADER_H, bottom: FOOTER_H + 2 },
         head: [["Descripción", "Cantidad", "Precio unitario", "Impuestos", "Importe"]],
-        body,
+        body: glosasBody,
         theme: "plain",
         styles: {
           font: "helvetica",
@@ -276,7 +267,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
         },
       });
 
-      // ===== Totales =====
+      // ===== Totales (usa los de la cotización) =====
       let y = (doc.lastAutoTable?.finalY ?? 160) + 6;
 
       autoTable(doc, {
@@ -344,7 +335,10 @@ export default function CotizacionPDFButton({ cotizacion }) {
         yy += lines.length * 4.1 + 6;
       };
 
-      addBlock("Descripción", cotizacion?.descripcion);
+      // ✅ Ya no mostramos "Descripción" general como línea de items
+      // (puedes dejarlo si quieres como "Glosa general" o "Asunto")
+      addBlock("Asunto", cotizacion?.asunto || cotizacion?.descripcion);
+
       addBlock("Términos y condiciones", cotizacion?.terminos_condiciones);
       addBlock("Acuerdo de pago", cotizacion?.acuerdo_pago);
 
@@ -356,7 +350,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
         drawFooter(p, pageCount);
       }
 
-      const fileName = `Orden_${numDoc}_${safeName(
+      const fileName = `Cotizacion_${numDoc}_${safeName(
         cotizacion?.cliente?.nombre || cotizacion?.proyecto?.nombre || "cotizacion"
       )}.pdf`;
 
