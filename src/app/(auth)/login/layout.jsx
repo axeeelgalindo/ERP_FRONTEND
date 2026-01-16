@@ -1,8 +1,8 @@
 import Image from "next/image";
 
 export const metadata = {
-  title: "Iniciar sesión — SEST",
-  description: "Accede al sistema SEST con tu cuenta.",
+  title: "Iniciar sesión — ERP",
+  description: "Accede al sistema ERP con tu cuenta.",
   robots: { index: false, follow: false },
 };
 
@@ -39,13 +39,12 @@ export default function AuthLayout({ children }) {
               Gestión simple, <span className="text-white/90">resultados reales</span>
             </h1>
             <p className="mt-4 text-white/85 max-w-lg">
-              Centraliza estándares, personas y métricas en un solo lugar. Seguro, rápido y
-              preparado para equipos de cualquier tamaño.
+              ERP DE BLUE INGENIERÍA SPA es un sistema moderno y eficiente diseñado para optimizar la gestión empresarial.
             </p>
             <ul className="mt-6 space-y-2 text-white/90">
               <li className="flex items-center gap-2">
                 <span className="inline-block h-2 w-2 rounded-full bg-white" />
-                Autenticación segura con JWT/NextAuth
+                Autenticación segura y confiable
               </li>
               <li className="flex items-center gap-2">
                 <span className="inline-block h-2 w-2 rounded-full bg-white" />
@@ -59,7 +58,7 @@ export default function AuthLayout({ children }) {
           </div>
 
           <p className="text-sm text-white/75">
-            © {new Date().getFullYear()} SEST. Todos los derechos reservados.
+            © {new Date().getFullYear()} ERP | Blue Ingeniería SPA. Todos los derechos reservados.
           </p>
         </div>
       </aside>
