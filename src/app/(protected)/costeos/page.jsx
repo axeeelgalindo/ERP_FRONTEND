@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { Box, CircularProgress } from "@mui/material";
 import { useRouter } from "next/navigation";
@@ -10,17 +10,8 @@ import VentasSummary from "@/components/ventas/VentasSummary";
 import VentasTable from "@/components/ventas/VentasTable";
 import NuevaVentaDialog from "@/components/ventas/NuevaVentaDialog";
 
-// ✅ ojo: este ahora debe ser el NUEVO modal de cotización (con glosas)
-// cámbialo por el archivo que creaste/pegaste (ej: NuevaCotizacionDialog.jsx)
 import NuevaCotizacionDialog from "@/components/ventas/CotizacionFromVentasDialog";
 import { useVentas } from "@/components/ventas/hooks/useVentas";
-
-function calcTotalVenta(v) {
-  return (v?.detalles || []).reduce(
-    (s, d) => s + (Number(d.total ?? d.ventaTotal) || 0),
-    0
-  );
-}
 
 export default function VentasPage() {
   const { data: session, status } = useSession();
@@ -48,36 +39,23 @@ export default function VentasPage() {
 
   const [openNew, setOpenNew] = useState(false);
   const [openCot, setOpenCot] = useState(false);
-
-  // ✅ abrir cotización con venta preseleccionada
   const [preselectedVentaIds, setPreselectedVentaIds] = useState([]);
 
-  const openCotFromVenta = (ventaId) => {
+  // ✅ ESTA ES LA FUNCIÓN QUE FALTABA (la que la tabla intenta llamar)
+  const onCreateCotizacionFromVenta = useCallback((ventaId) => {
+    if (!ventaId) return;
     setPreselectedVentaIds([ventaId]);
     setOpenCot(true);
-  };
+  }, []);
 
-  const openCotManual = () => {
+  const openCotManual = useCallback(() => {
     setPreselectedVentaIds([]); // sin preselección
     setOpenCot(true);
-  };
+  }, []);
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
   }, [status, router]);
-
-  // ✅ subtotalBase = suma de ventas seleccionadas (neto)
-  const subtotalBase = useMemo(() => {
-    if (!Array.isArray(ventas) || ventas.length === 0) return 0;
-    if (!Array.isArray(preselectedVentaIds) || preselectedVentaIds.length === 0)
-      return 0;
-
-    const setIds = new Set(preselectedVentaIds.map(String));
-
-    return ventas
-      .filter((v) => setIds.has(String(v.id)))
-      .reduce((acc, v) => acc + calcTotalVenta(v), 0);
-  }, [ventas, preselectedVentaIds]);
 
   if (status === "loading") {
     return (
@@ -110,10 +88,10 @@ export default function VentasPage() {
         ventas={ventas}
         error={errorVentas}
         loading={loadingVentas}
-        onCreateCotizacionFromVenta={openCotFromVenta}
+        // ✅ ahora sí existe y se pasa correctamente
+        onCreateCotizacionFromVenta={onCreateCotizacionFromVenta}
       />
 
-      {/* Dialogs */}
       <NuevaVentaDialog
         open={openNew}
         onClose={() => setOpenNew(false)}
@@ -122,13 +100,14 @@ export default function VentasPage() {
         onCreated={fetchVentas}
       />
 
-      {/* ✅ NUEVO: total NO editable, viene de subtotalBase */}
+      {/* ✅ Modal: selecciona ventas y calcula total desde ellas */}
       <NuevaCotizacionDialog
         open={openCot}
         onClose={() => setOpenCot(false)}
         session={session}
         empresaIdFromToken={empresaIdFromToken}
-        subtotalBase={subtotalBase}
+        ventas={ventas}
+        preselectedVentaIds={preselectedVentaIds}
         ivaRate={0.19}
         onCreated={fetchVentas}
       />

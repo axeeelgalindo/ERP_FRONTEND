@@ -1,8 +1,9 @@
 "use client";
 
-import { Box, Button, Typography } from "@mui/material";
+import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import AddIcon from "@mui/icons-material/Add";
+import DescriptionIcon from "@mui/icons-material/Description";
 
 export default function VentasHeader({
   empresaLabel,
@@ -12,49 +13,70 @@ export default function VentasHeader({
   onOpenCotizacion,
 }) {
   return (
-    <Box
-      sx={{
-        mb: 3,
-        display: "flex",
-        flexDirection: { xs: "column", md: "row" },
-        alignItems: { xs: "flex-start", md: "center" },
-        justifyContent: "space-between",
-        gap: 1,
-      }}
-    >
-      <Box>
-        <Typography variant="h4" fontWeight={700}>
-          Ventas
-        </Typography>
+    <Box sx={{ mb: 2.5 }}>
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        alignItems={{ xs: "flex-start", md: "center" }}
+        justifyContent="space-between"
+        spacing={1.5}
+      >
+        <Box>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="h4" fontWeight={900} letterSpacing={-0.5}>
+              Costeos
+            </Typography>
 
-        <Typography variant="body2" color="text.secondary">
-          Empresa: <strong>{empresaLabel}</strong>
-        </Typography>
+            {empresaLabel ? (
+              <Chip
+                size="small"
+                label={empresaLabel}
+                variant="outlined"
+                sx={{ borderRadius: 999 }}
+              />
+            ) : null}
+          </Stack>
 
-        <Typography variant="body2" color="text.secondary">
-          Crea ventas por HH (mano de obra) o por ítems de compra (insumos), con
-          margen por tipo de ítem.
-        </Typography>
-      </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Gestión de costeos, ítems y generación de cotizaciones.
+          </Typography>
+        </Box>
 
-      <Box sx={{ display: "flex", gap: 1, mt: { xs: 1, md: 0 }, flexWrap: "wrap" }}>
-        <Button
-          variant="outlined"
-          startIcon={<RefreshIcon />}
-          onClick={onRefresh}
-          disabled={loadingVentas}
+        <Stack
+          direction="row"
+          spacing={1}
+          useFlexGap
+          flexWrap="wrap"
+          sx={{ justifyContent: { xs: "flex-start", md: "flex-end" } }}
         >
-          {loadingVentas ? "Actualizando..." : "Actualizar"}
-        </Button>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={onRefresh}
+            disabled={loadingVentas}
+            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 800 }}
+          >
+            {loadingVentas ? "Actualizando..." : "Actualizar"}
+          </Button>
 
-        <Button variant="outlined" onClick={onOpenCotizacion}>
-          Crear cotización cliente
-        </Button>
+          <Button
+            variant="outlined"
+            startIcon={<DescriptionIcon />}
+            onClick={onOpenCotizacion}
+            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 800 }}
+          >
+            Cotización cliente
+          </Button>
 
-        <Button variant="contained" startIcon={<AddIcon />} onClick={onOpenNewVenta}>
-          Nueva venta
-        </Button>
-      </Box>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={onOpenNewVenta}
+            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900 }}
+          >
+            Nuevo costeo
+          </Button>
+        </Stack>
+      </Stack>
     </Box>
   );
 }

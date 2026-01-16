@@ -133,7 +133,10 @@ export default function HHPage() {
 
   const fetchHH = async () => {
     if (!empresaIdFromToken) {
-      showSnackbar("error", "No se encontró empresa en tu sesión. Revisa el token.");
+      showSnackbar(
+        "error",
+        "No se encontró empresa en tu sesión. Revisa el token."
+      );
       return;
     }
 
@@ -155,7 +158,8 @@ export default function HHPage() {
       setPeriodFilter("ALL");
       setPeriodoLabel("Todos los períodos");
 
-      if (!registros.length) showSnackbar("info", "No hay registros HH para esta empresa.");
+      if (!registros.length)
+        showSnackbar("info", "No hay registros HH para esta empresa.");
     } catch (err) {
       showSnackbar("error", err.message || "Error al obtener HH");
     } finally {
@@ -164,17 +168,26 @@ export default function HHPage() {
   };
 
   const handleUpload = async () => {
-    if (!file) return showSnackbar("error", "Debes seleccionar un archivo .xlsx.");
-    if (!empresaIdFromToken) return showSnackbar("error", "No se encontró empresa en tu sesión.");
-    if (!anio || !mes) return showSnackbar("error", "Debes indicar Año y Mes para el archivo.");
+    if (!file)
+      return showSnackbar("error", "Debes seleccionar un archivo .xlsx.");
+    if (!empresaIdFromToken)
+      return showSnackbar("error", "No se encontró empresa en tu sesión.");
+    if (!anio || !mes)
+      return showSnackbar("error", "Debes indicar Año y Mes para el archivo.");
     if (!horasMensuales || !porcentajeEfectividad) {
-      return showSnackbar("error", "Debes indicar Horas mensuales y % efectividad para calcular el costo HH.");
+      return showSnackbar(
+        "error",
+        "Debes indicar Horas mensuales y % efectividad para calcular el costo HH."
+      );
     }
 
     // ✅ CIF numérico
     const cifNum = Number(String(cif).replace(",", "."));
     if (!cif || Number.isNaN(cifNum)) {
-      return showSnackbar("error", "Debes indicar un CIF numérico (ej: 1234.56).");
+      return showSnackbar(
+        "error",
+        "Debes indicar un CIF numérico (ej: 1234.56)."
+      );
     }
 
     const formData = new FormData();
@@ -288,12 +301,23 @@ export default function HHPage() {
   }, [rows, periodFilter]);
 
   const totalEmpleados = filteredRows.length;
-  const totalCostoHH = filteredRows.reduce((acc, r) => acc + (getCostoHHForRow(r) || 0), 0);
-  const promedioCostoHH = totalEmpleados > 0 ? totalCostoHH / totalEmpleados : 0;
+  const totalCostoHH = filteredRows.reduce(
+    (acc, r) => acc + (getCostoHHForRow(r) || 0),
+    0
+  );
+  const promedioCostoHH =
+    totalEmpleados > 0 ? totalCostoHH / totalEmpleados : 0;
 
   if (status === "loading") {
     return (
-      <Box sx={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <Box
+        sx={{
+          minHeight: "60vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         <CircularProgress />
       </Box>
     );
@@ -413,7 +437,11 @@ export default function HHPage() {
               />
 
               {horasEfectivasTotales > 0 && (
-                <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ mt: -1 }}
+                >
                   Horas efectivas totales:{" "}
                   <strong>{horasEfectivasTotales.toFixed(2)} hrs/mes</strong>
                 </Typography>
@@ -429,7 +457,11 @@ export default function HHPage() {
               onClick={() => fetchHH()}
               disabled={loadingList}
             >
-              {loadingList ? <CircularProgress size={20} color="inherit" /> : "Buscar HH"}
+              {loadingList ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : (
+                "Buscar HH"
+              )}
             </Button>
 
             <Button
@@ -472,7 +504,8 @@ export default function HHPage() {
                 />
               </Button>
               <Typography variant="caption" color="text.secondary">
-                Recuerda seleccionar Mes/Año, parámetros HH y el CIF antes de subir el archivo.
+                Recuerda seleccionar Mes/Año, parámetros HH y el CIF antes de
+                subir el archivo.
               </Typography>
             </Box>
           </CardContent>
@@ -484,7 +517,11 @@ export default function HHPage() {
               disabled={loadingUpload}
               startIcon={!loadingUpload && <UploadFileIcon />}
             >
-              {loadingUpload ? <CircularProgress size={22} color="inherit" /> : "Subir y procesar"}
+              {loadingUpload ? (
+                <CircularProgress size={22} color="inherit" />
+              ) : (
+                "Subir y procesar"
+              )}
             </Button>
             <Button
               variant="text"
@@ -503,25 +540,48 @@ export default function HHPage() {
           mb: 3,
           borderRadius: 3,
           boxShadow: 2,
-          background: "linear-gradient(135deg, rgba(25,118,210,0.06), rgba(25,118,210,0.01))",
+          background:
+            "linear-gradient(135deg, rgba(25,118,210,0.06), rgba(25,118,210,0.01))",
         }}
       >
         <CardContent>
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" }, gap: 2 }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
+              gap: 2,
+            }}
+          >
             <Box>
-              <Typography variant="subtitle2" color="text.secondary">Empleados con HH</Typography>
-              <Typography variant="h5" fontWeight={700}>{totalEmpleados}</Typography>
-            </Box>
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary">Suma costo HH (aprox.)</Typography>
+              <Typography variant="subtitle2" color="text.secondary">
+                Empleados con HH
+              </Typography>
               <Typography variant="h5" fontWeight={700}>
-                {totalCostoHH.toLocaleString("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 })}
+                {totalEmpleados}
               </Typography>
             </Box>
             <Box>
-              <Typography variant="subtitle2" color="text.secondary">Costo HH promedio</Typography>
+              <Typography variant="subtitle2" color="text.secondary">
+                Suma costo HH (aprox.)
+              </Typography>
               <Typography variant="h5" fontWeight={700}>
-                {promedioCostoHH.toLocaleString("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 })}
+                {totalCostoHH.toLocaleString("es-CL", {
+                  style: "currency",
+                  currency: "CLP",
+                  maximumFractionDigits: 0,
+                })}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary">
+                Costo HH promedio
+              </Typography>
+              <Typography variant="h5" fontWeight={700}>
+                {promedioCostoHH.toLocaleString("es-CL", {
+                  style: "currency",
+                  currency: "CLP",
+                  maximumFractionDigits: 0,
+                })}
               </Typography>
             </Box>
           </Box>
@@ -565,11 +625,11 @@ export default function HHPage() {
                   <TableCell>Nombre</TableCell>
                   <TableCell>RUT</TableCell>
                   <TableCell align="right">Días trab.</TableCell>
-                  <TableCell align="right">Haberes</TableCell>
-                  <TableCell align="right">Empleador</TableCell>
+                  {/*<TableCell align="right">Haberes</TableCell>*/}
+                  {/*<TableCell align="right">Empleador</TableCell>*/}
                   <TableCell align="right">Pagado</TableCell>
-                  <TableCell align="right">Feriado</TableCell>
-                  <TableCell align="right">Indemnización</TableCell>
+                  {/*<TableCell align="right">Feriado</TableCell>*/}
+                  {/*<TableCell align="right">Indemnización</TableCell>*/}
                   <TableCell align="right">Total</TableCell>
                   <TableCell align="right">Costo HH</TableCell>
                 </TableRow>
@@ -587,8 +647,8 @@ export default function HHPage() {
                       : "-";
 
                   const cifFmt =
-                    row.cif != null
-                      ? Number(row.cif).toLocaleString("es-CL", {
+                    row.cif.valor != null
+                      ? Number(row.cif.valor).toLocaleString("es-CL", {
                           style: "currency",
                           currency: "CLP",
                           maximumFractionDigits: 0,
@@ -602,12 +662,14 @@ export default function HHPage() {
                       <TableCell align="right">{cifFmt}</TableCell>
                       <TableCell>{row.nombre}</TableCell>
                       <TableCell>{row.rut}</TableCell>
-                      <TableCell align="right">{row.dias_trabajados ?? "-"}</TableCell>
-                      <TableCell align="right">{money(row.haberes)}</TableCell>
-                      <TableCell align="right">{money(row.empleador)}</TableCell>
+                      <TableCell align="right">
+                        {row.dias_trabajados ?? "-"}
+                      </TableCell>
+                      {/*<TableCell align="right">{money(row.haberes)}</TableCell>*/}
+                      {/*<TableCell align="right">{money(row.empleador)}</TableCell>*/}
                       <TableCell align="right">{money(row.pagado)}</TableCell>
-                      <TableCell align="right">{money(row.feriado)}</TableCell>
-                      <TableCell align="right">{money(row.indemnizacion)}</TableCell>
+                      {/*<TableCell align="right">{money(row.feriado)}</TableCell>*/}
+                      {/* <TableCell align="right">{money(row.indemnizacion)}</TableCell>*/}
                       <TableCell align="right">{money(row.total)}</TableCell>
                       <TableCell align="right">
                         {costoHH != null && !Number.isNaN(costoHH)
@@ -625,7 +687,11 @@ export default function HHPage() {
                 {!filteredRows.length && !loadingList && (
                   <TableRow>
                     <TableCell colSpan={13} align="center">
-                      <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ py: 3 }}
+                      >
                         No hay datos para mostrar con el filtro seleccionado.
                       </Typography>
                     </TableCell>
@@ -635,7 +701,14 @@ export default function HHPage() {
                 {loadingList && (
                   <TableRow>
                     <TableCell colSpan={13} align="center">
-                      <Box sx={{ py: 3, display: "flex", gap: 1, justifyContent: "center" }}>
+                      <Box
+                        sx={{
+                          py: 3,
+                          display: "flex",
+                          gap: 1,
+                          justifyContent: "center",
+                        }}
+                      >
                         <CircularProgress size={24} />
                         <Typography variant="body2" color="text.secondary">
                           Cargando HH de la empresa...

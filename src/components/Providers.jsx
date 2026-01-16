@@ -1,35 +1,27 @@
-// src/components/Providers.jsx
 "use client";
 
-import { SessionProvider } from "next-auth/react";
-import { createTheme, ThemeProvider, CssBaseline } from "@mui/material";
+import * as React from "react";
+import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
+import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
 
 const theme = createTheme({
   palette: {
     mode: "light",
-    primary: { main: "#1976d2" },
-    secondary: { main: "#9c27b0" },
+    primary: { main: "#1565C0" },
   },
+  shape: { borderRadius: 12 },
   typography: {
-    fontFamily: [
-      "Roboto",
-      "-apple-system",
-      "BlinkMacSystemFont",
-      "Segoe UI",
-      "Helvetica",
-      "Arial",
-      "sans-serif",
-    ].join(","),
+    fontFamily: "Roboto, Arial, sans-serif",
   },
 });
 
 export default function Providers({ children }) {
   return (
-    <SessionProvider>
+    <AppRouterCacheProvider options={{ key: "mui" }}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
         {children}
       </ThemeProvider>
-    </SessionProvider>
+    </AppRouterCacheProvider>
   );
 }

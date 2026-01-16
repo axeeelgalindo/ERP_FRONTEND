@@ -17,10 +17,16 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 
-import { estadoColor, fechaCL, formatCLP, nextEstados } from "@/components/cotizaciones/utils/utils";
-import CotizacionItemsTable from "@/components/cotizaciones/CotizacionItemsTable";
+import {
+  estadoColor,
+  fechaCL,
+  formatCLP,
+  nextEstados,
+} from "@/components/cotizaciones/utils/utils";
+
 import CotizacionActionsMenu from "@/components/cotizaciones/CotizacionActionsMenu";
 import CotizacionPDFButton from "@/components/cotizaciones/CotizacionPDFButton";
+import CotizacionGlosasTable from "@/components/cotizaciones/CotizacionGlosasTable";
 
 export default function CotizacionesMobileCards({
   cotizaciones = [],
@@ -68,7 +74,13 @@ export default function CotizacionesMobileCards({
               onClick={() => onToggleExpanded?.(c.id)}
             >
               <CardContent>
-                <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 1,
+                  }}
+                >
                   <Box>
                     <Typography fontWeight={900}>
                       Cotización #{c.numero ?? "—"}
@@ -80,22 +92,35 @@ export default function CotizacionesMobileCards({
                       Proyecto: <strong>{c.proyecto?.nombre || "—"}</strong>
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Cliente: <strong>{c.cliente?.nombre || "Sin cliente"}</strong>
+                      Cliente:{" "}
+                      <strong>{c.cliente?.nombre || "Sin cliente"}</strong>
                     </Typography>
                   </Box>
 
-                  <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.75 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-end",
+                      gap: 0.75,
+                    }}
+                  >
                     <Chip
-                      label={estado}
+                      label={estado.replaceAll("_", " ")}
                       size="small"
                       color={estadoColor(estado)}
                       variant="outlined"
                     />
-                    <Typography fontWeight={900}>{formatCLP(c.total)}</Typography>
+                    <Typography fontWeight={900}>
+                      {formatCLP(c.total)}
+                    </Typography>
 
                     <Box onClick={(e) => e.stopPropagation()}>
                       <Tooltip title="Acciones">
-                        <IconButton size="small" onClick={(e) => openActions(e, c)}>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => openActions(e, c)}
+                        >
                           <MoreVertIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
@@ -107,7 +132,10 @@ export default function CotizacionesMobileCards({
                       </Tooltip>
 
                       <Tooltip title={open ? "Ocultar detalle" : "Ver detalle"}>
-                        <IconButton size="small" onClick={() => onToggleExpanded?.(c.id)}>
+                        <IconButton
+                          size="small"
+                          onClick={() => onToggleExpanded?.(c.id)}
+                        >
                           {open ? (
                             <KeyboardArrowUpIcon fontSize="small" />
                           ) : (
@@ -122,11 +150,16 @@ export default function CotizacionesMobileCards({
                 <Collapse in={open} timeout="auto" unmountOnExit>
                   <Divider sx={{ my: 1.5 }} />
                   {c.descripcion && (
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 1 }}
+                    >
                       {c.descripcion}
                     </Typography>
                   )}
-                  <CotizacionItemsTable items={c.items || []} />
+
+                  <CotizacionGlosasTable cotizacion={c} />
                 </Collapse>
               </CardContent>
             </Card>

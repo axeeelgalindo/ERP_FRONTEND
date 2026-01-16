@@ -21,7 +21,6 @@ import {
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
-import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 
 import {
   estadoColor,
@@ -30,9 +29,9 @@ import {
   nextEstados,
 } from "@/components/cotizaciones/utils/utils";
 
-import CotizacionItemsTable from "@/components/cotizaciones/CotizacionItemsTable";
 import CotizacionActionsMenu from "@/components/cotizaciones/CotizacionActionsMenu";
 import CotizacionPDFButton from "@/components/cotizaciones/CotizacionPDFButton";
+import CotizacionGlosasTable from "@/components/cotizaciones/CotizacionGlosasTable";
 
 export default function CotizacionesDesktopTable({
   cotizaciones = [],
@@ -40,7 +39,6 @@ export default function CotizacionesDesktopTable({
   onToggleExpanded,
   onUpdateEstado,
 }) {
-  // Menú acciones (3 puntitos)
   const [anchorEl, setAnchorEl] = useState(null);
   const [menuCot, setMenuCot] = useState(null);
   const openMenu = Boolean(anchorEl);
@@ -67,22 +65,26 @@ export default function CotizacionesDesktopTable({
               <TableCell width={52} />
               <TableCell width={80}>#</TableCell>
               <TableCell width={130}>Fecha</TableCell>
-              <TableCell>Proyecto</TableCell>
+
+              {/* ✅ ELIMINADO: Proyecto */}
               <TableCell width={240}>Cliente</TableCell>
 
-              {/* ✅ Estado separado */}
               <TableCell width={220}>Estado</TableCell>
 
+              <TableCell align="right" width={160}>
+                Subtotal
+              </TableCell>
+              <TableCell align="right" width={160}>
+                IVA
+              </TableCell>
               <TableCell align="right" width={160}>
                 Total
               </TableCell>
 
-              {/* ✅ PDF separado */}
               <TableCell align="center" width={120}>
                 PDF
               </TableCell>
 
-              {/* ✅ Acciones separado */}
               <TableCell align="center" width={90}>
                 Acciones
               </TableCell>
@@ -98,7 +100,6 @@ export default function CotizacionesDesktopTable({
 
               return (
                 <Fragment key={c.id}>
-                  {/* ROW */}
                   <TableRow
                     hover
                     onClick={() => onToggleExpanded?.(c.id)}
@@ -107,7 +108,6 @@ export default function CotizacionesDesktopTable({
                       "&:hover td": { bgcolor: "action.hover" },
                     }}
                   >
-                    {/* expand */}
                     <TableCell>
                       <Tooltip title={open ? "Ocultar detalle" : "Ver detalle"}>
                         <IconButton
@@ -128,29 +128,9 @@ export default function CotizacionesDesktopTable({
 
                     <TableCell>{fechaCL(c.creada_en)}</TableCell>
 
-                    <TableCell sx={{ maxWidth: 520 }}>
-                      <Typography fontWeight={700}>
-                        {c.proyecto?.nombre || "—"}
-                      </Typography>
-                      {c.descripcion ? (
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{
-                            display: "-webkit-box",
-                            WebkitLineClamp: 1,
-                            WebkitBoxOrient: "vertical",
-                            overflow: "hidden",
-                          }}
-                        >
-                          {c.descripcion}
-                        </Typography>
-                      ) : null}
-                    </TableCell>
-
+                    {/* ✅ Cliente (queda aquí) */}
                     <TableCell>{c.cliente?.nombre || "Sin cliente"}</TableCell>
 
-                    {/* ✅ Estado column */}
                     <TableCell>
                       <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
                         <Chip
@@ -167,17 +147,26 @@ export default function CotizacionesDesktopTable({
                               <strong>{siguiente.replaceAll("_", " ")}</strong>
                             </>
                           ) : (
-                            <>Final: <strong>PAGADA</strong></>
+                            <>
+                              Final: <strong>PAGADA</strong>
+                            </>
                           )}
                         </Typography>
                       </Box>
                     </TableCell>
 
                     <TableCell align="right">
+                      <Typography fontWeight={900}>{formatCLP(c.subtotal)}</Typography>
+                    </TableCell>
+
+                    <TableCell align="right">
+                      <Typography fontWeight={900}>{formatCLP(c.iva)}</Typography>
+                    </TableCell>
+
+                    <TableCell align="right">
                       <Typography fontWeight={900}>{formatCLP(c.total)}</Typography>
                     </TableCell>
 
-                    {/* ✅ PDF column */}
                     <TableCell
                       align="center"
                       onClick={(e) => e.stopPropagation()}
@@ -186,29 +175,22 @@ export default function CotizacionesDesktopTable({
                       <CotizacionPDFButton cotizacion={c} />
                     </TableCell>
 
-                    {/* ✅ Actions column (solo 3 puntitos) */}
-                    <TableCell
-                      align="center"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <TableCell align="center" onClick={(e) => e.stopPropagation()}>
                       <Tooltip title="Acciones">
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleOpenMenu(e, c)}
-                        >
+                        <IconButton size="small" onClick={(e) => handleOpenMenu(e, c)}>
                           <MoreVertIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     </TableCell>
                   </TableRow>
 
-                  {/* DETAIL */}
+                  {/* ✅ DETAIL: colSpan baja a 10 */}
                   <TableRow>
-                    <TableCell colSpan={9} sx={{ p: 0, borderBottom: 0 }}>
+                    <TableCell colSpan={10} sx={{ p: 0, borderBottom: 0 }}>
                       <Collapse in={open} timeout="auto" unmountOnExit>
                         <Box sx={{ px: 2, pb: 2 }}>
                           <Divider sx={{ my: 1.5 }} />
-                          <CotizacionItemsTable items={c.items || []} />
+                          <CotizacionGlosasTable cotizacion={c} />
                         </Box>
                       </Collapse>
                     </TableCell>
@@ -220,7 +202,6 @@ export default function CotizacionesDesktopTable({
         </Table>
       </TableContainer>
 
-      {/* Menú acciones: aquí pones lo pro (cambiar estado, etc.) */}
       <CotizacionActionsMenu
         open={openMenu}
         anchorEl={anchorEl}

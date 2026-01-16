@@ -5,7 +5,7 @@ import "@fontsource/roboto/400.css";
 import "@fontsource/roboto/500.css";
 import "@fontsource/roboto/700.css";
 
-import Providers from "@/components/Providers";
+import AppProviders from "@/components/AppProviders";
 import SidebarPortalMount from "@/components/layout/SidebarPortalMount";
 
 export const metadata = {
@@ -17,17 +17,13 @@ export default function RootLayout({ children }) {
   return (
     <html lang="es">
       <body className="bg-gray-50 text-gray-900 font-sans min-h-screen">
-        {/* Slot fijo para el sidebar (no compite con MUI) */}
         <div id="sidebar-slot" />
 
-        {/* 👇 OJO: ahora <main> es el primer hijo estable de <body> */}
         <main className="transition-[padding] duration-300 ease-in-out">
-          {/* Todo MUI (CssBaseline/Theme/Emotion) vive DENTRO de main */}
-          <Providers>
-            {/* El sidebar se monta en el slot (cliente) y ajusta body.has-sidebar */}
+          <AppProviders>
             <SidebarPortalMount />
             {children}
-          </Providers>
+          </AppProviders>
         </main>
       </body>
     </html>

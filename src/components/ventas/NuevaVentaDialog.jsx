@@ -106,9 +106,7 @@ export default function NuevaVentaDialog({
   }
 
   function getEmpleadoRut(emp) {
-    return (
-      emp?.rut ?? emp?.RUT ?? emp?.usuario?.rut ?? emp?.usuario?.RUT ?? null
-    );
+    return emp?.rut ?? emp?.RUT ?? emp?.usuario?.rut ?? emp?.usuario?.RUT ?? null;
   }
 
   function getHHRut(hh) {
@@ -117,6 +115,35 @@ export default function NuevaVentaDialog({
 
   function getHHEmpleadoEmpleadoId(hh) {
     return hh?.empleado_id ?? hh?.empleadoId ?? hh?.empleado?.id ?? null;
+  }
+
+  // ✅ CIF helpers (soporta hh.cif number, hh.cifObj, hh.cif {valor}, etc.)
+  function getHHCIFValue(hh) {
+    if (!hh) return 0;
+
+    if (hh?.cif != null && typeof hh.cif === "number") return Number(hh.cif);
+
+    if (hh?.cif != null && typeof hh.cif === "string") {
+      const n = Number(hh.cif);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    if (hh?.cif?.valor != null) {
+      const n = Number(hh.cif.valor);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    if (hh?.cifObj?.valor != null) {
+      const n = Number(hh.cifObj.valor);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    if (hh?.cifObj?.cif?.valor != null) {
+      const n = Number(hh.cifObj.cif.valor);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    return 0;
   }
 
   // TipoItem HH (para UI/preview)
@@ -128,24 +155,28 @@ export default function NuevaVentaDialog({
     return hh;
   }, [tipoItems]);
 
+  // ✅ alpha: si viene null/"" => default 10; si viene 0 => 0 real
+  const normalizeAlphaPctUI = (v) => {
+    if (v == null || v === "") return 10;
+    const n = Number(v);
+    if (!Number.isFinite(n)) return 10;
+    if (n < 0) return 0;
+    return n;
+  };
+
   const emptyDet = () => ({
     descripcion: "",
     modo: "HH", // "HH" | "COMPRA"
     cantidad: 1,
 
-    // HH: backend lo fuerza a HH. En UI lo dejamos (autocompletado si existe), pero NO es requerido.
     tipoItemId: tipoItemHH?.id || "",
 
     tipoDiaId: "",
-    alphaPct: 10, // 10 => +10% | 0 => sin ajuste
+    alphaPct: 10, // ✅ default 10, pero 0 se respeta
 
-    // HH
     empleadoId: "",
 
-    // COMPRA vinculada
     compraId: "",
-
-    // COMPRA manual (sin folio manual)
     costoUnitarioManual: "",
   });
 
@@ -177,10 +208,7 @@ export default function NuevaVentaDialog({
       const [resTipoItems, resTipoDias, resOV] = await Promise.all([
         fetch(`${API_URL}/ventas/tipoitems`, { headers, cache: "no-store" }),
         fetch(`${API_URL}/ventas/tipodias`, { headers, cache: "no-store" }),
-        fetch(`${API_URL}/ventas/ordenes-venta`, {
-          headers,
-          cache: "no-store",
-        }),
+        fetch(`${API_URL}/ventas/ordenes-venta`, { headers, cache: "no-store" }),
       ]);
 
       const [dataTipoItems, dataTipoDias, dataOV] = await Promise.all([
@@ -271,7 +299,7 @@ export default function NuevaVentaDialog({
         setCompraItems(itemsFlat);
       }
 
-      // ✅ si existe TipoItem HH, autocompletar para ítems modo HH (solo UI/preview)
+      // autocompletar tipoItem HH en ítems HH
       const hh =
         ti.find((t) => String(t?.codigo || "").toUpperCase() === "HH") ||
         ti.find((t) => String(t?.nombre || "").toUpperCase() === "HH") ||
@@ -289,7 +317,6 @@ export default function NuevaVentaDialog({
     }
   };
 
-  // al abrir
   useEffect(() => {
     if (!open) return;
     resetForm();
@@ -297,7 +324,6 @@ export default function NuevaVentaDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // refrescar HH si cambia periodo mientras está abierto
   useEffect(() => {
     if (!open) return;
     if (!session?.user) return;
@@ -334,7 +360,6 @@ export default function NuevaVentaDialog({
       ...prev,
       {
         ...emptyDet(),
-        // asegura hh en nuevos ítems si existe
         tipoItemId: tipoItemHH?.id || "",
       },
     ]);
@@ -356,9 +381,7 @@ export default function NuevaVentaDialog({
     const empRut = normalizeRut(getEmpleadoRut(emp));
     if (!empRut) return null;
 
-    return (
-      hhRegistros.find((hh) => normalizeRut(getHHRut(hh)) === empRut) || null
-    );
+    return hhRegistros.find((hh) => normalizeRut(getHHRut(hh)) === empRut) || null;
   };
 
   // =========================
@@ -368,22 +391,20 @@ export default function NuevaVentaDialog({
     const lines = detalles.map((d) => {
       const cantidad = Number(d.cantidad) || 1;
 
-      // alphaPct (10, 0, 20...) => alpha decimal (0.10, 0, 0.20...)
-      const alpha = (Number(d.alphaPct ?? 10) || 10) / 100;
+      // ✅ alphaPct respeta 0
+      const alphaPct = normalizeAlphaPctUI(d.alphaPct);
+      const alphaMult = 1 + alphaPct / 100;
 
       const tipoDia = tipoDias.find((t) => t.id === d.tipoDiaId) || null;
 
-      // ✅ HH usa siempre tipoItemHH (si existe); COMPRA usa el tipoItem elegido
       const tipoItem =
         d.modo === "HH"
           ? tipoItemHH
           : tipoItems.find((t) => t.id === d.tipoItemId) || null;
 
-      const gananciaPct = tipoItem
-        ? Number(tipoItem.porcentajeUtilidad || 0)
-        : 0;
+      const gananciaPct = tipoItem ? Number(tipoItem.porcentajeUtilidad || 0) : 0;
 
-      // ✅ extra fijo SOLO por tipoDia.valor (Normal = 0)
+      // ✅ extra fijo por ítem (NO por cantidad)
       const extraFijo = tipoDia ? Number(tipoDia.valor ?? 0) : 0;
 
       let costoTotal = 0;
@@ -392,20 +413,16 @@ export default function NuevaVentaDialog({
       if (d.modo === "HH") {
         const hh = findHHForEmpleado(d.empleadoId);
         const costoHH = hh?.costoHH != null ? Number(hh.costoHH) : 0;
-        const cif = hh?.cif != null ? Number(hh.cif) : 0;
+        const cif = getHHCIFValue(hh);
 
-        // costo real
         costoTotal = costoHH * cantidad + cif;
 
-        // ✅ venta correcta: costo + margen + CIF prorrateado + extra fijo
-        const ventaUnit =
-          costoHH * (1 + gananciaPct / 100) +
-          (cantidad > 0 ? cif / cantidad : cif) +
-          extraFijo;
+        // ✅ venta base: variable por cantidad + CIF (1 vez) + extra fijo (1 vez)
+        const ventaVariable = costoHH * (1 + gananciaPct / 100) * cantidad;
+        const ventaBase = ventaVariable + cif + extraFijo;
 
-        ventaTotal = ventaUnit * cantidad * (1 + alpha);
+        ventaTotal = ventaBase * alphaMult;
       } else {
-        // COMPRA: vinculada (compraId) o manual (costoUnitarioManual)
         const ci = compraItems.find((x) => x.id === d.compraId);
         let costoUnit = 0;
 
@@ -426,9 +443,11 @@ export default function NuevaVentaDialog({
 
         costoTotal = costoUnit * cantidad;
 
-        // venta: costo + margen + alpha
-        const ventaUnit = costoUnit * (1 + gananciaPct / 100);
-        ventaTotal = ventaUnit * cantidad * (1 + alpha);
+        // ✅ venta base: variable por cantidad + extra fijo (1 vez)
+        const ventaVariable = costoUnit * (1 + gananciaPct / 100) * cantidad;
+        const ventaBase = ventaVariable + extraFijo;
+
+        ventaTotal = ventaBase * alphaMult;
       }
 
       const utilidad = ventaTotal - costoTotal;
@@ -442,15 +461,7 @@ export default function NuevaVentaDialog({
     const utilidad = total - costo;
 
     return { total, costo, utilidad, lines };
-  }, [
-    detalles,
-    tipoItems,
-    tipoDias,
-    hhRegistros,
-    compraItems,
-    empleados,
-    tipoItemHH,
-  ]);
+  }, [detalles, tipoItems, tipoDias, hhRegistros, compraItems, empleados, tipoItemHH]);
 
   // =========================
   // validate + submit
@@ -465,33 +476,31 @@ export default function NuevaVentaDialog({
       const cant = Number(d.cantidad);
       if (!cant || cant <= 0) return `Ítem #${i + 1}: Cantidad inválida.`;
 
+      // ✅ alpha: si lo borran y queda "", les vuelve a 10 por default (para no NaN)
+      const alphaPct = normalizeAlphaPctUI(d.alphaPct);
+      if (!Number.isFinite(alphaPct) || alphaPct < 0) {
+        return `Ítem #${i + 1}: Ajuste % (alpha) inválido.`;
+      }
+
       if (d.modo === "HH") {
         if (!d.empleadoId) return `Ítem #${i + 1}: Selecciona empleado.`;
         const hh = findHHForEmpleado(d.empleadoId);
         if (!hh) {
-          return `Ítem #${
-            i + 1
-          }: Falta HH del período para este empleado (${mes}/${anio}).`;
+          return `Ítem #${i + 1}: Falta HH del período para este empleado (${mes}/${anio}).`;
         }
-        // ✅ NO exigir tipoItemId en HH (backend fuerza HH)
       } else {
-        // COMPRA: tipoItemId requerido (categoría/margen)
         if (!d.tipoItemId) return `Ítem #${i + 1}: Selecciona Tipo ítem.`;
 
         const manualPU =
-          d.costoUnitarioManual != null &&
-          String(d.costoUnitarioManual).trim() !== ""
+          d.costoUnitarioManual != null && String(d.costoUnitarioManual).trim() !== ""
             ? Number(d.costoUnitarioManual)
             : null;
 
         const tieneCompra = !!d.compraId;
-        const tieneManual =
-          manualPU != null && Number.isFinite(manualPU) && manualPU > 0;
+        const tieneManual = manualPU != null && Number.isFinite(manualPU) && manualPU > 0;
 
         if (!tieneCompra && !tieneManual) {
-          return `Ítem #${
-            i + 1
-          }: En COMPRA debes seleccionar un detalle de compra o ingresar un Precio Unitario manual.`;
+          return `Ítem #${i + 1}: En COMPRA debes seleccionar un detalle de compra o ingresar un Precio Unitario manual.`;
         }
       }
     }
@@ -514,8 +523,8 @@ export default function NuevaVentaDialog({
         ordenVentaId: ordenVentaId || null,
         descripcion: descripcionVenta || null,
         detalles: detalles.map((d) => {
-          // ✅ enviamos porcentaje (10, 0, 20...) NO decimal
-          const alpha = Number(d.alphaPct ?? 10) || 10;
+          // ✅ alpha respeta 0 (sin || 10)
+          const alpha = normalizeAlphaPctUI(d.alphaPct);
 
           if (d.modo === "HH") {
             const hh = findHHForEmpleado(d.empleadoId);
@@ -523,7 +532,7 @@ export default function NuevaVentaDialog({
               descripcion: d.descripcion,
               cantidad: Number(d.cantidad) || 1,
               modo: "HH",
-              tipoItemId: null, // HH: backend lo fuerza
+              tipoItemId: null,
               tipoDiaId: d.tipoDiaId || null,
               alpha, // 10, 0, 20...
               empleadoId: d.empleadoId || null,
@@ -545,8 +554,7 @@ export default function NuevaVentaDialog({
             compraId: d.compraId || null,
             costoUnitarioManual: d.compraId
               ? null
-              : d.costoUnitarioManual != null &&
-                String(d.costoUnitarioManual).trim() !== ""
+              : d.costoUnitarioManual != null && String(d.costoUnitarioManual).trim() !== ""
               ? Number(d.costoUnitarioManual)
               : null,
           };
@@ -660,18 +668,8 @@ export default function NuevaVentaDialog({
               sx={{ minWidth: 160 }}
             >
               {[
-                "Enero",
-                "Febrero",
-                "Marzo",
-                "Abril",
-                "Mayo",
-                "Junio",
-                "Julio",
-                "Agosto",
-                "Septiembre",
-                "Octubre",
-                "Noviembre",
-                "Diciembre",
+                "Enero","Febrero","Marzo","Abril","Mayo","Junio",
+                "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre",
               ].map((m, idx) => (
                 <MenuItem key={idx + 1} value={String(idx + 1)}>
                   {m}
@@ -687,26 +685,19 @@ export default function NuevaVentaDialog({
           </Typography>
 
           {detalles.map((det, idx) => {
-            const hhSelected =
-              det.modo === "HH" ? findHHForEmpleado(det.empleadoId) : null;
+            const hhSelected = det.modo === "HH" ? findHHForEmpleado(det.empleadoId) : null;
 
             const hhSelectedCostoHH =
               hhSelected?.costoHH != null ? Number(hhSelected.costoHH) : 0;
-            const hhSelectedCIF =
-              hhSelected?.cif != null ? Number(hhSelected.cif) : 0;
+
+            const hhSelectedCIF = getHHCIFValue(hhSelected);
 
             const faltaHH = det.modo === "HH" && det.empleadoId && !hhSelected;
 
             return (
               <Card key={idx} variant="outlined" sx={{ borderRadius: 2 }}>
                 <CardContent>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 1,
-                    }}
-                  >
+                  <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
                     <Typography fontWeight={700}>Ítem #{idx + 1}</Typography>
                     {detalles.length > 1 && (
                       <IconButton onClick={() => removeDetalle(idx)} size="small">
@@ -727,9 +718,7 @@ export default function NuevaVentaDialog({
                       label="Descripción"
                       size="small"
                       value={det.descripcion}
-                      onChange={(e) =>
-                        updateDetalle(idx, { descripcion: e.target.value })
-                      }
+                      onChange={(e) => updateDetalle(idx, { descripcion: e.target.value })}
                       fullWidth
                     />
 
@@ -747,7 +736,6 @@ export default function NuevaVentaDialog({
                             empleadoId: det.empleadoId || "",
                             compraId: "",
                             costoUnitarioManual: "",
-                            // solo UI/preview
                             tipoItemId: tipoItemHH?.id || det.tipoItemId || "",
                           });
                         } else {
@@ -756,10 +744,8 @@ export default function NuevaVentaDialog({
                             empleadoId: "",
                             compraId: "",
                             costoUnitarioManual: "",
-                            // en COMPRA sí se selecciona tipoItemId (categoría)
                             tipoItemId:
-                              det.tipoItemId &&
-                              det.tipoItemId !== (tipoItemHH?.id || "")
+                              det.tipoItemId && det.tipoItemId !== (tipoItemHH?.id || "")
                                 ? det.tipoItemId
                                 : "",
                           });
@@ -771,16 +757,13 @@ export default function NuevaVentaDialog({
                       <MenuItem value="COMPRA">Compra (Insumo)</MenuItem>
                     </TextField>
 
-                    {/* Tipo ítem */}
                     {det.modo === "HH" ? (
                       <TextField
                         label="Tipo ítem (auto)"
                         size="small"
                         value={
                           tipoItemHH
-                            ? `${tipoItemHH.nombre} — ${
-                                tipoItemHH.porcentajeUtilidad ?? 0
-                              }%`
+                            ? `${tipoItemHH.nombre} — ${tipoItemHH.porcentajeUtilidad ?? 0}%`
                             : "HH (no encontrado en catálogo)"
                         }
                         fullWidth
@@ -793,19 +776,15 @@ export default function NuevaVentaDialog({
                         label="Tipo ítem (margen)"
                         size="small"
                         value={det.tipoItemId}
-                        onChange={(e) =>
-                          updateDetalle(idx, { tipoItemId: e.target.value })
-                        }
+                        onChange={(e) => updateDetalle(idx, { tipoItemId: e.target.value })}
                         fullWidth
                       >
                         <MenuItem value="">(Selecciona)</MenuItem>
                         {tipoItems.map((t) => (
                           <MenuItem key={t.id} value={t.id}>
                             {t.nombre}
-                            {t.unidadItem?.nombre
-                              ? ` (${t.unidadItem.nombre})`
-                              : ""}{" "}
-                            — {t.porcentajeUtilidad ?? 0}%
+                            {t.unidadItem?.nombre ? ` (${t.unidadItem.nombre})` : ""} —{" "}
+                            {t.porcentajeUtilidad ?? 0}%
                           </MenuItem>
                         ))}
                       </TextField>
@@ -816,9 +795,7 @@ export default function NuevaVentaDialog({
                       size="small"
                       type="number"
                       value={det.cantidad}
-                      onChange={(e) =>
-                        updateDetalle(idx, { cantidad: Number(e.target.value) })
-                      }
+                      onChange={(e) => updateDetalle(idx, { cantidad: Number(e.target.value) })}
                       fullWidth
                       inputProps={{ min: 1 }}
                     />
@@ -828,9 +805,7 @@ export default function NuevaVentaDialog({
                       label="Tipo día (opcional)"
                       size="small"
                       value={det.tipoDiaId}
-                      onChange={(e) =>
-                        updateDetalle(idx, { tipoDiaId: e.target.value })
-                      }
+                      onChange={(e) => updateDetalle(idx, { tipoDiaId: e.target.value })}
                       fullWidth
                       helperText="El extra fijo sale del campo tipoDia.valor (Normal debe ser 0)."
                     >
@@ -846,13 +821,13 @@ export default function NuevaVentaDialog({
                       label="Ajuste % (alpha)"
                       size="small"
                       type="number"
-                      value={det.alphaPct ?? 10}
+                      value={det.alphaPct}
                       onChange={(e) =>
-                        updateDetalle(idx, { alphaPct: Number(e.target.value) })
+                        updateDetalle(idx, { alphaPct: e.target.value === "" ? "" : Number(e.target.value) })
                       }
                       fullWidth
                       inputProps={{ step: 1, min: 0 }}
-                      helperText="Ej: 10 = +10% (default) | 0 = sin ajuste"
+                      helperText="Ej: 10 = +10% | 0 = sin ajuste (0 se respeta)"
                     />
 
                     {det.modo === "HH" ? (
@@ -862,9 +837,7 @@ export default function NuevaVentaDialog({
                           label="Empleado"
                           size="small"
                           value={det.empleadoId}
-                          onChange={(e) =>
-                            updateDetalle(idx, { empleadoId: e.target.value })
-                          }
+                          onChange={(e) => updateDetalle(idx, { empleadoId: e.target.value })}
                           fullWidth
                         >
                           <MenuItem value="">(Selecciona)</MenuItem>
@@ -875,24 +848,14 @@ export default function NuevaVentaDialog({
                           ))}
                         </TextField>
 
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 1,
-                          }}
-                        >
+                        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
                           <TextField
                             label="Costo HH (según período)"
                             size="small"
                             value={
                               det.empleadoId
                                 ? hhSelected
-                                  ? `${formatCLP(hhSelectedCostoHH)}${
-                                      hhSelectedCIF
-                                        ? ` | CIF: ${formatCLP(hhSelectedCIF)}`
-                                        : ""
-                                    }`
+                                  ? `${formatCLP(hhSelectedCostoHH)} | CIF: ${formatCLP(hhSelectedCIF)}`
                                   : "-"
                                 : "-"
                             }
@@ -901,15 +864,14 @@ export default function NuevaVentaDialog({
                             helperText={
                               det.empleadoId && !hhSelected
                                 ? `No hay HHEmpleado para este empleado en ${mes}/${anio}.`
-                                : ""
+                                : "CIF se muestra aunque sea 0."
                             }
                           />
 
                           {faltaHH && (
                             <Alert severity="warning">
-                              Falta HH del período para este empleado. Carga el
-                              HHEmpleado de {mes}/{anio} o revisa la relación
-                              (empleado_id) en HHEmpleado.
+                              Falta HH del período para este empleado. Carga el HHEmpleado de {mes}/
+                              {anio} o revisa la relación (empleado_id) en HHEmpleado.
                             </Alert>
                           )}
                         </Box>
@@ -924,17 +886,13 @@ export default function NuevaVentaDialog({
                           onChange={(e) =>
                             updateDetalle(idx, {
                               compraId: e.target.value,
-                              ...(e.target.value
-                                ? { costoUnitarioManual: "" }
-                                : {}),
+                              ...(e.target.value ? { costoUnitarioManual: "" } : {}),
                             })
                           }
                           fullWidth
                           helperText="Si seleccionas uno, costea con datos reales. Si lo dejas vacío, ingresa PU manual."
                         >
-                          <MenuItem value="">
-                            (Sin vincular: usar PU manual)
-                          </MenuItem>
+                          <MenuItem value="">(Sin vincular: usar PU manual)</MenuItem>
                           {compraItems.map((ci) => (
                             <MenuItem key={ci.id} value={ci.id}>
                               {compraItemLabel(ci)}
@@ -950,9 +908,7 @@ export default function NuevaVentaDialog({
                           onChange={(e) =>
                             updateDetalle(idx, {
                               costoUnitarioManual: e.target.value,
-                              ...(String(e.target.value).trim()
-                                ? { compraId: "" }
-                                : {}),
+                              ...(String(e.target.value).trim() ? { compraId: "" } : {}),
                             })
                           }
                           fullWidth
@@ -970,8 +926,8 @@ export default function NuevaVentaDialog({
 
                   <Box sx={{ mt: 1.5 }}>
                     <Typography variant="caption" color="text.secondary">
-                      Preview ítem: costo {formatCLP(preview.lines[idx]?.costoTotal)}{" "}
-                      | venta {formatCLP(preview.lines[idx]?.ventaTotal)} | utilidad{" "}
+                      Preview ítem: costo {formatCLP(preview.lines[idx]?.costoTotal)} | venta{" "}
+                      {formatCLP(preview.lines[idx]?.ventaTotal)} | utilidad{" "}
                       {formatCLP(preview.lines[idx]?.utilidad)}{" "}
                       {preview.lines[idx]?.pct != null
                         ? `(${preview.lines[idx].pct.toFixed(1)}%)`
@@ -995,8 +951,8 @@ export default function NuevaVentaDialog({
                 Totales (preview)
               </Typography>
               <Typography fontWeight={700}>
-                Venta: {formatCLP(preview.total)} | Costo: {formatCLP(preview.costo)}{" "}
-                | Utilidad: {formatCLP(preview.utilidad)}
+                Venta: {formatCLP(preview.total)} | Costo: {formatCLP(preview.costo)} | Utilidad:{" "}
+                {formatCLP(preview.utilidad)}
               </Typography>
             </CardContent>
           </Card>

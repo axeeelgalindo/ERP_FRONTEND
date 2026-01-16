@@ -22,6 +22,7 @@ import {
   Card,
   CardContent,
   Tooltip,
+  Button,
 } from "@mui/material";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
@@ -35,10 +36,7 @@ import { formatCLP } from "@/components/ventas/utils/money";
 // Helpers
 function calcTotalVenta(venta) {
   const detalles = venta?.detalles || [];
-  return detalles.reduce(
-    (s, d) => s + (Number(d.total ?? d.ventaTotal) || 0),
-    0
-  );
+  return detalles.reduce((s, d) => s + (Number(d.total ?? d.ventaTotal) || 0), 0);
 }
 
 function getOvLabel(venta) {
@@ -108,7 +106,7 @@ function DetallesVentaTable({ detalles }) {
             const unidadNombre = det.tipoItem?.unidadItem?.nombre || "-";
             const origen = buildOrigen(det);
 
-            const isHH = !!det?.empleado; // simple: si viene empleado => HH
+            const isHH = !!det?.empleado;
             const badgeIcon = isHH ? (
               <WorkOutlineIcon fontSize="small" />
             ) : (
@@ -169,15 +167,11 @@ function DetallesVentaTable({ detalles }) {
                 </TableCell>
 
                 <TableCell align="right">
-                  <Typography variant="body2">
-                    {formatCLP(det.costoTotal)}
-                  </Typography>
+                  <Typography variant="body2">{formatCLP(det.costoTotal)}</Typography>
                 </TableCell>
 
                 <TableCell align="right">
-                  <Typography fontWeight={800}>
-                    {formatCLP(det.total ?? det.ventaTotal)}
-                  </Typography>
+                  <Typography fontWeight={800}>{formatCLP(det.total ?? det.ventaTotal)}</Typography>
                 </TableCell>
 
                 <TableCell align="right">
@@ -200,12 +194,8 @@ function DetallesVentaTable({ detalles }) {
           {(!detalles || detalles.length === 0) && (
             <TableRow>
               <TableCell colSpan={8} align="center">
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ py: 2 }}
-                >
-                  Esta venta no tiene ítems de detalle.
+                <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+                  Este costeo no tiene ítems de detalle.
                 </Typography>
               </TableCell>
             </TableRow>
@@ -221,16 +211,13 @@ function DetallesVentaTable({ detalles }) {
  * - ventas: Venta[]
  * - onCreateCotizacionFromVenta: (ventaId: string) => void
  */
-export default function VentasTable({
-  ventas = [],
-  onCreateCotizacionFromVenta,
-}) {
+export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }) {
   const isMobile = useMediaQuery("(max-width:900px)");
 
   // Expand rows
-  const [openMap, setOpenMap] = useState({}); // { [ventaId]: boolean }
+  const [openMap, setOpenMap] = useState({});
 
-  // Actions menu
+  // Actions menu (opcional)
   const [anchorEl, setAnchorEl] = useState(null);
   const [menuVenta, setMenuVenta] = useState(null);
   const openMenu = Boolean(anchorEl);
@@ -256,7 +243,7 @@ export default function VentasTable({
     setOpenMap((prev) => ({ ...prev, [ventaId]: !prev[ventaId] }));
   };
 
-  // ✅ IMPORTANTE: para que el click en acciones NO dispare el toggle
+  // para que clicks en botones no togglen la fila/card
   const stopRowToggle = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -273,7 +260,12 @@ export default function VentasTable({
     setMenuVenta(null);
   };
 
-  const handleCreateCot = () => {
+  const handleCreateCotFromRow = (e, ventaId) => {
+    stopRowToggle(e);
+    onCreateCotizacionFromVenta?.(ventaId);
+  };
+
+  const handleCreateCotFromMenu = () => {
     const ventaId = menuVenta?.id;
     handleCloseMenu();
     if (!ventaId) return;
@@ -287,7 +279,7 @@ export default function VentasTable({
     setPage(0);
   };
 
-  // ====== MOBILE VIEW (cards) ======
+  // ===== MOBILE VIEW (cards) =====
   if (isMobile) {
     return (
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
@@ -301,20 +293,12 @@ export default function VentasTable({
               key={venta.id}
               variant="outlined"
               sx={{ borderRadius: 2, cursor: "pointer" }}
-              onClick={() => handleToggle(venta.id)} // ✅ click en card abre/cierra
+              onClick={() => handleToggle(venta.id)}
             >
               <CardContent>
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 1,
-                  }}
-                >
+                <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
                   <Box>
-                    <Typography fontWeight={800}>
-                      Venta #{venta.numero ?? "—"}
-                    </Typography>
+                    <Typography fontWeight={900}>Costeo #{venta.numero ?? "—"}</Typography>
                     <Typography variant="body2" color="text.secondary">
                       Fecha: {getFechaLabel(venta)}
                     </Typography>
@@ -326,14 +310,7 @@ export default function VentasTable({
                     </Typography>
                   </Box>
 
-                  <Box
-                    sx={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "flex-end",
-                      gap: 0.5,
-                    }}
-                  >
+                  <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.75 }}>
                     <Chip
                       label={formatCLP(total)}
                       color="primary"
@@ -342,38 +319,35 @@ export default function VentasTable({
                       sx={{ borderRadius: 999 }}
                     />
 
-                    <Box
-                      sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
-                    >
-                      <Tooltip title="Acciones">
-                        <IconButton
+                    <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
+                      <Tooltip title="Crear cotización">
+                        <Button
                           size="small"
-                          onClick={(e) => handleOpenMenu(e, venta)} // ✅ no abre collapse
+                          variant="outlined"
+                          startIcon={<DescriptionIcon fontSize="small" />}
+                          onClick={(e) => handleCreateCotFromRow(e, venta.id)}
+                          sx={{ borderRadius: 2, textTransform: "none", fontWeight: 800 }}
                         >
+                          Cotizar
+                        </Button>
+                      </Tooltip>
+
+                      <Box sx={{ display: "flex", alignItems: "center", px: 0.5 }}>
+                        {opened ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
+                      </Box>
+
+                      {/* menú opcional */}
+                      <Tooltip title="Más acciones">
+                        <IconButton size="small" onClick={(e) => handleOpenMenu(e, venta)}>
                           <MoreVertIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
-
-                      {/* flecha solo visual (opcional). Si la quieres clickable, igual debe stopPropagation */}
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", px: 0.5 }}
-                      >
-                        {opened ? (
-                          <KeyboardArrowUpIcon fontSize="small" />
-                        ) : (
-                          <KeyboardArrowDownIcon fontSize="small" />
-                        )}
-                      </Box>
                     </Box>
                   </Box>
                 </Box>
 
                 {venta.descripcion && (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: 1 }}
-                  >
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                     {venta.descripcion}
                   </Typography>
                 )}
@@ -401,21 +375,21 @@ export default function VentasTable({
           />
         </Paper>
 
-        {/* ✅ Menú mejorado */}
+        {/* Menú (opcional) */}
         <Menu
           anchorEl={anchorEl}
           open={openMenu}
           onClose={handleCloseMenu}
           PaperProps={{ sx: { borderRadius: 2, minWidth: 240 } }}
         >
-          <MenuItem onClick={handleCreateCot} sx={{ py: 1.2, gap: 1 }}>
+          <MenuItem onClick={handleCreateCotFromMenu} sx={{ py: 1.2, gap: 1 }}>
             <DescriptionIcon fontSize="small" />
             <Box>
               <Typography fontWeight={700} variant="body2">
                 Crear cotización
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Usar esta venta como base
+                Usar este costeo como base
               </Typography>
             </Box>
           </MenuItem>
@@ -424,22 +398,29 @@ export default function VentasTable({
     );
   }
 
-  // ====== DESKTOP TABLE VIEW ======
+  // ===== DESKTOP TABLE VIEW =====
   return (
     <Paper variant="outlined" sx={{ borderRadius: 2, overflow: "hidden" }}>
       <TableContainer>
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell sx={{ width: 48 }} />
+              <TableCell sx={{ width: 52 }} />
               <TableCell>#</TableCell>
               <TableCell>Fecha</TableCell>
               <TableCell>OV/Cot</TableCell>
               <TableCell>Descripción</TableCell>
               <TableCell align="right">Ítems</TableCell>
               <TableCell align="right">Total</TableCell>
+
+              {/* ✅ NUEVO: botón por registro */}
+              <TableCell align="right" sx={{ width: 170 }}>
+                Cotización
+              </TableCell>
+
+              {/* menú opcional */}
               <TableCell align="right" sx={{ width: 56 }}>
-                Acciones
+                Más
               </TableCell>
             </TableRow>
           </TableHead>
@@ -452,11 +433,7 @@ export default function VentasTable({
 
               return (
                 <Fragment key={venta.id}>
-                  <TableRow
-                    hover
-                    onClick={() => handleToggle(venta.id)}
-                    sx={{ cursor: "pointer" }}
-                  >
+                  <TableRow hover onClick={() => handleToggle(venta.id)} sx={{ cursor: "pointer" }}>
                     <TableCell>
                       <IconButton
                         size="small"
@@ -465,18 +442,12 @@ export default function VentasTable({
                           handleToggle(venta.id);
                         }}
                       >
-                        {opened ? (
-                          <KeyboardArrowUpIcon />
-                        ) : (
-                          <KeyboardArrowDownIcon />
-                        )}
+                        {opened ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
                       </IconButton>
                     </TableCell>
 
                     <TableCell>
-                      <Typography fontWeight={700}>
-                        {venta.numero ?? "—"}
-                      </Typography>
+                      <Typography fontWeight={800}>{venta.numero ?? "—"}</Typography>
                     </TableCell>
 
                     <TableCell>{getFechaLabel(venta)}</TableCell>
@@ -509,23 +480,41 @@ export default function VentasTable({
                     <TableCell align="right">{detalles.length}</TableCell>
 
                     <TableCell align="right">
-                      <Typography fontWeight={800}>
-                        {formatCLP(total)}
-                      </Typography>
+                      <Typography fontWeight={900}>{formatCLP(total)}</Typography>
                     </TableCell>
 
+                    {/* ✅ BOTÓN DIRECTO */}
                     <TableCell align="right">
-                      <IconButton
-                        size="small"
-                        onClick={(e) => handleOpenMenu(e, venta)}
-                      >
-                        <MoreVertIcon fontSize="small" />
-                      </IconButton>
+                      <Tooltip title="Crear cotización desde este costeo">
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<DescriptionIcon fontSize="small" />}
+                          onClick={(e) => handleCreateCotFromRow(e, venta.id)}
+                          sx={{
+                            borderRadius: 2,
+                            textTransform: "none",
+                            fontWeight: 900,
+                            px: 1.25,
+                          }}
+                        >
+                          Cotizar
+                        </Button>
+                      </Tooltip>
+                    </TableCell>
+
+                    {/* menú opcional */}
+                    <TableCell align="right">
+                      <Tooltip title="Más acciones">
+                        <IconButton size="small" onClick={(e) => handleOpenMenu(e, venta)}>
+                          <MoreVertIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
 
                   <TableRow>
-                    <TableCell colSpan={8} sx={{ p: 0, borderBottom: 0 }}>
+                    <TableCell colSpan={9} sx={{ p: 0, borderBottom: 0 }}>
                       <Collapse in={opened} timeout="auto" unmountOnExit>
                         <Box sx={{ px: 1, pb: 1 }}>
                           <Divider sx={{ my: 1 }} />
@@ -553,21 +542,21 @@ export default function VentasTable({
         rowsPerPageOptions={[5, 10, 25, 50]}
       />
 
-      {/* ✅ Menú mejorado */}
+      {/* Menú opcional */}
       <Menu
         anchorEl={anchorEl}
         open={openMenu}
         onClose={handleCloseMenu}
         PaperProps={{ sx: { borderRadius: 2, minWidth: 240 } }}
       >
-        <MenuItem onClick={handleCreateCot} sx={{ py: 1.2, gap: 1 }}>
+        <MenuItem onClick={handleCreateCotFromMenu} sx={{ py: 1.2, gap: 1 }}>
           <DescriptionIcon fontSize="small" />
           <Box>
             <Typography fontWeight={700} variant="body2">
               Crear cotización
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              Usar esta venta como base
+              Usar este costeo como base
             </Typography>
           </Box>
         </MenuItem>
