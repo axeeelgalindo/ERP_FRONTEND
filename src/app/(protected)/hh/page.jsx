@@ -60,8 +60,9 @@ export default function HHPage() {
   const [horasMensuales, setHorasMensuales] = useState("");
   const [porcentajeEfectividad, setPorcentajeEfectividad] = useState("");
 
-  // ✅ CIF float
-  const [cif, setCif] = useState("");
+  // ✅ CIF: input formateado + valor "limpio" para backend
+  const [cifInput, setCifInput] = useState("");
+  const [cif, setCif] = useState(""); // SOLO NUMEROS (string) para enviar al backend
 
   const [loadingUpload, setLoadingUpload] = useState(false);
   const [loadingList, setLoadingList] = useState(false);
@@ -131,6 +132,43 @@ export default function HHPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodMonth]);
 
+  /* =========================
+     ✅ Helpers CIF CLP
+  ========================= */
+  const formatCLP = (n) =>
+    Number(n || 0).toLocaleString("es-CL", {
+      style: "currency",
+      currency: "CLP",
+      maximumFractionDigits: 0,
+    });
+
+  // deja solo dígitos (no signos, no puntos, no $)
+  const onlyDigits = (s) => String(s ?? "").replace(/[^\d]/g, "");
+
+  // Convierte "4.000" / "$4.000" / "4000" / "4,000" => "4000"
+  const parseCLPToNumberString = (s) => {
+    const digits = onlyDigits(s);
+    return digits ? String(Number(digits)) : "";
+  };
+
+  const handleCifChange = (e) => {
+    const raw = e.target.value;
+
+    // 1) valor limpio (para backend)
+    const clean = parseCLPToNumberString(raw);
+    setCif(clean);
+
+    // 2) valor mostrado (formateado)
+    if (!clean) {
+      setCifInput("");
+      return;
+    }
+    setCifInput(formatCLP(Number(clean)));
+  };
+
+  /* =========================
+     Data fetch
+  ========================= */
   const fetchHH = async () => {
     if (!empresaIdFromToken) {
       showSnackbar(
@@ -181,13 +219,10 @@ export default function HHPage() {
       );
     }
 
-    // ✅ CIF numérico
-    const cifNum = Number(String(cif).replace(",", "."));
-    if (!cif || Number.isNaN(cifNum)) {
-      return showSnackbar(
-        "error",
-        "Debes indicar un CIF numérico (ej: 1234.56)."
-      );
+    // ✅ CIF (limpio)
+    const cifNum = Number(cif);
+    if (!cif || Number.isNaN(cifNum) || cifNum <= 0) {
+      return showSnackbar("error", "Debes indicar un CIF válido (ej: 4000).");
     }
 
     const formData = new FormData();
@@ -199,7 +234,7 @@ export default function HHPage() {
     formData.append("horas_mensuales", horasMensuales);
     formData.append("porcentaje_efectividad", porcentajeEfectividad);
 
-    // ✅ enviar como texto, backend lo parsea a float con parseNumber
+    // ✅ enviar como texto numérico limpio
     formData.append("cif", String(cif));
 
     try {
@@ -355,11 +390,9 @@ export default function HHPage() {
             Libro de Remuneraciones (HH)
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Empresa: <strong>{empresaLabel}</strong>
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
             Sube tu libro mensual y visualiza el costo hora (HH) por empleado.
           </Typography>
+          
         </Box>
         {periodoLabel && (
           <Chip
@@ -426,14 +459,20 @@ export default function HHPage() {
                 />
               </Box>
 
+              {/* ✅ CIF formateado en vivo */}
               <TextField
                 label="CIF (costos indirectos del período)"
-                type="number"
+                type="text"
                 size="small"
-                value={cif}
-                onChange={(e) => setCif(e.target.value)}
-                placeholder="Ej: 123456.78"
-                helperText="Número (float). Si usas coma, igual lo parseamos."
+                value={cifInput}
+                onChange={handleCifChange}
+                placeholder="Ej: 4000"
+                helperText={
+                  cif
+                    ? `Se enviará como: ${cif} (CLP)`
+                    : "Escribe un monto y se formatea como CLP (ej: 4000 → $4.000)."
+                }
+                inputProps={{ inputMode: "numeric" }}
               />
 
               {horasEfectivasTotales > 0 && (
@@ -474,6 +513,7 @@ export default function HHPage() {
                 const mm = String(now2.getMonth() + 1).padStart(2, "0");
                 setPeriodMonth(`${yyyy}-${mm}`);
                 setCif("");
+                setCifInput("");
                 fetchHH();
               }}
             >
@@ -625,11 +665,7 @@ export default function HHPage() {
                   <TableCell>Nombre</TableCell>
                   <TableCell>RUT</TableCell>
                   <TableCell align="right">Días trab.</TableCell>
-                  {/*<TableCell align="right">Haberes</TableCell>*/}
-                  {/*<TableCell align="right">Empleador</TableCell>*/}
                   <TableCell align="right">Pagado</TableCell>
-                  {/*<TableCell align="right">Feriado</TableCell>*/}
-                  {/*<TableCell align="right">Indemnización</TableCell>*/}
                   <TableCell align="right">Total</TableCell>
                   <TableCell align="right">Costo HH</TableCell>
                 </TableRow>
@@ -646,9 +682,14 @@ export default function HHPage() {
                         })
                       : "-";
 
+                  // ⚠️ OJO: tu backend parece devolver row.cif.valor
+                  // Si a veces viene null/undefined, lo protegemos:
+                  const cifValor =
+                    row?.cif?.valor != null ? Number(row.cif.valor) : null;
+
                   const cifFmt =
-                    row.cif.valor != null
-                      ? Number(row.cif.valor).toLocaleString("es-CL", {
+                    cifValor != null && !Number.isNaN(cifValor)
+                      ? cifValor.toLocaleString("es-CL", {
                           style: "currency",
                           currency: "CLP",
                           maximumFractionDigits: 0,
@@ -665,11 +706,7 @@ export default function HHPage() {
                       <TableCell align="right">
                         {row.dias_trabajados ?? "-"}
                       </TableCell>
-                      {/*<TableCell align="right">{money(row.haberes)}</TableCell>*/}
-                      {/*<TableCell align="right">{money(row.empleador)}</TableCell>*/}
                       <TableCell align="right">{money(row.pagado)}</TableCell>
-                      {/*<TableCell align="right">{money(row.feriado)}</TableCell>*/}
-                      {/* <TableCell align="right">{money(row.indemnizacion)}</TableCell>*/}
                       <TableCell align="right">{money(row.total)}</TableCell>
                       <TableCell align="right">
                         {costoHH != null && !Number.isNaN(costoHH)

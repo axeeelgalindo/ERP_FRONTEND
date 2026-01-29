@@ -66,7 +66,7 @@ export default function Sidebar() {
         href: "/",
         label: "Inicio",
         Icon: Home,
-        roles: ["master", "admin", "empleado", "cliente"],
+        roles: ["master", "admin", "user"],
       },
       {
         href: "/clientes",
@@ -84,13 +84,13 @@ export default function Sidebar() {
         href: "/productos",
         label: "Productos",
         Icon: ShoppingCart,
-        roles: ["master", "admin", "empleado"],
+        roles: ["master", "admin"],
       },
       {
         href: "/proyectos",
         label: "Proyectos",
         Icon: FolderKanban,
-        roles: ["master", "admin", "empleado"],
+        roles: ["master", "admin"],
       },
       {
         href: "/empleados",
@@ -108,7 +108,7 @@ export default function Sidebar() {
         href: "/costeos",
         label: "Costeos",
         Icon: FileText,
-        roles: ["master", "admin"],
+        roles: ["master", "admin", "user", "empleado"],
       },
       {
         href: "/compras",
@@ -120,7 +120,7 @@ export default function Sidebar() {
         href: "/cotizaciones",
         label: "Cotizaciones",
         Icon: FileText,
-        roles: ["master", "admin"],
+        roles: ["master", "admin", "user", "empleado"],
       },
       {
         href: "/empresas",
