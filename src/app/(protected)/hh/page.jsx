@@ -1,8 +1,9 @@
-// (tu página HHPage.jsx / page.jsx)
+// src/app/(protected)/hh/page.jsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import {
   Box,
   Typography,
@@ -33,6 +34,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function HHPage() {
+  const router = useRouter();
   const { data: session, status } = useSession();
 
   const empresaIdFromToken = useMemo(
@@ -142,10 +144,8 @@ export default function HHPage() {
       maximumFractionDigits: 0,
     });
 
-  // deja solo dígitos (no signos, no puntos, no $)
   const onlyDigits = (s) => String(s ?? "").replace(/[^\d]/g, "");
 
-  // Convierte "4.000" / "$4.000" / "4000" / "4,000" => "4000"
   const parseCLPToNumberString = (s) => {
     const digits = onlyDigits(s);
     return digits ? String(Number(digits)) : "";
@@ -167,14 +167,38 @@ export default function HHPage() {
   };
 
   /* =========================
+     ✅ SAFE JSON + AUTH ERRORS
+  ========================= */
+  const safeJson = async (res) => {
+    try {
+      return await res.json();
+    } catch {
+      return null;
+    }
+  };
+
+  const handleAuthErrors = (statusCode) => {
+    if (statusCode === 401) {
+      showSnackbar("warning", "Tu sesión no es válida. Inicia sesión nuevamente.");
+      setTimeout(() => router.push("/login"), 600);
+      return true;
+    }
+
+    if (statusCode === 403) {
+      showSnackbar("error", "Acceso restringido: módulo HH confidencial.");
+      setTimeout(() => router.push("/"), 800);
+      return true;
+    }
+
+    return false;
+  };
+
+  /* =========================
      Data fetch
   ========================= */
   const fetchHH = async () => {
     if (!empresaIdFromToken) {
-      showSnackbar(
-        "error",
-        "No se encontró empresa en tu sesión. Revisa el token."
-      );
+      showSnackbar("error", "No se encontró empresa en tu sesión. Revisa el token.");
       return;
     }
 
@@ -186,32 +210,30 @@ export default function HHPage() {
 
       const url = `${API_URL}/hh/libro?${params.toString()}`;
       const res = await fetch(url, { headers: buildAuthHeaders() });
-      const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || "Error al obtener HH");
+      if (handleAuthErrors(res.status)) return;
 
-      const registros = Array.isArray(data) ? data : data.rows || [];
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data?.error || "Error al obtener HH");
+
+      const registros = Array.isArray(data) ? data : data?.rows || [];
       setRows(registros);
 
       setPeriodFilter("ALL");
       setPeriodoLabel("Todos los períodos");
 
-      if (!registros.length)
-        showSnackbar("info", "No hay registros HH para esta empresa.");
+      if (!registros.length) showSnackbar("info", "No hay registros HH para esta empresa.");
     } catch (err) {
-      showSnackbar("error", err.message || "Error al obtener HH");
+      showSnackbar("error", err?.message || "Error al obtener HH");
     } finally {
       setLoadingList(false);
     }
   };
 
   const handleUpload = async () => {
-    if (!file)
-      return showSnackbar("error", "Debes seleccionar un archivo .xlsx.");
-    if (!empresaIdFromToken)
-      return showSnackbar("error", "No se encontró empresa en tu sesión.");
-    if (!anio || !mes)
-      return showSnackbar("error", "Debes indicar Año y Mes para el archivo.");
+    if (!file) return showSnackbar("error", "Debes seleccionar un archivo .xlsx.");
+    if (!empresaIdFromToken) return showSnackbar("error", "No se encontró empresa en tu sesión.");
+    if (!anio || !mes) return showSnackbar("error", "Debes indicar Año y Mes para el archivo.");
     if (!horasMensuales || !porcentajeEfectividad) {
       return showSnackbar(
         "error",
@@ -234,7 +256,6 @@ export default function HHPage() {
     formData.append("horas_mensuales", horasMensuales);
     formData.append("porcentaje_efectividad", porcentajeEfectividad);
 
-    // ✅ enviar como texto numérico limpio
     formData.append("cif", String(cif));
 
     try {
@@ -246,15 +267,17 @@ export default function HHPage() {
         body: formData,
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error al subir el archivo");
+      if (handleAuthErrors(res.status)) return;
+
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data?.error || "Error al subir el archivo");
 
       showSnackbar("success", "Libro de remuneraciones cargado correctamente");
       setFile(null);
 
       await fetchHH();
     } catch (err) {
-      showSnackbar("error", err.message || "Error al subir el archivo");
+      showSnackbar("error", err?.message || "Error al subir el archivo");
     } finally {
       setLoadingUpload(false);
     }
@@ -392,8 +415,12 @@ export default function HHPage() {
           <Typography variant="body2" color="text.secondary">
             Sube tu libro mensual y visualiza el costo hora (HH) por empleado.
           </Typography>
-          
+          {/* Opcional */}
+          {/* <Typography variant="caption" color="text.secondary">
+            {empresaLabel}
+          </Typography> */}
         </Box>
+
         {periodoLabel && (
           <Chip
             label={`Período: ${periodoLabel}`}
@@ -459,7 +486,6 @@ export default function HHPage() {
                 />
               </Box>
 
-              {/* ✅ CIF formateado en vivo */}
               <TextField
                 label="CIF (costos indirectos del período)"
                 type="text"
@@ -540,7 +566,7 @@ export default function HHPage() {
                   type="file"
                   hidden
                   accept=".xlsx"
-                  onChange={(e) => setFile(e.target.files[0] || null)}
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
                 />
               </Button>
               <Typography variant="caption" color="text.secondary">
@@ -682,8 +708,6 @@ export default function HHPage() {
                         })
                       : "-";
 
-                  // ⚠️ OJO: tu backend parece devolver row.cif.valor
-                  // Si a veces viene null/undefined, lo protegemos:
                   const cifValor =
                     row?.cif?.valor != null ? Number(row.cif.valor) : null;
 

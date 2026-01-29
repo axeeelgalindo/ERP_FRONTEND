@@ -690,30 +690,13 @@ export default function NuevaVentaDialog({
 
         <Stack spacing={2}>
           <TextField
-            label="Descripción de la venta (opcional)"
+            label="Descripción de la venta"
             value={descripcionVenta}
             onChange={(e) => setDescripcionVenta(e.target.value)}
             fullWidth
             size="small"
+            required
           />
-
-          <TextField
-            select
-            label="Cotización/OV (opcional)"
-            value={ordenVentaId}
-            onChange={(e) => setOrdenVentaId(e.target.value)}
-            fullWidth
-            size="small"
-          >
-            <MenuItem value="">(Sin cotización/OV)</MenuItem>
-            {ordenesVenta.map((ov) => (
-              <MenuItem key={ov.id} value={ov.id}>
-                #{ov.numero} — {ov.proyecto?.nombre || "Sin proyecto"} —{" "}
-                {ov.cliente?.nombre || "Sin cliente"} — {formatCLP(ov.total)}{" "}
-                {ov.estado ? `— ${ov.estado}` : ""}
-              </MenuItem>
-            ))}
-          </TextField>
 
           <Divider />
 

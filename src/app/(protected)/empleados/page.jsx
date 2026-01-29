@@ -113,13 +113,20 @@ export default function EmpleadosPage() {
     setEditOpen(true);
   };
 
-  const handleSaveEmpleado = async () => {
+  /**
+   * onSave desde modal: puede venir con usuarioPatch
+   * @param {{ usuarioPatch?: any, clearUsuarioFields?: Function }} opts
+   */
+  const handleSaveEmpleado = async (opts = {}) => {
     if (!session || !currentEmp) return;
+
+    const { usuarioPatch, clearUsuarioFields } = opts;
 
     try {
       setLoading(true);
       setError("");
 
+      // 1) Guardar EMPLEADO
       const payload = {
         cargo: currentEmp.cargo || null,
         telefono: currentEmp.telefono || null,
@@ -149,6 +156,37 @@ export default function EmpleadosPage() {
         throw new Error(
           msg || `Error al ${isEdit ? "actualizar" : "crear"} empleado`
         );
+      }
+
+      // Si es create, el backend puede devolver el empleado creado
+      // para obtener el id y poder patch usuario.
+      let savedEmp = null;
+      try {
+        savedEmp = await res.json();
+      } catch {
+        savedEmp = null;
+      }
+
+      const empleadoIdFinal = currentEmp.id || savedEmp?.id;
+
+      // 2) Guardar USUARIO del empleado (rol/contraseña) -> SOLO SI VIENE PATCH
+      if (empleadoIdFinal && usuarioPatch && Object.keys(usuarioPatch).length) {
+        const resU = await fetch(`${API_URL}/empleados/${empleadoIdFinal}/usuario`, {
+          method: "PATCH",
+          headers: {
+            ...makeHeaders(session),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(usuarioPatch),
+        });
+
+        if (!resU.ok) {
+          const msg = await resU.text().catch(() => "");
+          throw new Error(msg || "Error al actualizar rol/contraseña del usuario");
+        }
+
+        // limpia password en UI (opcional)
+        clearUsuarioFields?.();
       }
 
       setEditOpen(false);
@@ -189,9 +227,9 @@ export default function EmpleadosPage() {
         method,
         headers: {
           ...makeHeaders(session),
-          "Content-Type": "application/json", // 👈 importante
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({}), // 👈 enviamos un JSON vacío
+        body: JSON.stringify({}), // para evitar FST_ERR_CTP_EMPTY_JSON_BODY
       });
 
       if (!res.ok) {
@@ -233,7 +271,6 @@ export default function EmpleadosPage() {
         }}
       />
 
-      {/* Estado carga / error */}
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
@@ -267,10 +304,11 @@ export default function EmpleadosPage() {
       <EmpleadoFormModal
         open={editOpen}
         mode={editMode}
+        session={session} // 👈 IMPORTANTE
         currentEmp={currentEmp}
         onChangeCurrentEmp={setCurrentEmp}
         onClose={() => setEditOpen(false)}
-        onSave={handleSaveEmpleado}
+        onSave={handleSaveEmpleado} // 👈 recibe opts con usuarioPatch
         saving={loading}
       />
 
