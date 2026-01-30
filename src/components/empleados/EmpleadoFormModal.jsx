@@ -6,10 +6,35 @@ import { makeHeaders } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+// ✅ arma "Apellidos, Nombres"
+function buildDisplayName(apellidos, nombres) {
+  const a = String(apellidos || "").trim().replace(/\s+/g, " ");
+  const n = String(nombres || "").trim().replace(/\s+/g, " ");
+  if (!a && !n) return "";
+  if (!a) return n;
+  if (!n) return a;
+  return `${a}, ${n}`;
+}
+
+// ✅ intenta separar desde "Apellidos, Nombres"
+function splitDisplayName(full) {
+  const s = String(full || "").trim();
+  if (!s) return { apellidos: "", nombres: "" };
+  const parts = s.split(",");
+  if (parts.length >= 2) {
+    return {
+      apellidos: parts[0].trim(),
+      nombres: parts.slice(1).join(",").trim(),
+    };
+  }
+  // fallback: si no hay coma, dejamos todo en nombres (sin inventar apellidos)
+  return { apellidos: "", nombres: s };
+}
+
 export default function EmpleadoFormModal({
   open,
-  mode,
-  session, // 👈 viene del page.jsx
+  mode, // "create" | "edit"
+  session,
   currentEmp,
   onChangeCurrentEmp,
   onClose,
@@ -21,9 +46,17 @@ export default function EmpleadoFormModal({
   const [roles, setRoles] = useState([]);
   const [rolesLoading, setRolesLoading] = useState(false);
 
+  // update usuario existente
   const [rolId, setRolId] = useState("");
   const [password, setPassword] = useState("");
   const [userErr, setUserErr] = useState("");
+
+  // ✅ create usuario nuevo (separado)
+  const [newApellidos, setNewApellidos] = useState("");
+  const [newNombres, setNewNombres] = useState("");
+  const [newCorreo, setNewCorreo] = useState("");
+  const [newRolId, setNewRolId] = useState("");
+  const [newPassword, setNewPassword] = useState("");
 
   const hasUsuario = Boolean(currentEmp?.usuario?.id);
 
@@ -47,12 +80,30 @@ export default function EmpleadoFormModal({
 
   const canEditUser = isAdmin;
 
+  // reset al abrir
   useEffect(() => {
     if (!open) return;
+
     setUserErr("");
+
+    // editar usuario existente
     setPassword("");
     setRolId(currentEmp?.usuario?.rol?.id || "");
-  }, [open, currentEmp?.usuario?.rol?.id]);
+
+    // ✅ crear usuario nuevo (modo create y sin usuario)
+    const { apellidos, nombres } = splitDisplayName(currentEmp?.usuario?.nombre || "");
+    setNewApellidos(apellidos);
+    setNewNombres(nombres);
+
+    setNewCorreo(currentEmp?.usuario?.correo || "");
+    setNewRolId(currentEmp?.usuario?.rol?.id || "");
+    setNewPassword("");
+  }, [
+    open,
+    currentEmp?.usuario?.rol?.id,
+    currentEmp?.usuario?.nombre,
+    currentEmp?.usuario?.correo,
+  ]);
 
   // Cargar roles
   useEffect(() => {
@@ -71,7 +122,7 @@ export default function EmpleadoFormModal({
         if (!res.ok) throw new Error("No se pudieron cargar roles");
         const json = await res.json();
         if (!cancelled) setRoles(json.data || []);
-      } catch (e) {
+      } catch {
         if (!cancelled) setRoles([]);
       } finally {
         if (!cancelled) setRolesLoading(false);
@@ -86,6 +137,16 @@ export default function EmpleadoFormModal({
   const handleSaveClick = async () => {
     setUserErr("");
 
+    // ✅ 1) empleadoPatch (siempre)
+    const empleadoPatch = {
+      cargo: currentEmp?.cargo ?? "",
+      telefono: currentEmp?.telefono ?? "",
+      fecha_ingreso: currentEmp?.fecha_ingreso || null,
+      sueldo_base: currentEmp?.sueldo_base ?? 0,
+      activo: !!currentEmp?.activo,
+    };
+
+    // ✅ 2) usuarioPatch (solo si existe usuario y admin)
     const usuarioPatch =
       hasUsuario && canEditUser
         ? {
@@ -97,12 +158,65 @@ export default function EmpleadoFormModal({
     const patchFinal =
       usuarioPatch && Object.keys(usuarioPatch).length > 0 ? usuarioPatch : null;
 
-    // Mandamos al page.jsx
+    // ✅ 3) usuarioCreate (solo si NO existe usuario, modo create y admin)
+    const nombreFinal = buildDisplayName(newApellidos, newNombres);
+
+    const usuarioCreate =
+      !hasUsuario && canEditUser && mode === "create"
+        ? {
+            nombre: nombreFinal,
+            correo: String(newCorreo || "").trim(),
+            rol_id: String(newRolId || "").trim(),
+            contrasena: String(newPassword || ""),
+          }
+        : null;
+
+    // validación básica del create
+    if (usuarioCreate) {
+      if (!String(newApellidos || "").trim()) {
+        setUserErr("Faltan los apellidos del usuario.");
+        return;
+      }
+      if (!String(newNombres || "").trim()) {
+        setUserErr("Faltan los nombres del usuario.");
+        return;
+      }
+      if (!usuarioCreate.nombre) {
+        setUserErr("Nombre final inválido.");
+        return;
+      }
+      if (!usuarioCreate.correo) {
+        setUserErr("Falta correo para el usuario.");
+        return;
+      }
+      if (!usuarioCreate.rol_id) {
+        setUserErr("Debes seleccionar un rol para el usuario.");
+        return;
+      }
+      if (!usuarioCreate.contrasena || usuarioCreate.contrasena.length < 6) {
+        setUserErr("La contraseña debe tener al menos 6 caracteres.");
+        return;
+      }
+    }
+
     await onSave?.({
+      empleadoPatch,
       usuarioPatch: patchFinal,
-      clearUsuarioFields: () => setPassword(""),
+      usuarioCreate,
+      clearUsuarioFields: () => {
+        setPassword("");
+        setNewPassword("");
+      },
     });
   };
+
+  const showCreateUserBox = canEditUser && mode === "create" && !hasUsuario;
+  const showEditUserBox = canEditUser && hasUsuario;
+
+  const previewNombre = useMemo(
+    () => buildDisplayName(newApellidos, newNombres),
+    [newApellidos, newNombres]
+  );
 
   return (
     <Modal
@@ -129,7 +243,105 @@ export default function EmpleadoFormModal({
             </div>
           )}
 
-          {hasUsuario && canEditUser && (
+          {/* ✅ CREATE usuario nuevo */}
+          {showCreateUserBox && (
+            <div className="rounded-lg border border-slate-200 bg-white p-3">
+              <div className="mb-2 text-xs font-semibold text-slate-700">
+                Acceso (crear usuario)
+              </div>
+
+              {userErr && (
+                <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {userErr}
+                </div>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-700">
+                    Apellidos
+                  </label>
+                  <input
+                    type="text"
+                    value={newApellidos}
+                    onChange={(e) => setNewApellidos(e.target.value)}
+                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="Ej: Gonzalez Ramirez"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-700">
+                    Nombres
+                  </label>
+                  <input
+                    type="text"
+                    value={newNombres}
+                    onChange={(e) => setNewNombres(e.target.value)}
+                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="Ej: Juan Carlos"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-700">
+                    Correo
+                  </label>
+                  <input
+                    type="email"
+                    value={newCorreo}
+                    onChange={(e) => setNewCorreo(e.target.value)}
+                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="correo@empresa.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-700">
+                    Rol
+                  </label>
+                  <select
+                    value={newRolId}
+                    onChange={(e) => setNewRolId(e.target.value)}
+                    disabled={rolesLoading}
+                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
+                  >
+                    <option value="">
+                      {rolesLoading ? "Cargando..." : "Selecciona un rol"}
+                    </option>
+                    {roles.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="mb-1 block text-xs font-medium text-gray-700">
+                    Contraseña
+                  </label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="Mínimo 6 caracteres"
+                  />
+                </div>
+              </div>
+
+              <p className="mt-2 text-[11px] text-gray-500">
+                Se guardará como:{" "}
+                <span className="font-semibold text-gray-700">
+                  {previewNombre || "—"}
+                </span>
+              </p>
+            </div>
+          )}
+
+          {/* ✅ EDIT usuario existente */}
+          {showEditUserBox && (
             <div className="rounded-lg border border-slate-200 bg-white p-3">
               <div className="mb-2 text-xs font-semibold text-slate-700">
                 Acceso (Usuario)
@@ -193,7 +405,7 @@ export default function EmpleadoFormModal({
               </label>
               <input
                 type="text"
-                value={currentEmp.cargo}
+                value={currentEmp.cargo ?? ""}
                 onChange={(e) =>
                   onChangeCurrentEmp((prev) => ({
                     ...prev,
@@ -211,7 +423,7 @@ export default function EmpleadoFormModal({
               </label>
               <input
                 type="text"
-                value={currentEmp.telefono}
+                value={currentEmp.telefono ?? ""}
                 onChange={(e) =>
                   onChangeCurrentEmp((prev) => ({
                     ...prev,
@@ -247,7 +459,7 @@ export default function EmpleadoFormModal({
               <input
                 type="number"
                 min={0}
-                value={currentEmp.sueldo_base}
+                value={currentEmp.sueldo_base ?? 0}
                 onChange={(e) =>
                   onChangeCurrentEmp((prev) => ({
                     ...prev,
@@ -264,7 +476,7 @@ export default function EmpleadoFormModal({
                 <input
                   type="checkbox"
                   className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  checked={currentEmp.activo}
+                  checked={!!currentEmp.activo}
                   onChange={(e) =>
                     onChangeCurrentEmp((prev) => ({
                       ...prev,
