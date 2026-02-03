@@ -317,7 +317,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
       doc.setFont("cambria", "normal");
       doc.setFontSize(9.2);
       doc.setTextColor(...C.text);
-      doc.text(fmtDate(cotizacion?.creada_en), mx + 4, barY + 10);
+      doc.text(fmtDate(cotizacion?.fecha_documento), mx + 4, barY + 10);
       doc.text(vendedorNombre, mx + 98, barY + 10);
 
       // ===== Tabla glosas =====

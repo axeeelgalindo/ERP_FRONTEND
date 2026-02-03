@@ -13,6 +13,8 @@ import CotizacionesMobileCards from "@/components/cotizaciones/CotizacionesMobil
 import CotizacionesSnack from "@/components/cotizaciones/CotizacionesSnack";
 import CotizacionesState from "@/components/cotizaciones/CotizacionesState";
 
+import ImportCotizacionPdfDialog from "@/components/cotizaciones/ImportCotizacionPdfDialog";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 async function safeJson(res) {
@@ -29,10 +31,15 @@ export default function CotizacionesPage() {
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   const [cotizaciones, setCotizaciones] = useState([]);
+  const [clientes, setClientes] = useState([]);
+
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
   const [expandedId, setExpandedId] = useState(null);
+
+  // Modal import pdf
+  const [openImport, setOpenImport] = useState(false);
 
   // Snackbar
   const [snack, setSnack] = useState({
@@ -78,8 +85,26 @@ export default function CotizacionesPage() {
     }
   };
 
+  const fetchClientes = async () => {
+    if (!session) return;
+    try {
+      const res = await fetch(`${API_URL}/clientes`, {
+        headers: makeHeaders(session),
+        cache: "no-store",
+      });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data?.error || data?.detalle || "Error al listar clientes");
+      setClientes(Array.isArray(data) ? data : data?.data || []);
+    } catch {
+      setClientes([]);
+    }
+  };
+
   useEffect(() => {
-    if (status === "authenticated") fetchCotizaciones();
+    if (status === "authenticated") {
+      fetchCotizaciones();
+      fetchClientes();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
@@ -105,12 +130,7 @@ export default function CotizacionesPage() {
       setCotizaciones((prev) =>
         prev.map((c) => {
           if (c.id !== cotizacionId) return c;
-
-          return {
-            ...c, // mantiene items viejos
-            ...data, // pisa con lo nuevo (estado, etc.)
-            items: data.items ?? c.items ?? [], // ✅ clave
-          };
+          return { ...c, ...data, items: data.items ?? c.items ?? [] };
         })
       );
     } catch (e) {
@@ -126,7 +146,18 @@ export default function CotizacionesPage() {
 
   return (
     <Box sx={{ maxWidth: "3xl", mx: "auto", p: { xs: 2, md: 3 } }}>
+      {/* Header actual */}
       <CotizacionesHeader loading={loading} onRefresh={fetchCotizaciones} />
+
+      {/* ✅ Botón Importar PDF (rápido, arriba) */}
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2, mb: 2 }}>
+        <button
+          onClick={() => setOpenImport(true)}
+          className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+        >
+          Importar PDF
+        </button>
+      </Box>
 
       <CotizacionesState
         status={status}
@@ -152,6 +183,16 @@ export default function CotizacionesPage() {
           onUpdateEstado={updateEstado}
         />
       )}
+
+      {/* ✅ Dialog import PDF */}
+      <ImportCotizacionPdfDialog
+        open={openImport}
+        onClose={() => setOpenImport(false)}
+        session={session}
+        clientes={clientes}
+        showSnack={showSnack}
+        onCreated={() => fetchCotizaciones()}
+      />
 
       <CotizacionesSnack snack={snack} onClose={closeSnack} />
     </Box>
