@@ -72,7 +72,7 @@ export default function Sidebar() {
         href: "/clientes",
         label: "Clientes",
         Icon: Users,
-        roles: ["master", "admin"],
+        roles: ["master", "admin", "user", "empleado" ],
       },
       {
         href: "/proveedores",
