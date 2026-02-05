@@ -62,12 +62,6 @@ export default function CotizacionPDFButton({ cotizacion }) {
       const W = 226;
       const H = 260;
 
-      const doc = new jsPDF({
-        orientation: "p",
-        unit: "mm",
-        format: [W, H],
-      });
-
       const mx = 14;
 
       const C = {
@@ -125,7 +119,6 @@ export default function CotizacionPDFButton({ cotizacion }) {
         doc.setFillColor(...C.white);
 
         if (mode === "down") {
-          // onda colgando (hacia abajo)
           doc.path(
             [
               ["M", 0, yTop + height - 6],
@@ -145,7 +138,6 @@ export default function CotizacionPDFButton({ cotizacion }) {
             "F"
           );
         } else if (mode === "up") {
-          // onda hacia arriba (footer)
           doc.path(
             [
               ["M", 0, yTop + 6],
@@ -174,7 +166,6 @@ export default function CotizacionPDFButton({ cotizacion }) {
           22.0
         );
 
-        // ===== CAJA DIRECCIÓN (SIEMPRE DENTRO DEL HEADER) =====
         const boxW = 72;
         const boxX = W - mx - boxW;
 
@@ -249,6 +240,11 @@ export default function CotizacionPDFButton({ cotizacion }) {
       };
 
       // ===== Página 1 base =====
+      const doc = new jsPDF({
+        orientation: "p",
+        unit: "mm",
+        format: [W, H],
+      });
       drawHeader();
       drawFooter(1, 1);
 
@@ -257,12 +253,10 @@ export default function CotizacionPDFButton({ cotizacion }) {
       doc.setFont("cambria", "normal");
       doc.setFontSize(9);
       doc.setTextColor(...C.text);
-      doc.text(
-        safe(cotizacion?.cliente?.nombre + " | " + cotizacion?.cliente?.rut) ||
-          "Cliente",
-        mx,
-        yCliente
-      );
+      const clienteLabel =
+        safe(cotizacion?.cliente?.nombre) +
+        (cotizacion?.cliente?.rut ? ` | ${safe(cotizacion?.cliente?.rut)}` : "");
+      doc.text(clienteLabel || "Cliente", mx, yCliente);
 
       // ===== Título + vigencia =====
       const yTitle = 52;
@@ -302,11 +296,13 @@ export default function CotizacionPDFButton({ cotizacion }) {
       doc.setFillColor(...C.bar);
       doc.roundedRect(mx, barY, W - mx * 2, 12, 2.5, 2.5, "F");
 
+      // ✅ 3 columnas: Fecha | Vencimiento | Vendedor
       doc.setFont("cambria", "bold");
       doc.setFontSize(8.6);
       doc.setTextColor(...C.blue);
       doc.text("Fecha", mx + 4, barY + 5);
-      doc.text("Vendedor", mx + 98, barY + 5);
+      doc.text("Vencimiento", mx + 58, barY + 5);
+      doc.text("Vendedor", mx + 128, barY + 5);
 
       const vendedorNombre =
         safe(cotizacion?.vendedor?.nombre) ||
@@ -318,7 +314,8 @@ export default function CotizacionPDFButton({ cotizacion }) {
       doc.setFontSize(9.2);
       doc.setTextColor(...C.text);
       doc.text(fmtDate(cotizacion?.fecha_documento), mx + 4, barY + 10);
-      doc.text(vendedorNombre, mx + 98, barY + 10);
+      doc.text(fmtDate(cotizacion?.vencimiento_documento), mx + 58, barY + 10);
+      doc.text(vendedorNombre, mx + 128, barY + 10);
 
       // ===== Tabla glosas =====
       const glosas = Array.isArray(cotizacion?.glosas) ? cotizacion.glosas : [];
@@ -352,15 +349,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
         startY: tableStartY,
         margin: { left: mx, right: mx, top: HEADER_H, bottom: FOOTER_H + 2 },
         tableWidth: tableW,
-        head: [
-          [
-            "Descripción",
-            "Cantidad",
-            "Precio unitario",
-            "Impuestos",
-            "Importe",
-          ],
-        ],
+        head: [["Descripción", "Cantidad", "Precio unitario", "Impuestos", "Importe"]],
         body: glosasBody,
         theme: "plain",
         styles: {
