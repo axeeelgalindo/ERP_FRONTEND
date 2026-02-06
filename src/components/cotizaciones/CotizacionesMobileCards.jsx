@@ -170,9 +170,9 @@ export default function CotizacionesMobileCards({
       <CotizacionActionsMenu
         anchorEl={anchorEl}
         open={openMenu}
+        cotizacion={menuCot}
         onClose={closeActions}
-        onAction={handleMenuAction}
-        canGoTo={canGoTo}
+        onUpdateEstado={onUpdateEstado}
       />
     </>
   );

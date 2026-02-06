@@ -1,3 +1,4 @@
+// src/app/(protected)/compras/page.jsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -49,6 +50,21 @@ function toCLP(v) {
   });
 }
 
+/** ✅ Filtrar SIEMPRE por fecha_docto (RCV) */
+function getCompraDate(c) {
+  const raw =
+    c?.fecha_docto ?? // ✅ este es el bueno
+    c?.fecha_emision ??
+    c?.fecha ??
+    c?.creada_en ??
+    c?.createdAt ??
+    null;
+
+  if (!raw) return null;
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export default function ComprasPage() {
   const { data: session, status } = useSession();
 
@@ -64,6 +80,14 @@ export default function ComprasPage() {
   // filtros UI
   const [estadoFilter, setEstadoFilter] = useState("ALL");
   const [q, setQ] = useState("");
+
+  // ✅ Periodo tipo HH: "YYYY-MM" (input type="month")
+  const now = new Date();
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const defaultPeriodo = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
+
+  // Si quieres que NO filtre por defecto, déjalo en ""
+  const [periodo, setPeriodo] = useState(defaultPeriodo);
 
   // ===== Modal crear manual =====
   const [openCreate, setOpenCreate] = useState(false);
@@ -195,13 +219,25 @@ export default function ComprasPage() {
   // --- filtros client-side (rápido y útil para UX)
   const rows = useMemo(() => {
     const arr = bundle?.data || [];
-    const term = String(q || "")
-      .trim()
-      .toLowerCase();
+    const term = String(q || "").trim().toLowerCase();
 
     return arr.filter((c) => {
       if (estadoFilter !== "ALL" && String(c.estado) !== estadoFilter)
         return false;
+
+      // ✅ filtro por periodo (YYYY-MM) usando fecha_docto
+      if (periodo) {
+        const d = getCompraDate(c);
+        if (!d) return false;
+
+        const [py, pm] = String(periodo).split("-").map(Number);
+        const y = d.getFullYear();
+        const m = d.getMonth() + 1;
+
+        if (y !== py) return false;
+        if (m !== pm) return false;
+      }
+
       if (!term) return true;
 
       const proveedorNombre = c?.proveedor?.nombre ?? "";
@@ -225,7 +261,7 @@ export default function ComprasPage() {
 
       return hay.includes(term);
     });
-  }, [bundle, q, estadoFilter]);
+  }, [bundle, q, estadoFilter, periodo]);
 
   // stats
   const stats = useMemo(() => {
@@ -307,6 +343,7 @@ export default function ComprasPage() {
               className="h-9 rounded-lg border px-3 text-sm hover:bg-slate-50 disabled:opacity-60"
               onClick={handleRefresh}
               disabled={loading || lookupsLoading}
+              type="button"
             >
               {loading || lookupsLoading ? "Cargando…" : "Recargar"}
             </button>
@@ -314,6 +351,7 @@ export default function ComprasPage() {
             <button
               className="h-9 rounded-lg bg-slate-900 px-3 text-sm text-white hover:opacity-90"
               onClick={() => setOpenCreate(true)}
+              type="button"
             >
               + Crear manual
             </button>
@@ -373,7 +411,10 @@ export default function ComprasPage() {
                 <select
                   className="h-9 rounded-lg border px-2 text-sm bg-white"
                   value={estadoFilter}
-                  onChange={(e) => setEstadoFilter(e.target.value)}
+                  onChange={(e) => {
+                    setEstadoFilter(e.target.value);
+                    setPage(1);
+                  }}
                 >
                   <option value="ALL">Todos</option>
                   <option value="ORDEN_COMPRA">ORDEN_COMPRA</option>
@@ -382,11 +423,43 @@ export default function ComprasPage() {
                 </select>
               </div>
 
+              {/* ✅ Periodo tipo calendario (HH): Año-Mes juntos */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">Periodo</span>
+
+                <input
+                  type="month"
+                  className="h-9 rounded-lg border px-2 text-sm bg-white"
+                  value={periodo}
+                  onChange={(e) => {
+                    setPeriodo(e.target.value);
+                    setPage(1);
+                  }}
+                  title="Periodo (Año-Mes)"
+                />
+
+                <button
+                  type="button"
+                  className="h-9 rounded-lg border px-3 text-sm hover:bg-slate-50 disabled:opacity-60"
+                  onClick={() => {
+                    setPeriodo("");
+                    setPage(1);
+                  }}
+                  disabled={!periodo}
+                  title="Quitar filtro de periodo"
+                >
+                  Limpiar
+                </button>
+              </div>
+
               <input
                 className="h-9 w-full md:w-96 rounded-lg border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-200"
                 placeholder="Buscar por proveedor, RUT, folio, tipo doc, proyecto…"
                 value={q}
-                onChange={(e) => setQ(e.target.value)}
+                onChange={(e) => {
+                  setQ(e.target.value);
+                  setPage(1);
+                }}
               />
             </div>
           </div>

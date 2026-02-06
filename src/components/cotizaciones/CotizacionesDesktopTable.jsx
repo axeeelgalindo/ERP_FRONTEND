@@ -117,13 +117,19 @@ export default function CotizacionesDesktopTable({
                             onToggleExpanded?.(c.id);
                           }}
                         >
-                          {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+                          {open ? (
+                            <KeyboardArrowUpIcon />
+                          ) : (
+                            <KeyboardArrowDownIcon />
+                          )}
                         </IconButton>
                       </Tooltip>
                     </TableCell>
 
                     <TableCell>
-                      <Typography fontWeight={900}>{c.numero ?? "—"}</Typography>
+                      <Typography fontWeight={900}>
+                        {c.numero ?? "—"}
+                      </Typography>
                     </TableCell>
 
                     <TableCell>{fechaCL(c.creada_en)}</TableCell>
@@ -132,7 +138,13 @@ export default function CotizacionesDesktopTable({
                     <TableCell>{c.cliente?.nombre || "Sin cliente"}</TableCell>
 
                     <TableCell>
-                      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 0.75,
+                        }}
+                      >
                         <Chip
                           label={estado.replaceAll("_", " ")}
                           size="small"
@@ -140,31 +152,32 @@ export default function CotizacionesDesktopTable({
                           variant="outlined"
                           sx={{ width: "fit-content", fontWeight: 700 }}
                         />
-                        <Typography variant="caption" color="text.secondary">
-                          {siguiente ? (
-                            <>
-                              Siguiente:{" "}
-                              <strong>{siguiente.replaceAll("_", " ")}</strong>
-                            </>
-                          ) : (
-                            <>
-                              Final: <strong>PAGADA</strong>
-                            </>
-                          )}
-                        </Typography>
+                        {!["PAGADA", "RECHAZADA"].includes(estado) &&
+                        siguiente ? (
+                          <Typography variant="caption" color="text.secondary">
+                            Siguiente:{" "}
+                            <strong>{siguiente.replaceAll("_", " ")}</strong>
+                          </Typography>
+                        ) : null}
                       </Box>
                     </TableCell>
 
                     <TableCell align="right">
-                      <Typography fontWeight={900}>{formatCLP(c.subtotal)}</Typography>
+                      <Typography fontWeight={900}>
+                        {formatCLP(c.subtotal)}
+                      </Typography>
                     </TableCell>
 
                     <TableCell align="right">
-                      <Typography fontWeight={900}>{formatCLP(c.iva)}</Typography>
+                      <Typography fontWeight={900}>
+                        {formatCLP(c.iva)}
+                      </Typography>
                     </TableCell>
 
                     <TableCell align="right">
-                      <Typography fontWeight={900}>{formatCLP(c.total)}</Typography>
+                      <Typography fontWeight={900}>
+                        {formatCLP(c.total)}
+                      </Typography>
                     </TableCell>
 
                     <TableCell
@@ -175,9 +188,15 @@ export default function CotizacionesDesktopTable({
                       <CotizacionPDFButton cotizacion={c} />
                     </TableCell>
 
-                    <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                    <TableCell
+                      align="center"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <Tooltip title="Acciones">
-                        <IconButton size="small" onClick={(e) => handleOpenMenu(e, c)}>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => handleOpenMenu(e, c)}
+                        >
                           <MoreVertIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>

@@ -93,7 +93,10 @@ export default function CotizacionesPage() {
         cache: "no-store",
       });
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data?.error || data?.detalle || "Error al listar clientes");
+      if (!res.ok)
+        throw new Error(
+          data?.error || data?.detalle || "Error al listar clientes"
+        );
       setClientes(Array.isArray(data) ? data : data?.data || []);
     } catch {
       setClientes([]);
@@ -108,14 +111,15 @@ export default function CotizacionesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
-  const updateEstado = async (cotizacionId, estado) => {
+  // ✅ IMPORTANTE: ahora soporta "extra"
+  const updateEstado = async (cotizacionId, estado, extra = {}) => {
     try {
       const res = await fetch(
         `${API_URL}/cotizaciones/${cotizacionId}/estado`,
         {
           method: "POST",
           headers: makeHeaders(session),
-          body: JSON.stringify({ estado }),
+          body: JSON.stringify({ estado, ...extra }),
         }
       );
 
@@ -126,7 +130,12 @@ export default function CotizacionesPage() {
         );
       }
 
-      showSnack("success", `Estado actualizado a ${estado}`);
+      if (estado === "ACEPTADA")
+        showSnack("success", "Cotización aceptada. Proyecto creado/iniciado.");
+      else if (estado === "RECHAZADA")
+        showSnack("success", "Cotización rechazada.");
+      else showSnack("success", `Estado actualizado a ${estado}`);
+
       setCotizaciones((prev) =>
         prev.map((c) => {
           if (c.id !== cotizacionId) return c;
@@ -138,7 +147,6 @@ export default function CotizacionesPage() {
     }
   };
 
-  // Estados base (loading / unauth)
   const stateUI = (
     <CotizacionesState status={status} loading={loading} err={err} />
   );
@@ -146,10 +154,8 @@ export default function CotizacionesPage() {
 
   return (
     <Box sx={{ maxWidth: "3xl", mx: "auto", p: { xs: 2, md: 3 } }}>
-      {/* Header actual */}
       <CotizacionesHeader loading={loading} onRefresh={fetchCotizaciones} />
 
-      {/* ✅ Botón Importar PDF (rápido, arriba) */}
       <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2, mb: 2 }}>
         <button
           onClick={() => setOpenImport(true)}
@@ -184,7 +190,6 @@ export default function CotizacionesPage() {
         />
       )}
 
-      {/* ✅ Dialog import PDF */}
       <ImportCotizacionPdfDialog
         open={openImport}
         onClose={() => setOpenImport(false)}

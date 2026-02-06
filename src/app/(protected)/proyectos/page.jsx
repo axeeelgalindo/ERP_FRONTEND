@@ -13,6 +13,14 @@ import AddProyectoButton from "@/components/proyectos/AddProyectoButton";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
+async function safeJson(res) {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 export default function ProyectosPage() {
   const { data: session } = useSession();
 
@@ -33,6 +41,7 @@ export default function ProyectosPage() {
     msg: "",
     severity: "info",
   });
+
   const openSnack = (msg, severity = "info") =>
     setSnack({ open: true, msg, severity });
   const closeSnack = () =>
@@ -52,15 +61,17 @@ export default function ProyectosPage() {
       url.searchParams.set("pageSize", String(pageSize));
 
       const res = await fetch(url, { headers, cache: "no-store" });
-      const json = await res.json().catch(() => null);
+      const json = await safeJson(res);
+
       if (!res.ok)
         throw new Error(json?.message || json?.msg || "Error al cargar");
 
       const list = Array.isArray(json?.items)
         ? json.items
         : Array.isArray(json)
-        ? json
-        : [];
+          ? json
+          : [];
+
       setRows(list);
       setTotal(Number(json?.total ?? list.length) || 0);
       setErr("");
@@ -73,6 +84,7 @@ export default function ProyectosPage() {
 
   useEffect(() => {
     if (session?.user) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, q, estado, page]);
 
   const filtered = useMemo(() => {
@@ -88,6 +100,67 @@ export default function ProyectosPage() {
       return cs.some((txt) => txt.includes(needle));
     });
   }, [rows, cliente]);
+
+  // ✅ INICIAR (fecha real)
+  const handleStartProyecto = async (row) => {
+    if (!session) return;
+    if (!row?.id) return;
+
+    const ok = window.confirm(
+      "¿Iniciar proyecto ahora?\nSe guardará la fecha real de inicio.",
+    );
+    if (!ok) return;
+
+    try {
+      const res = await fetch(`${API}/proyectos/${row.id}/iniciar`, {
+        method: "POST",
+        headers: makeHeaders(session),
+        body: JSON.stringify({}), // ✅ FIX
+      });
+
+      const json = await safeJson(res);
+      if (!res.ok)
+        throw new Error(
+          json?.error || json?.detalle || "Error al iniciar proyecto",
+        );
+
+      openSnack("Proyecto iniciado ✅", "success");
+      await load();
+    } catch (e) {
+      openSnack(e?.message || "Error al iniciar proyecto", "error");
+    }
+  };
+
+  // ✅ FINALIZAR (fecha real)
+  const handleFinishProyecto = async (row) => {
+    if (!session) return;
+    if (!row?.id) return;
+
+    const ok = window.confirm(
+      "¿Finalizar proyecto ahora?\nSe guardará la fecha real de término.",
+    );
+    if (!ok) return;
+
+    try {
+      const res = await fetch(`${API}/proyectos/${row.id}/finalizar`, {
+        method: "POST",
+        headers: makeHeaders(session),
+        body: JSON.stringify({}), // ✅ FIX
+
+      });
+
+      const json = await safeJson(res);
+      if (!res.ok)
+        throw new Error(
+          json?.error || json?.detalle || "Error al finalizar proyecto",
+        );
+
+      openSnack("Proyecto finalizado ✅", "success");
+      await load();
+    } catch (e) {
+      openSnack(e?.message || "Error al finalizar proyecto", "error");
+    }
+  };
 
   return (
     <div className="px-6 py-6">
@@ -117,6 +190,9 @@ export default function ProyectosPage() {
           pageSize={pageSize}
           total={total}
           onPageChange={(p) => setPage(p)}
+          // ✅ NUEVO
+          onStart={handleStartProyecto}
+          onFinish={handleFinishProyecto}
         />
       </div>
 
