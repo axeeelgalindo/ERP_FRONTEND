@@ -28,6 +28,7 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import DescriptionIcon from "@mui/icons-material/Description";
+import EditIcon from "@mui/icons-material/Edit";
 import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 
@@ -57,7 +58,7 @@ function calcPctUtilSobreVenta(venta) {
   return totalVenta > 0 ? (utilidad / totalVenta) * 100 : 0;
 }
 
-// % sobre COSTO: (venta - costo) / costo  -> permite 130%, 180%, etc.
+// % sobre COSTO: (venta - costo) / costo
 function calcPctUtilSobreCosto(venta) {
   const totalCosto = calcTotalCosto(venta);
   const utilidad = calcUtilidadTotal(venta);
@@ -111,7 +112,7 @@ function DetallesVentaTable({ detalles, totals }) {
         />
       </Box>
 
-      {/* ✅ RESUMEN TOTAL (más claro) */}
+      {/* ✅ RESUMEN TOTAL */}
       <Box
         sx={{
           mt: 1,
@@ -242,7 +243,9 @@ function DetallesVentaTable({ detalles, totals }) {
                 </TableCell>
 
                 <TableCell align="right">
-                  <Typography fontWeight={800}>{formatCLP(det.total ?? det.ventaTotal)}</Typography>
+                  <Typography fontWeight={800}>
+                    {formatCLP(det.total ?? det.ventaTotal)}
+                  </Typography>
                 </TableCell>
 
                 <TableCell align="right">
@@ -281,19 +284,20 @@ function DetallesVentaTable({ detalles, totals }) {
  * Props:
  * - ventas: Venta[]
  * - onCreateCotizacionFromVenta: (ventaId: string) => void
+ * - onEditVenta: (ventaId: string) => void   ✅ NUEVO
  */
-export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }) {
+export default function VentasTable({
+  ventas = [],
+  onCreateCotizacionFromVenta,
+  onEditVenta,
+}) {
   const isMobile = useMediaQuery("(max-width:900px)");
 
-  // Expand rows
   const [openMap, setOpenMap] = useState({});
-
-  // Actions menu (opcional)
   const [anchorEl, setAnchorEl] = useState(null);
   const [menuVenta, setMenuVenta] = useState(null);
   const openMenu = Boolean(anchorEl);
 
-  // Pagination
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
@@ -314,7 +318,6 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
     setOpenMap((prev) => ({ ...prev, [ventaId]: !prev[ventaId] }));
   };
 
-  // para que clicks en botones no togglen la fila/card
   const stopRowToggle = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -341,6 +344,13 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
     handleCloseMenu();
     if (!ventaId) return;
     onCreateCotizacionFromVenta?.(ventaId);
+  };
+
+  const handleEditFromMenu = () => {
+    const ventaId = menuVenta?.id;
+    handleCloseMenu();
+    if (!ventaId) return;
+    onEditVenta?.(ventaId);
   };
 
   const handleChangePage = (_, newPage) => setPage(newPage);
@@ -403,7 +413,6 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
                       sx={{ borderRadius: 999 }}
                     />
 
-                    {/* ✅ % total visible en mobile */}
                     <Tooltip title={`Base venta: ${pctVenta.toFixed(1)}% | Base costo: ${pctCosto.toFixed(1)}%`}>
                       <Chip
                         label={`Util: ${pctCosto.toFixed(1)}%`}
@@ -431,7 +440,6 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
                         {opened ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
                       </Box>
 
-                      {/* menú opcional */}
                       <Tooltip title="Más acciones">
                         <IconButton size="small" onClick={(e) => handleOpenMenu(e, venta)}>
                           <MoreVertIcon fontSize="small" />
@@ -470,7 +478,7 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
           />
         </Paper>
 
-        {/* Menú (opcional) */}
+        {/* Menú (mobile) */}
         <Menu
           anchorEl={anchorEl}
           open={openMenu}
@@ -485,6 +493,18 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 Usar este costeo como base
+              </Typography>
+            </Box>
+          </MenuItem>
+
+          <MenuItem onClick={handleEditFromMenu} sx={{ py: 1.2, gap: 1 }}>
+            <EditIcon fontSize="small" />
+            <Box>
+              <Typography fontWeight={700} variant="body2">
+                Editar costeo
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Modificar ítems y % objetivo
               </Typography>
             </Box>
           </MenuItem>
@@ -507,16 +527,10 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
               <TableCell>Descripción</TableCell>
               <TableCell align="right">Ítems</TableCell>
               <TableCell align="right">Total</TableCell>
-
-              {/* ✅ NUEVO: % Util total */}
               <TableCell align="right">% Util. Total</TableCell>
-
-              {/* botón por registro */}
               <TableCell align="right" sx={{ width: 170 }}>
                 Cotización
               </TableCell>
-
-              {/* menú opcional */}
               <TableCell align="right" sx={{ width: 56 }}>
                 Más
               </TableCell>
@@ -594,7 +608,6 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
                       <Typography fontWeight={900}>{formatCLP(total)}</Typography>
                     </TableCell>
 
-                    {/* ✅ % util total visible (mostramos base COSTO, tooltip muestra ambas) */}
                     <TableCell align="right" onClick={stopRowToggle}>
                       <Tooltip
                         title={`Utilidad: ${formatCLP(utilidadTotal)} | Base venta: ${pctVenta.toFixed(
@@ -611,7 +624,6 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
                       </Tooltip>
                     </TableCell>
 
-                    {/* BOTÓN DIRECTO */}
                     <TableCell align="right">
                       <Tooltip title="Crear cotización desde este costeo">
                         <Button
@@ -631,7 +643,6 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
                       </Tooltip>
                     </TableCell>
 
-                    {/* menú opcional */}
                     <TableCell align="right">
                       <Tooltip title="Más acciones">
                         <IconButton size="small" onClick={(e) => handleOpenMenu(e, venta)}>
@@ -642,7 +653,6 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
                   </TableRow>
 
                   <TableRow>
-                    {/* ✅ colSpan sube a 10 por la nueva columna */}
                     <TableCell colSpan={10} sx={{ p: 0, borderBottom: 0 }}>
                       <Collapse in={opened} timeout="auto" unmountOnExit>
                         <Box sx={{ px: 1, pb: 1 }}>
@@ -671,7 +681,7 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
         rowsPerPageOptions={[5, 10, 25, 50]}
       />
 
-      {/* Menú opcional */}
+      {/* Menú (desktop) */}
       <Menu
         anchorEl={anchorEl}
         open={openMenu}
@@ -686,6 +696,18 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
             </Typography>
             <Typography variant="caption" color="text.secondary">
               Usar este costeo como base
+            </Typography>
+          </Box>
+        </MenuItem>
+
+        <MenuItem onClick={handleEditFromMenu} sx={{ py: 1.2, gap: 1 }}>
+          <EditIcon fontSize="small" />
+          <Box>
+            <Typography fontWeight={700} variant="body2">
+              Editar costeo
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Modificar ítems y % objetivo
             </Typography>
           </Box>
         </MenuItem>

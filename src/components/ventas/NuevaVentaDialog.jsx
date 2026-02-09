@@ -34,7 +34,10 @@ export default function NuevaVentaDialog({
   session,
   empresaIdFromToken,
   onCreated,
+  ventaId = null, // ✅ NUEVO: si viene => EDIT
 }) {
+  const isEdit = !!ventaId;
+
   // =========================
   // Form state
   // =========================
@@ -43,11 +46,8 @@ export default function NuevaVentaDialog({
 
   const [descripcionVenta, setDescripcionVenta] = useState("");
   const [ordenVentaId, setOrdenVentaId] = useState("");
-
-  // ✅ % utilidad objetivo global (sobre COSTO)
   const [utilidadPctObjetivo, setUtilidadPctObjetivo] = useState("");
 
-  // periodo HH
   const now = useMemo(() => new Date(), []);
   const [anio, setAnio] = useState(String(now.getFullYear()));
   const [mes, setMes] = useState(String(now.getMonth() + 1));
@@ -62,6 +62,10 @@ export default function NuevaVentaDialog({
 
   const [loadingCatalogos, setLoadingCatalogos] = useState(false);
   const [catalogosErr, setCatalogosErr] = useState("");
+
+  // carga venta a editar
+  const [loadingVenta, setLoadingVenta] = useState(false);
+  const [ventaCargada, setVentaCargada] = useState(false);
 
   // =========================
   // helpers
@@ -109,9 +113,7 @@ export default function NuevaVentaDialog({
   }
 
   function getEmpleadoRut(emp) {
-    return (
-      emp?.rut ?? emp?.RUT ?? emp?.usuario?.rut ?? emp?.usuario?.RUT ?? null
-    );
+    return emp?.rut ?? emp?.RUT ?? emp?.usuario?.rut ?? emp?.usuario?.RUT ?? null;
   }
 
   function getHHRut(hh) {
@@ -122,36 +124,29 @@ export default function NuevaVentaDialog({
     return hh?.empleado_id ?? hh?.empleadoId ?? hh?.empleado?.id ?? null;
   }
 
-  // ✅ CIF helpers
   function getHHCIFValue(hh) {
     if (!hh) return 0;
 
     if (hh?.cif != null && typeof hh.cif === "number") return Number(hh.cif);
-
     if (hh?.cif != null && typeof hh.cif === "string") {
       const n = Number(hh.cif);
       return Number.isFinite(n) ? n : 0;
     }
-
     if (hh?.cif?.valor != null) {
       const n = Number(hh.cif.valor);
       return Number.isFinite(n) ? n : 0;
     }
-
     if (hh?.cifObj?.valor != null) {
       const n = Number(hh.cifObj.valor);
       return Number.isFinite(n) ? n : 0;
     }
-
     if (hh?.cifObj?.cif?.valor != null) {
       const n = Number(hh.cifObj.cif.valor);
       return Number.isFinite(n) ? n : 0;
     }
-
     return 0;
   }
 
-  // TipoItem HH (para UI/preview)
   const tipoItemHH = useMemo(() => {
     const hh =
       tipoItems.find((t) => String(t?.codigo || "").toUpperCase() === "HH") ||
@@ -160,7 +155,6 @@ export default function NuevaVentaDialog({
     return hh;
   }, [tipoItems]);
 
-  // ✅ alpha: si viene null/"" => default 10; si viene 0 => 0 real
   const normalizeAlphaPctUI = (v) => {
     if (v == null || v === "") return 10;
     const n = Number(v);
@@ -169,9 +163,7 @@ export default function NuevaVentaDialog({
     return n;
   };
 
-  // =========================
-  // ✅ Money input helpers
-  // =========================
+  // money helpers
   const onlyDigits = (s) => String(s ?? "").replace(/[^\d]/g, "");
 
   const parseCLPToNumberString = (s) => {
@@ -192,9 +184,7 @@ export default function NuevaVentaDialog({
     return Number.isFinite(n) ? n : 0;
   };
 
-  // =========================
   // Tipo día enable rule
-  // =========================
   const normalizeText = (s) =>
     String(s ?? "")
       .trim()
@@ -226,16 +216,12 @@ export default function NuevaVentaDialog({
 
   const emptyDet = () => ({
     descripcion: "",
-    modo: "HH", // "HH" | "COMPRA"
+    modo: "HH",
     cantidad: 1,
-
-    tipoItemId: tipoItemHH?.id || "",
-
+    tipoItemId: "",
     tipoDiaId: "",
     alphaPct: 10,
-
     empleadoId: "",
-
     compraId: "",
     costoUnitarioManual: "",
   });
@@ -252,6 +238,7 @@ export default function NuevaVentaDialog({
     setDetalles([emptyDet()]);
     setFormErr("");
     setCatalogosErr("");
+    setVentaCargada(false);
   };
 
   // =========================
@@ -269,10 +256,7 @@ export default function NuevaVentaDialog({
       const [resTipoItems, resTipoDias, resOV] = await Promise.all([
         fetch(`${API_URL}/ventas/tipoitems`, { headers, cache: "no-store" }),
         fetch(`${API_URL}/ventas/tipodias`, { headers, cache: "no-store" }),
-        fetch(`${API_URL}/ventas/ordenes-venta`, {
-          headers,
-          cache: "no-store",
-        }),
+        fetch(`${API_URL}/ventas/ordenes-venta`, { headers, cache: "no-store" }),
       ]);
 
       const [dataTipoItems, dataTipoDias, dataOV] = await Promise.all([
@@ -282,21 +266,11 @@ export default function NuevaVentaDialog({
       ]);
 
       if (!resTipoItems.ok)
-        throw new Error(
-          dataTipoItems?.error ||
-            dataTipoItems?.message ||
-            "Error cargando tipoItems"
-        );
+        throw new Error(dataTipoItems?.error || dataTipoItems?.message || "Error cargando tipoItems");
       if (!resTipoDias.ok)
-        throw new Error(
-          dataTipoDias?.error ||
-            dataTipoDias?.message ||
-            "Error cargando tipoDias"
-        );
+        throw new Error(dataTipoDias?.error || dataTipoDias?.message || "Error cargando tipoDias");
       if (!resOV.ok)
-        throw new Error(
-          dataOV?.error || dataOV?.message || "Error cargando cotizaciones/OV"
-        );
+        throw new Error(dataOV?.error || dataOV?.message || "Error cargando cotizaciones/OV");
 
       const ti = Array.isArray(dataTipoItems) ? dataTipoItems : [];
       setTipoItems(ti);
@@ -305,14 +279,8 @@ export default function NuevaVentaDialog({
 
       const [resEmpleados, resHH, resCompraDisp] = await Promise.all([
         fetch(`${API_URL}/ventas/empleados`, { headers, cache: "no-store" }),
-        fetch(`${API_URL}/ventas/hh-empleados?anio=${anio}&mes=${mes}`, {
-          headers,
-          cache: "no-store",
-        }),
-        fetch(`${API_URL}/compras/disponibles-venta`, {
-          headers,
-          cache: "no-store",
-        }),
+        fetch(`${API_URL}/ventas/hh-empleados?anio=${anio}&mes=${mes}`, { headers, cache: "no-store" }),
+        fetch(`${API_URL}/compras/disponibles-venta`, { headers, cache: "no-store" }),
       ]);
 
       const [dataEmpleados, dataHH, dataCompraDisp] = await Promise.all([
@@ -321,20 +289,9 @@ export default function NuevaVentaDialog({
         safeJson(resCompraDisp),
       ]);
 
-      if (!resEmpleados.ok)
-        throw new Error(
-          dataEmpleados?.error ||
-            dataEmpleados?.message ||
-            "Error cargando empleados"
-        );
-      if (!resHH.ok)
-        throw new Error(dataHH?.error || dataHH?.message || "Error HHEmpleado");
-      if (!resCompraDisp.ok)
-        throw new Error(
-          dataCompraDisp?.error ||
-            dataCompraDisp?.message ||
-            "Error cargando compras disponibles"
-        );
+      if (!resEmpleados.ok) throw new Error(dataEmpleados?.error || dataEmpleados?.message || "Error cargando empleados");
+      if (!resHH.ok) throw new Error(dataHH?.error || dataHH?.message || "Error HHEmpleado");
+      if (!resCompraDisp.ok) throw new Error(dataCompraDisp?.error || dataCompraDisp?.message || "Error compras disponibles");
 
       setEmpleados(Array.isArray(dataEmpleados) ? dataEmpleados : []);
       setHhRegistros(Array.isArray(dataHH) ? dataHH : []);
@@ -347,17 +304,13 @@ export default function NuevaVentaDialog({
 
       const isCompraItemArray =
         raw.length > 0 &&
-        (raw[0]?.compra_id !== undefined ||
-          raw[0]?.precio_unit !== undefined ||
-          raw[0]?.item !== undefined);
+        (raw[0]?.compra_id !== undefined || raw[0]?.precio_unit !== undefined || raw[0]?.item !== undefined);
 
       if (isCompraItemArray) {
         setCompraItems(raw.map((it) => ({ ...it, compra: it.compra || null })));
       } else {
         const comprasArr = raw;
-        const itemsFlat = comprasArr.flatMap((c) =>
-          (c.items || []).map((it) => ({ ...it, compra: c }))
-        );
+        const itemsFlat = comprasArr.flatMap((c) => (c.items || []).map((it) => ({ ...it, compra: c })));
         setCompraItems(itemsFlat);
       }
 
@@ -366,10 +319,9 @@ export default function NuevaVentaDialog({
         ti.find((t) => String(t?.nombre || "").toUpperCase() === "HH") ||
         null;
 
-      if (hh?.id) {
-        setDetalles((prev) =>
-          prev.map((d) => (d.modo === "HH" ? { ...d, tipoItemId: hh.id } : d))
-        );
+      // Si es creación, actualizar detalles con tipoItemId HH
+      if (!isEdit && hh?.id) {
+        setDetalles((prev) => prev.map((d) => (d.modo === "HH" ? { ...d, tipoItemId: hh.id } : d)));
       }
     } catch (e) {
       setCatalogosErr(e?.message || "Error cargando catálogos");
@@ -378,13 +330,25 @@ export default function NuevaVentaDialog({
     }
   };
 
+  // ✅ al abrir: si CREATE resetea; si EDIT no, porque vamos a cargar venta
   useEffect(() => {
     if (!open) return;
-    resetForm();
+
+    setFormErr("");
+    setCatalogosErr("");
+
+    if (!isEdit) {
+      resetForm();
+    } else {
+      // Para edición, resetear ventaCargada
+      setVentaCargada(false);
+    }
+
     fetchCatalogos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // recargar HH cuando cambia período
   useEffect(() => {
     if (!open) return;
     if (!session?.user) return;
@@ -392,10 +356,7 @@ export default function NuevaVentaDialog({
     (async () => {
       try {
         const headers = makeHeaders(session, empresaIdFromToken);
-        const resHH = await fetch(
-          `${API_URL}/ventas/hh-empleados?anio=${anio}&mes=${mes}`,
-          { headers, cache: "no-store" }
-        );
+        const resHH = await fetch(`${API_URL}/ventas/hh-empleados?anio=${anio}&mes=${mes}`, { headers, cache: "no-store" });
         const dataHH = await safeJson(resHH);
         if (!resHH.ok) throw new Error(dataHH?.error || "Error HHEmpleado");
         setHhRegistros(Array.isArray(dataHH) ? dataHH : []);
@@ -404,6 +365,143 @@ export default function NuevaVentaDialog({
       }
     })();
   }, [anio, mes, open, session, empresaIdFromToken]);
+
+  const findHHForEmpleado = (empleadoId) => {
+    if (!empleadoId) return null;
+    const idStr = String(empleadoId);
+
+    const byId =
+      hhRegistros.find((hh) => String(getHHEmpleadoEmpleadoId(hh)) === idStr) || null;
+    if (byId) return byId;
+
+    const emp = empleados.find((e) => String(e.id) === idStr);
+    const empRut = normalizeRut(getEmpleadoRut(emp));
+    if (!empRut) return null;
+
+    return hhRegistros.find((hh) => normalizeRut(getHHRut(hh)) === empRut) || null;
+  };
+
+  // =========================
+  // ✅ EDIT: cargar venta y poblar formulario
+  // =========================
+  const loadVentaToEdit = async () => {
+    if (!isEdit || !ventaId || !session?.user || ventaCargada) return;
+
+    try {
+      setLoadingVenta(true);
+      setFormErr("");
+
+      const headers = makeHeaders(session, empresaIdFromToken);
+      const res = await fetch(`${API_URL}/ventas/${ventaId}`, { headers, cache: "no-store" });
+      const data = await safeJson(res);
+
+      if (!res.ok) throw new Error(data?.error || data?.message || "Error cargando venta");
+
+      // data = venta con detalles
+      setDescripcionVenta(data?.descripcion || "");
+      setOrdenVentaId(data?.ordenVentaId || "");
+      
+      // Formatear utilidad objetivo correctamente
+      if (data?.utilidadObjetivoPct != null) {
+        const utilidadNum = Number(data.utilidadObjetivoPct);
+        setUtilidadPctObjetivo(Number.isFinite(utilidadNum) ? String(utilidadNum) : "");
+      } else {
+        setUtilidadPctObjetivo("");
+      }
+
+      // Si trae detalles HH con hhEmpleado, intentamos setear periodo desde el primero
+      const anyHH = (data?.detalles || []).find((d) => d?.modo === "HH" && d?.hhEmpleado);
+      if (anyHH?.hhEmpleado?.anio) {
+        setAnio(String(anyHH.hhEmpleado.anio));
+      }
+      if (anyHH?.hhEmpleado?.mes) {
+        setMes(String(anyHH.hhEmpleado.mes));
+      }
+
+      // Obtener tipoItem HH para asignarlo a los detalles HH
+      const hhTipoItem = tipoItems.find((t) => 
+        String(t?.codigo || "").toUpperCase() === "HH" || 
+        String(t?.nombre || "").toUpperCase() === "HH"
+      );
+
+      const mapped = (data?.detalles || []).map((d) => {
+        const modo = d?.modo || "HH";
+
+        if (modo === "HH") {
+          return {
+            descripcion: d?.descripcion || "",
+            modo: "HH",
+            cantidad: Number(d?.cantidad) || 1,
+            tipoItemId: hhTipoItem?.id || "", // usar el tipoItem HH encontrado
+            tipoDiaId: d?.tipoDiaId || "",
+            alphaPct: d?.alpha == null ? 10 : Number(d.alpha),
+            empleadoId: d?.empleadoId || "",
+            compraId: "",
+            costoUnitarioManual: "",
+          };
+        }
+
+        // COMPRA
+        const manualPU =
+          d?.compraId
+            ? ""
+            : d?.costoUnitario != null
+            ? toCLPDisplay(Number(d.costoUnitario))
+            : "";
+
+        return {
+          descripcion: d?.descripcion || "",
+          modo: "COMPRA",
+          cantidad: Number(d?.cantidad) || 1,
+          tipoItemId: d?.tipoItemId || "",
+          tipoDiaId: d?.tipoDiaId || "",
+          alphaPct: d?.alpha == null ? 10 : Number(d.alpha),
+          empleadoId: "",
+          compraId: d?.compraId || "",
+          costoUnitarioManual: manualPU,
+        };
+      });
+
+      setDetalles(mapped.length ? mapped : [emptyDet()]);
+      setVentaCargada(true);
+    } catch (e) {
+      setFormErr(e?.message || "Error cargando venta");
+      console.error("Error cargando venta:", e);
+    } finally {
+      setLoadingVenta(false);
+    }
+  };
+
+  // cargar venta cuando: open + isEdit + ya hay catálogos cargados
+  useEffect(() => {
+    if (!open) return;
+    if (!isEdit) return;
+    if (!ventaId) return;
+    // Esperar a que los catálogos estén cargados
+    if (loadingCatalogos) return;
+    // Evitar cargar múltiples veces
+    if (ventaCargada) return;
+
+    loadVentaToEdit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isEdit, ventaId, loadingCatalogos, tipoItems.length]);
+
+  // Actualizar tipoItemId en detalles cuando se carga tipoItemHH
+  useEffect(() => {
+    if (!open) return;
+    
+    if (tipoItemHH?.id) {
+      setDetalles(prev => {
+        return prev.map(det => {
+          // Solo actualizar si es modo HH y no tiene tipoItemId
+          if (det.modo === "HH" && !det.tipoItemId) {
+            return { ...det, tipoItemId: tipoItemHH.id };
+          }
+          return det;
+        });
+      });
+    }
+  }, [tipoItemHH, open]);
 
   // =========================
   // detalles handlers
@@ -433,27 +531,8 @@ export default function NuevaVentaDialog({
   const removeDetalle = (idx) =>
     setDetalles((prev) => prev.filter((_, i) => i !== idx));
 
-  const findHHForEmpleado = (empleadoId) => {
-    if (!empleadoId) return null;
-
-    const idStr = String(empleadoId);
-
-    const byId =
-      hhRegistros.find((hh) => String(getHHEmpleadoEmpleadoId(hh)) === idStr) ||
-      null;
-    if (byId) return byId;
-
-    const emp = empleados.find((e) => String(e.id) === idStr);
-    const empRut = normalizeRut(getEmpleadoRut(emp));
-    if (!empRut) return null;
-
-    return (
-      hhRegistros.find((hh) => normalizeRut(getHHRut(hh)) === empRut) || null
-    );
-  };
-
   // =========================
-  // preview (✅ utilidad global sobre COSTO)
+  // preview (utilidad global sobre COSTO)
   // =========================
   const preview = useMemo(() => {
     const lines = detalles.map((d) => {
@@ -501,17 +580,13 @@ export default function NuevaVentaDialog({
       return { costoTotal, ventaTotalActual };
     });
 
-    const totalVentaActual = lines.reduce(
-      (acc, x) => acc + (x.ventaTotalActual || 0),
-      0
-    );
+    const totalVentaActual = lines.reduce((acc, x) => acc + (x.ventaTotalActual || 0), 0);
     const totalCosto = lines.reduce((acc, x) => acc + (x.costoTotal || 0), 0);
 
     const u = utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo);
 
     let k = 1;
 
-    // ✅ ahora permite > 100 porque es utilidad sobre COSTO
     if (u != null && Number.isFinite(u) && u >= 0 && totalVentaActual > 0) {
       const ventaObjetivo = totalCosto * (1 + u / 100);
       if (Number.isFinite(ventaObjetivo) && ventaObjetivo > 0) {
@@ -529,22 +604,8 @@ export default function NuevaVentaDialog({
     const total = totalVentaActual * k;
     const utilidad = total - totalCosto;
 
-    return {
-      k,
-      total,
-      costo: totalCosto,
-      utilidad,
-      lines: linesFinal,
-    };
-  }, [
-    detalles,
-    tipoDias,
-    hhRegistros,
-    compraItems,
-    empleados,
-    tipoItemHH,
-    utilidadPctObjetivo,
-  ]);
+    return { k, total, costo: totalCosto, utilidad, lines: linesFinal };
+  }, [detalles, tipoDias, hhRegistros, compraItems, empleados, tipoItemHH, utilidadPctObjetivo]);
 
   // =========================
   // validate + submit
@@ -552,12 +613,9 @@ export default function NuevaVentaDialog({
   const validateForm = () => {
     if (!detalles.length) return "Debes agregar al menos un ítem.";
 
-    // ✅ ahora solo valida >= 0 (sin max 99)
     if (utilidadPctObjetivo !== "") {
       const u = Number(utilidadPctObjetivo);
-      if (!Number.isFinite(u) || u < 0) {
-        return "% utilidad objetivo inválido (>= 0).";
-      }
+      if (!Number.isFinite(u) || u < 0) return "% utilidad objetivo inválido (>= 0).";
     }
 
     for (let i = 0; i < detalles.length; i++) {
@@ -575,9 +633,7 @@ export default function NuevaVentaDialog({
       if (d.modo === "HH") {
         if (!d.empleadoId) return `Ítem #${i + 1}: Selecciona empleado.`;
         const hh = findHHForEmpleado(d.empleadoId);
-        if (!hh) {
-          return `Ítem #${i + 1}: Falta HH del período para este empleado (${mes}/${anio}).`;
-        }
+        if (!hh) return `Ítem #${i + 1}: Falta HH del período para este empleado (${mes}/${anio}).`;
       } else {
         if (!d.tipoItemId) return `Ítem #${i + 1}: Selecciona Tipo ítem.`;
 
@@ -585,8 +641,7 @@ export default function NuevaVentaDialog({
         const manualPU = manualClean ? Number(manualClean) : null;
 
         const tieneCompra = !!d.compraId;
-        const tieneManual =
-          manualPU != null && Number.isFinite(manualPU) && manualPU > 0;
+        const tieneManual = manualPU != null && Number.isFinite(manualPU) && manualPU > 0;
 
         if (!tieneCompra && !tieneManual) {
           return `Ítem #${i + 1}: En COMPRA debes seleccionar un detalle de compra o ingresar un Precio Unitario manual.`;
@@ -611,11 +666,8 @@ export default function NuevaVentaDialog({
       const payload = {
         ordenVentaId: ordenVentaId || null,
         descripcion: descripcionVenta || null,
-
-        // ✅ fuerza base COSTO (permite 130%, 180%, etc.)
         utilidadObjetivoBase: "COSTO",
-        utilidadPctObjetivo:
-          utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo),
+        utilidadPctObjetivo: utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo),
 
         detalles: detalles.map((d) => {
           const alpha = normalizeAlphaPctUI(d.alphaPct);
@@ -644,7 +696,7 @@ export default function NuevaVentaDialog({
             descripcion: d.descripcion,
             cantidad: Number(d.cantidad) || 1,
             modo: "COMPRA",
-            tipoItemId: d.tipoItemId || null, // categoría
+            tipoItemId: d.tipoItemId || null,
             tipoDiaId: d.tipoDiaId || null,
             alpha,
             empleadoId: null,
@@ -655,27 +707,29 @@ export default function NuevaVentaDialog({
         }),
       };
 
-      const res = await fetch(`${API_URL}/ventas/add`, {
-        method: "POST",
+      console.log("Enviando payload:", payload);
+
+      // ✅ CREATE vs EDIT
+      const url = isEdit ? `${API_URL}/ventas/${ventaId}` : `${API_URL}/ventas/add`;
+      const method = isEdit ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: makeHeaders(session, empresaIdFromToken),
         body: JSON.stringify(payload),
       });
 
       const data = await safeJson(res);
       if (!res.ok) {
-        console.log("❌ create venta error", res.status, data, payload);
-        throw new Error(
-          data?.detalle ||
-            data?.error ||
-            data?.message ||
-            "Error al crear venta"
-        );
+        console.log("❌ save venta error", res.status, data, payload);
+        throw new Error(data?.detalle || data?.error || data?.message || "Error al guardar venta");
       }
 
       onClose?.();
       await onCreated?.();
     } catch (e) {
-      setFormErr(e?.message || "Error al crear venta");
+      setFormErr(e?.message || "Error al guardar venta");
+      console.error("Error al guardar venta:", e);
     } finally {
       setSaving(false);
     }
@@ -684,16 +738,24 @@ export default function NuevaVentaDialog({
   // =========================
   // UI
   // =========================
+  const handleClose = () => {
+    // Limpiar estado al cerrar
+    if (isEdit) {
+      setVentaCargada(false);
+    }
+    onClose?.();
+  };
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>Nueva venta</DialogTitle>
+    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+      <DialogTitle>{isEdit ? `Editar costeo #${ventaId?.slice?.(0, 6) || ""}` : "Nueva venta"}</DialogTitle>
 
       <DialogContent dividers>
-        {loadingCatalogos && (
+        {(loadingCatalogos || loadingVenta) && (
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
             <CircularProgress size={18} />
             <Typography variant="body2" color="text.secondary">
-              Cargando catálogos...
+              {loadingVenta ? "Cargando costeo..." : "Cargando catálogos..."}
             </Typography>
           </Box>
         )}
@@ -748,18 +810,8 @@ export default function NuevaVentaDialog({
               sx={{ minWidth: 160 }}
             >
               {[
-                "Enero",
-                "Febrero",
-                "Marzo",
-                "Abril",
-                "Mayo",
-                "Junio",
-                "Julio",
-                "Agosto",
-                "Septiembre",
-                "Octubre",
-                "Noviembre",
-                "Diciembre",
+                "Enero","Febrero","Marzo","Abril","Mayo","Junio",
+                "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre",
               ].map((m, idx) => (
                 <MenuItem key={idx + 1} value={String(idx + 1)}>
                   {m}
@@ -775,28 +827,16 @@ export default function NuevaVentaDialog({
           </Typography>
 
           {detalles.map((det, idx) => {
-            const hhSelected =
-              det.modo === "HH" ? findHHForEmpleado(det.empleadoId) : null;
-
-            const hhSelectedCostoHH =
-              hhSelected?.costoHH != null ? Number(hhSelected.costoHH) : 0;
-
+            const hhSelected = det.modo === "HH" ? findHHForEmpleado(det.empleadoId) : null;
+            const hhSelectedCostoHH = hhSelected?.costoHH != null ? Number(hhSelected.costoHH) : 0;
             const hhSelectedCIF = getHHCIFValue(hhSelected);
-
             const faltaHH = det.modo === "HH" && det.empleadoId && !hhSelected;
-
             const tipoDiaEnabled = isTipoDiaEnabled(det);
 
             return (
               <Card key={idx} variant="outlined" sx={{ borderRadius: 2 }}>
                 <CardContent>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 1,
-                    }}
-                  >
+                  <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
                     <Typography fontWeight={700}>Ítem #{idx + 1}</Typography>
                     {detalles.length > 1 && (
                       <IconButton onClick={() => removeDetalle(idx)} size="small">
@@ -817,9 +857,7 @@ export default function NuevaVentaDialog({
                       label="Descripción"
                       size="small"
                       value={det.descripcion}
-                      onChange={(e) =>
-                        updateDetalle(idx, { descripcion: e.target.value })
-                      }
+                      onChange={(e) => updateDetalle(idx, { descripcion: e.target.value })}
                       fullWidth
                     />
 
@@ -841,14 +879,11 @@ export default function NuevaVentaDialog({
                           });
                         } else {
                           const nextTipoItemId =
-                            det.tipoItemId &&
-                            det.tipoItemId !== (tipoItemHH?.id || "")
+                            det.tipoItemId && det.tipoItemId !== (tipoItemHH?.id || "")
                               ? det.tipoItemId
                               : "";
 
-                          const ti =
-                            tipoItems.find((t) => t.id === nextTipoItemId) ||
-                            null;
+                          const ti = tipoItems.find((t) => t.id === nextTipoItemId) || null;
                           const enabled = isTipoItemAllowedTipoDia(ti);
 
                           updateDetalle(idx, {
@@ -874,7 +909,7 @@ export default function NuevaVentaDialog({
                         value={tipoItemHH ? `${tipoItemHH.nombre}` : "HH"}
                         fullWidth
                         disabled
-                        helperText="En modo HH el Tipo ítem se fuerza a HH en el backend (solo categoría)."
+                        helperText="En modo HH el Tipo ítem se fuerza a HH."
                       />
                     ) : (
                       <TextField
@@ -884,8 +919,7 @@ export default function NuevaVentaDialog({
                         value={det.tipoItemId}
                         onChange={(e) => {
                           const nextId = e.target.value;
-                          const ti =
-                            tipoItems.find((t) => t.id === nextId) || null;
+                          const ti = tipoItems.find((t) => t.id === nextId) || null;
                           const enabled = isTipoItemAllowedTipoDia(ti);
 
                           updateDetalle(idx, {
@@ -898,20 +932,12 @@ export default function NuevaVentaDialog({
                         <MenuItem value="">(Selecciona)</MenuItem>
 
                         {tipoItems
-                          .filter(
-                            (t) =>
-                              String(t?.codigo || "").toUpperCase() !== "HH"
-                          )
-                          .filter(
-                            (t) =>
-                              String(t?.nombre || "").toUpperCase() !== "HH"
-                          )
+                          .filter((t) => String(t?.codigo || "").toUpperCase() !== "HH")
+                          .filter((t) => String(t?.nombre || "").toUpperCase() !== "HH")
                           .map((t) => (
                             <MenuItem key={t.id} value={t.id}>
                               {t.nombre}
-                              {t.unidadItem?.nombre
-                                ? ` (${t.unidadItem.nombre})`
-                                : ""}
+                              {t.unidadItem?.nombre ? ` (${t.unidadItem.nombre})` : ""}
                             </MenuItem>
                           ))}
                       </TextField>
@@ -922,9 +948,7 @@ export default function NuevaVentaDialog({
                       size="small"
                       type="number"
                       value={det.cantidad}
-                      onChange={(e) =>
-                        updateDetalle(idx, { cantidad: Number(e.target.value) })
-                      }
+                      onChange={(e) => updateDetalle(idx, { cantidad: Number(e.target.value) })}
                       fullWidth
                       inputProps={{ min: 1 }}
                     />
@@ -934,15 +958,13 @@ export default function NuevaVentaDialog({
                       label="Tipo día (opcional)"
                       size="small"
                       value={det.tipoDiaId}
-                      onChange={(e) =>
-                        updateDetalle(idx, { tipoDiaId: e.target.value })
-                      }
+                      onChange={(e) => updateDetalle(idx, { tipoDiaId: e.target.value })}
                       fullWidth
                       disabled={!tipoDiaEnabled}
                       helperText={
                         tipoDiaEnabled
-                          ? "Extra fijo sale de tipoDia.valor (Normal debería ser 0)."
-                          : "Solo disponible para Tipo ítem: HH o Logística y transporte."
+                          ? "Extra fijo sale de tipoDia.valor."
+                          : "Solo disponible para HH o Logística y transporte."
                       }
                     >
                       <MenuItem value="">(Sin tipo día)</MenuItem>
@@ -960,13 +982,12 @@ export default function NuevaVentaDialog({
                       value={det.alphaPct}
                       onChange={(e) =>
                         updateDetalle(idx, {
-                          alphaPct:
-                            e.target.value === "" ? "" : Number(e.target.value),
+                          alphaPct: e.target.value === "" ? "" : Number(e.target.value),
                         })
                       }
                       fullWidth
                       inputProps={{ step: 1, min: 0 }}
-                      helperText="Ej: 10 = +10% | 0 = sin ajuste (0 se respeta)"
+                      helperText="Ej: 10 = +10% | 0 = sin ajuste"
                     />
 
                     {det.modo === "HH" ? (
@@ -976,9 +997,7 @@ export default function NuevaVentaDialog({
                           label="Empleado"
                           size="small"
                           value={det.empleadoId}
-                          onChange={(e) =>
-                            updateDetalle(idx, { empleadoId: e.target.value })
-                          }
+                          onChange={(e) => updateDetalle(idx, { empleadoId: e.target.value })}
                           fullWidth
                         >
                           <MenuItem value="">(Selecciona)</MenuItem>
@@ -996,9 +1015,7 @@ export default function NuevaVentaDialog({
                             value={
                               det.empleadoId
                                 ? hhSelected
-                                  ? `${formatCLP(hhSelectedCostoHH)} | CIF: ${formatCLP(
-                                      hhSelectedCIF
-                                    )}`
+                                  ? `${formatCLP(hhSelectedCostoHH)} | CIF: ${formatCLP(hhSelectedCIF)}`
                                   : "-"
                                 : "-"
                             }
@@ -1013,8 +1030,7 @@ export default function NuevaVentaDialog({
 
                           {faltaHH && (
                             <Alert severity="warning">
-                              Falta HH del período para este empleado. Carga el HHEmpleado de{" "}
-                              {mes}/{anio} o revisa la relación (empleado_id) en HHEmpleado.
+                              Falta HH del período para este empleado ({mes}/{anio}).
                             </Alert>
                           )}
                         </Box>
@@ -1075,9 +1091,7 @@ export default function NuevaVentaDialog({
                       Preview ítem: costo {formatCLP(preview.lines[idx]?.costoTotal)} | venta{" "}
                       {formatCLP(preview.lines[idx]?.ventaTotal)} | utilidad{" "}
                       {formatCLP(preview.lines[idx]?.utilidad)}{" "}
-                      {preview.lines[idx]?.pct != null
-                        ? `(${preview.lines[idx].pct.toFixed(1)}%)`
-                        : ""}
+                      {preview.lines[idx]?.pct != null ? `(${preview.lines[idx].pct.toFixed(1)}%)` : ""}
                     </Typography>
                   </Box>
                 </CardContent>
@@ -1091,7 +1105,6 @@ export default function NuevaVentaDialog({
 
           <Divider />
 
-          {/* ✅ % utilidad objetivo global (sobre costo) */}
           <TextField
             label="% utilidad objetivo (sobre costo)"
             size="small"
@@ -1099,8 +1112,8 @@ export default function NuevaVentaDialog({
             value={utilidadPctObjetivo}
             onChange={(e) => setUtilidadPctObjetivo(e.target.value)}
             fullWidth
-            inputProps={{ step: 0.1, min: 0 }} // ✅ sin max
-            helperText="Ej: 60% => venta = costo * 1.60 | 130% => venta = costo * 2.30. Si lo dejas vacío, se usa solo costo + tipo día + alpha."
+            inputProps={{ step: 0.1, min: 0 }}
+            helperText="Ej: 60% => venta = costo * 1.60 | 130% => venta = costo * 2.30"
           />
 
           <Card sx={{ borderRadius: 2, background: "rgba(25,118,210,0.05)" }}>
@@ -1125,15 +1138,15 @@ export default function NuevaVentaDialog({
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onClose} color="inherit" disabled={saving}>
+        <Button onClick={handleClose} color="inherit" disabled={saving}>
           Cancelar
         </Button>
         <Button
           variant="contained"
           onClick={submitVenta}
-          disabled={saving || loadingCatalogos}
+          disabled={saving || loadingCatalogos || loadingVenta}
         >
-          {saving ? "Guardando..." : "Crear venta"}
+          {saving ? "Guardando..." : isEdit ? "Guardar cambios" : "Crear venta"}
         </Button>
       </DialogActions>
     </Dialog>

@@ -38,10 +38,15 @@ export default function VentasPage() {
   });
 
   const [openNew, setOpenNew] = useState(false);
+
+  // ✅ EDIT
+  const [openEdit, setOpenEdit] = useState(false);
+  const [ventaIdEditing, setVentaIdEditing] = useState(null);
+
+  // Cotización
   const [openCot, setOpenCot] = useState(false);
   const [preselectedVentaIds, setPreselectedVentaIds] = useState([]);
 
-  // ✅ ESTA ES LA FUNCIÓN QUE FALTABA (la que la tabla intenta llamar)
   const onCreateCotizacionFromVenta = useCallback((ventaId) => {
     if (!ventaId) return;
     setPreselectedVentaIds([ventaId]);
@@ -49,8 +54,14 @@ export default function VentasPage() {
   }, []);
 
   const openCotManual = useCallback(() => {
-    setPreselectedVentaIds([]); // sin preselección
+    setPreselectedVentaIds([]);
     setOpenCot(true);
+  }, []);
+
+  const onEditVenta = useCallback((ventaId) => {
+    if (!ventaId) return;
+    setVentaIdEditing(ventaId);
+    setOpenEdit(true);
   }, []);
 
   useEffect(() => {
@@ -78,7 +89,10 @@ export default function VentasPage() {
         empresaLabel={empresaLabel}
         loadingVentas={loadingVentas}
         onRefresh={fetchVentas}
-        onOpenNewVenta={() => setOpenNew(true)}
+        onOpenNewVenta={() => {
+          setVentaIdEditing(null);
+          setOpenNew(true);
+        }}
         onOpenCotizacion={openCotManual}
       />
 
@@ -88,10 +102,11 @@ export default function VentasPage() {
         ventas={ventas}
         error={errorVentas}
         loading={loadingVentas}
-        // ✅ ahora sí existe y se pasa correctamente
         onCreateCotizacionFromVenta={onCreateCotizacionFromVenta}
+        onEditVenta={onEditVenta} // ✅ NUEVO
       />
 
+      {/* ✅ CREATE */}
       <NuevaVentaDialog
         open={openNew}
         onClose={() => setOpenNew(false)}
@@ -100,7 +115,19 @@ export default function VentasPage() {
         onCreated={fetchVentas}
       />
 
-      {/* ✅ Modal: selecciona ventas y calcula total desde ellas */}
+      {/* ✅ EDIT (mismo componente, pero con ventaId) */}
+      <NuevaVentaDialog
+        open={openEdit}
+        onClose={() => {
+          setOpenEdit(false);
+          setVentaIdEditing(null);
+        }}
+        session={session}
+        empresaIdFromToken={empresaIdFromToken}
+        onCreated={fetchVentas}
+        ventaId={ventaIdEditing} // ✅ clave
+      />
+
       <NuevaCotizacionDialog
         open={openCot}
         onClose={() => setOpenCot(false)}
