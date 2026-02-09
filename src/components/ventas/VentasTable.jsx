@@ -33,10 +33,35 @@ import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 
 import { formatCLP } from "@/components/ventas/utils/money";
 
-// Helpers
+// =========================
+// Helpers (totales + %)
+// =========================
 function calcTotalVenta(venta) {
   const detalles = venta?.detalles || [];
   return detalles.reduce((s, d) => s + (Number(d.total ?? d.ventaTotal) || 0), 0);
+}
+
+function calcTotalCosto(venta) {
+  const detalles = venta?.detalles || [];
+  return detalles.reduce((s, d) => s + (Number(d.costoTotal) || 0), 0);
+}
+
+function calcUtilidadTotal(venta) {
+  return calcTotalVenta(venta) - calcTotalCosto(venta);
+}
+
+// % sobre VENTA: (venta - costo) / venta
+function calcPctUtilSobreVenta(venta) {
+  const totalVenta = calcTotalVenta(venta);
+  const utilidad = calcUtilidadTotal(venta);
+  return totalVenta > 0 ? (utilidad / totalVenta) * 100 : 0;
+}
+
+// % sobre COSTO: (venta - costo) / costo  -> permite 130%, 180%, etc.
+function calcPctUtilSobreCosto(venta) {
+  const totalCosto = calcTotalCosto(venta);
+  const utilidad = calcUtilidadTotal(venta);
+  return totalCosto > 0 ? (utilidad / totalCosto) * 100 : 0;
 }
 
 function getOvLabel(venta) {
@@ -61,7 +86,7 @@ function buildOrigen(det) {
   return "-";
 }
 
-function DetallesVentaTable({ detalles }) {
+function DetallesVentaTable({ detalles, totals }) {
   return (
     <Box sx={{ p: { xs: 1.5, md: 2 } }}>
       <Box
@@ -83,6 +108,52 @@ function DetallesVentaTable({ detalles }) {
           variant="outlined"
           label={`${(detalles || []).length} ítem(s)`}
           sx={{ borderRadius: 999 }}
+        />
+      </Box>
+
+      {/* ✅ RESUMEN TOTAL (más claro) */}
+      <Box
+        sx={{
+          mt: 1,
+          mb: 1.5,
+          display: "flex",
+          gap: 1,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <Chip
+          size="small"
+          variant="outlined"
+          sx={{ borderRadius: 999 }}
+          label={`Venta: ${formatCLP(totals?.venta || 0)}`}
+        />
+        <Chip
+          size="small"
+          variant="outlined"
+          sx={{ borderRadius: 999 }}
+          label={`Costo: ${formatCLP(totals?.costo || 0)}`}
+        />
+        <Chip
+          size="small"
+          variant="outlined"
+          sx={{ borderRadius: 999 }}
+          label={`Utilidad: ${formatCLP(totals?.utilidad || 0)}`}
+          color={(totals?.utilidad || 0) >= 0 ? "success" : "error"}
+        />
+        <Chip
+          size="small"
+          variant="outlined"
+          sx={{ borderRadius: 999 }}
+          label={`% Util (Venta): ${Number(totals?.pctVenta || 0).toFixed(1)}%`}
+          color={(totals?.pctVenta || 0) >= 0 ? "success" : "error"}
+        />
+        <Chip
+          size="small"
+          variant="outlined"
+          sx={{ borderRadius: 999 }}
+          label={`% Util (Costo): ${Number(totals?.pctCosto || 0).toFixed(1)}%`}
+          color={(totals?.pctCosto || 0) >= 0 ? "success" : "error"}
         />
       </Box>
 
@@ -285,6 +356,19 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
         {paged.map((venta) => {
           const total = calcTotalVenta(venta);
+          const totalCosto = calcTotalCosto(venta);
+          const utilidadTotal = total - totalCosto;
+          const pctVenta = calcPctUtilSobreVenta(venta);
+          const pctCosto = calcPctUtilSobreCosto(venta);
+
+          const totals = {
+            venta: total,
+            costo: totalCosto,
+            utilidad: utilidadTotal,
+            pctVenta,
+            pctCosto,
+          };
+
           const detalles = venta?.detalles || [];
           const opened = !!openMap[venta.id];
 
@@ -318,6 +402,17 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
                       size="small"
                       sx={{ borderRadius: 999 }}
                     />
+
+                    {/* ✅ % total visible en mobile */}
+                    <Tooltip title={`Base venta: ${pctVenta.toFixed(1)}% | Base costo: ${pctCosto.toFixed(1)}%`}>
+                      <Chip
+                        label={`Util: ${pctCosto.toFixed(1)}%`}
+                        color={pctCosto >= 0 ? "success" : "error"}
+                        variant="outlined"
+                        size="small"
+                        sx={{ borderRadius: 999 }}
+                      />
+                    </Tooltip>
 
                     <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
                       <Tooltip title="Crear cotización">
@@ -355,7 +450,7 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
                 <Collapse in={opened} timeout="auto" unmountOnExit>
                   <Divider sx={{ my: 1.5 }} />
                   <Box sx={{ overflowX: "auto" }}>
-                    <DetallesVentaTable detalles={detalles} />
+                    <DetallesVentaTable detalles={detalles} totals={totals} />
                   </Box>
                 </Collapse>
               </CardContent>
@@ -413,7 +508,10 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
               <TableCell align="right">Ítems</TableCell>
               <TableCell align="right">Total</TableCell>
 
-              {/* ✅ NUEVO: botón por registro */}
+              {/* ✅ NUEVO: % Util total */}
+              <TableCell align="right">% Util. Total</TableCell>
+
+              {/* botón por registro */}
               <TableCell align="right" sx={{ width: 170 }}>
                 Cotización
               </TableCell>
@@ -429,7 +527,20 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
             {paged.map((venta) => {
               const opened = !!openMap[venta.id];
               const detalles = venta?.detalles || [];
+
               const total = calcTotalVenta(venta);
+              const totalCosto = calcTotalCosto(venta);
+              const utilidadTotal = total - totalCosto;
+              const pctVenta = calcPctUtilSobreVenta(venta);
+              const pctCosto = calcPctUtilSobreCosto(venta);
+
+              const totals = {
+                venta: total,
+                costo: totalCosto,
+                utilidad: utilidadTotal,
+                pctVenta,
+                pctCosto,
+              };
 
               return (
                 <Fragment key={venta.id}>
@@ -483,7 +594,24 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
                       <Typography fontWeight={900}>{formatCLP(total)}</Typography>
                     </TableCell>
 
-                    {/* ✅ BOTÓN DIRECTO */}
+                    {/* ✅ % util total visible (mostramos base COSTO, tooltip muestra ambas) */}
+                    <TableCell align="right" onClick={stopRowToggle}>
+                      <Tooltip
+                        title={`Utilidad: ${formatCLP(utilidadTotal)} | Base venta: ${pctVenta.toFixed(
+                          1
+                        )}% | Base costo: ${pctCosto.toFixed(1)}%`}
+                      >
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          sx={{ borderRadius: 999 }}
+                          label={`${pctCosto.toFixed(1)}%`}
+                          color={pctCosto >= 0 ? "success" : "error"}
+                        />
+                      </Tooltip>
+                    </TableCell>
+
+                    {/* BOTÓN DIRECTO */}
                     <TableCell align="right">
                       <Tooltip title="Crear cotización desde este costeo">
                         <Button
@@ -514,12 +642,13 @@ export default function VentasTable({ ventas = [], onCreateCotizacionFromVenta }
                   </TableRow>
 
                   <TableRow>
-                    <TableCell colSpan={9} sx={{ p: 0, borderBottom: 0 }}>
+                    {/* ✅ colSpan sube a 10 por la nueva columna */}
+                    <TableCell colSpan={10} sx={{ p: 0, borderBottom: 0 }}>
                       <Collapse in={opened} timeout="auto" unmountOnExit>
                         <Box sx={{ px: 1, pb: 1 }}>
                           <Divider sx={{ my: 1 }} />
                           <Box sx={{ overflowX: "auto" }}>
-                            <DetallesVentaTable detalles={detalles} />
+                            <DetallesVentaTable detalles={detalles} totals={totals} />
                           </Box>
                         </Box>
                       </Collapse>
