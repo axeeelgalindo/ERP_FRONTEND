@@ -31,6 +31,7 @@ import DescriptionIcon from "@mui/icons-material/Description";
 import EditIcon from "@mui/icons-material/Edit";
 import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
+import BlockIcon from "@mui/icons-material/Block"; // ✅ NUEVO
 
 import { formatCLP } from "@/components/ventas/utils/money";
 
@@ -284,12 +285,14 @@ function DetallesVentaTable({ detalles, totals }) {
  * Props:
  * - ventas: Venta[]
  * - onCreateCotizacionFromVenta: (ventaId: string) => void
- * - onEditVenta: (ventaId: string) => void   ✅ NUEVO
+ * - onEditVenta: (ventaId: string) => void
+ * - onDisableVenta: (venta: Venta) => void   ✅ NUEVO
  */
 export default function VentasTable({
   ventas = [],
   onCreateCotizacionFromVenta,
   onEditVenta,
+  onDisableVenta, // ✅ NUEVO
 }) {
   const isMobile = useMediaQuery("(max-width:900px)");
 
@@ -351,6 +354,14 @@ export default function VentasTable({
     handleCloseMenu();
     if (!ventaId) return;
     onEditVenta?.(ventaId);
+  };
+
+  // ✅ NUEVO: deshabilitar desde menú
+  const handleDisableFromMenu = () => {
+    const v = menuVenta;
+    handleCloseMenu();
+    if (!v?.id) return;
+    onDisableVenta?.(v);
   };
 
   const handleChangePage = (_, newPage) => setPage(newPage);
@@ -505,6 +516,19 @@ export default function VentasTable({
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 Modificar ítems y % objetivo
+              </Typography>
+            </Box>
+          </MenuItem>
+
+          {/* ✅ NUEVO: Deshabilitar */}
+          <MenuItem onClick={handleDisableFromMenu} sx={{ py: 1.2, gap: 1 }}>
+            <BlockIcon fontSize="small" />
+            <Box>
+              <Typography fontWeight={700} variant="body2">
+                Deshabilitar costeo
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Ocultarlo del listado (soft delete)
               </Typography>
             </Box>
           </MenuItem>
@@ -708,6 +732,19 @@ export default function VentasTable({
             </Typography>
             <Typography variant="caption" color="text.secondary">
               Modificar ítems y % objetivo
+            </Typography>
+          </Box>
+        </MenuItem>
+
+        {/* ✅ NUEVO: Deshabilitar */}
+        <MenuItem onClick={handleDisableFromMenu} sx={{ py: 1.2, gap: 1 }}>
+          <BlockIcon fontSize="small" />
+          <Box>
+            <Typography fontWeight={700} variant="body2">
+              Eliminar costeo
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Eliminar el costeo y sus items.
             </Typography>
           </Box>
         </MenuItem>

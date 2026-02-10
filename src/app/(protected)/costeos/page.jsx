@@ -1,3 +1,4 @@
+// src/app/(protected)/costeos/page.jsx (o donde esté tu VentasPage)
 "use client";
 
 import { useMemo, useState, useEffect, useCallback } from "react";
@@ -9,9 +10,11 @@ import VentasHeader from "@/components/ventas/VentasHeader";
 import VentasSummary from "@/components/ventas/VentasSummary";
 import VentasTable from "@/components/ventas/VentasTable";
 import NuevaVentaDialog from "@/components/ventas/NuevaVentaDialog";
-
 import NuevaCotizacionDialog from "@/components/ventas/CotizacionFromVentasDialog";
 import { useVentas } from "@/components/ventas/hooks/useVentas";
+
+// ✅ NUEVO
+import DisableVentaModal from "@/components/ventas/DisableVentaModal";
 
 export default function VentasPage() {
   const { data: session, status } = useSession();
@@ -64,6 +67,16 @@ export default function VentasPage() {
     setOpenEdit(true);
   }, []);
 
+  // ✅ NUEVO: deshabilitar
+  const [openDisable, setOpenDisable] = useState(false);
+  const [ventaDisable, setVentaDisable] = useState(null);
+
+  const onDisableVenta = useCallback((venta) => {
+    if (!venta?.id) return;
+    setVentaDisable(venta);
+    setOpenDisable(true);
+  }, []);
+
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
   }, [status, router]);
@@ -103,10 +116,11 @@ export default function VentasPage() {
         error={errorVentas}
         loading={loadingVentas}
         onCreateCotizacionFromVenta={onCreateCotizacionFromVenta}
-        onEditVenta={onEditVenta} // ✅ NUEVO
+        onEditVenta={onEditVenta}
+        onDisableVenta={onDisableVenta} // ✅ NUEVO
       />
 
-      {/* ✅ CREATE */}
+      {/* CREATE */}
       <NuevaVentaDialog
         open={openNew}
         onClose={() => setOpenNew(false)}
@@ -115,7 +129,7 @@ export default function VentasPage() {
         onCreated={fetchVentas}
       />
 
-      {/* ✅ EDIT (mismo componente, pero con ventaId) */}
+      {/* EDIT */}
       <NuevaVentaDialog
         open={openEdit}
         onClose={() => {
@@ -125,7 +139,7 @@ export default function VentasPage() {
         session={session}
         empresaIdFromToken={empresaIdFromToken}
         onCreated={fetchVentas}
-        ventaId={ventaIdEditing} // ✅ clave
+        ventaId={ventaIdEditing}
       />
 
       <NuevaCotizacionDialog
@@ -137,6 +151,17 @@ export default function VentasPage() {
         preselectedVentaIds={preselectedVentaIds}
         ivaRate={0.19}
         onCreated={fetchVentas}
+      />
+
+      {/* ✅ NUEVO: MODAL DESHABILITAR */}
+      <DisableVentaModal
+        open={openDisable}
+        onClose={() => {
+          setOpenDisable(false);
+          setVentaDisable(null);
+        }}
+        venta={ventaDisable}
+        onDisabled={fetchVentas}
       />
     </Box>
   );
