@@ -1113,7 +1113,7 @@ export default function NuevaVentaDialog({
             onChange={(e) => setUtilidadPctObjetivo(e.target.value)}
             fullWidth
             inputProps={{ step: 0.1, min: 0 }}
-            helperText="Ej: 60% => venta = costo * 1.60 | 130% => venta = costo * 2.30"
+            
           />
 
           <Card sx={{ borderRadius: 2, background: "rgba(25,118,210,0.05)" }}>

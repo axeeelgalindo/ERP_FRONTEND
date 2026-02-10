@@ -26,14 +26,14 @@ export default function VentasHeader({
               Costeos
             </Typography>
 
-            {empresaLabel ? (
+            {/*{empresaLabel ? (
               <Chip
                 size="small"
                 label={empresaLabel}
                 variant="outlined"
                 sx={{ borderRadius: 999 }}
               />
-            ) : null}
+            ) : null}*/}
           </Stack>
 
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
