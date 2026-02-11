@@ -1,20 +1,18 @@
-// src/app/(protected)/costeos/page.jsx (o donde esté tu VentasPage)
 "use client";
 
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { Box, CircularProgress } from "@mui/material";
 import { useRouter } from "next/navigation";
 
 import VentasHeader from "@/components/ventas/VentasHeader";
 import VentasSummary from "@/components/ventas/VentasSummary";
 import VentasTable from "@/components/ventas/VentasTable";
+
 import NuevaVentaDialog from "@/components/ventas/NuevaVentaDialog";
 import NuevaCotizacionDialog from "@/components/ventas/CotizacionFromVentasDialog";
-import { useVentas } from "@/components/ventas/hooks/useVentas";
-
-// ✅ NUEVO
 import DisableVentaModal from "@/components/ventas/DisableVentaModal";
+
+import { useVentas } from "@/components/ventas/hooks/useVentas";
 
 export default function VentasPage() {
   const { data: session, status } = useSession();
@@ -67,7 +65,7 @@ export default function VentasPage() {
     setOpenEdit(true);
   }, []);
 
-  // ✅ NUEVO: deshabilitar
+  // ✅ deshabilitar
   const [openDisable, setOpenDisable] = useState(false);
   const [ventaDisable, setVentaDisable] = useState(null);
 
@@ -83,42 +81,49 @@ export default function VentasPage() {
 
   if (status === "loading") {
     return (
-      <Box
-        sx={{
-          minHeight: "60vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <CircularProgress />
-      </Box>
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="h-10 w-10 rounded-full border-4 border-slate-200 border-t-blue-600 animate-spin" />
+      </div>
     );
   }
 
   return (
-    <Box sx={{ maxWidth: "2xl", mx: "auto", p: { xs: 2, md: 3 } }}>
-      <VentasHeader
-        empresaLabel={empresaLabel}
-        loadingVentas={loadingVentas}
-        onRefresh={fetchVentas}
-        onOpenNewVenta={() => {
+    <main className="flex-1  overflow-y-auto">
+      <div className="w-full max-w-none px-6 md:px-8 py-6 md:py-8">
+        <VentasHeader
+          empresaLabel={empresaLabel}
+          loadingVentas={loadingVentas}
+          onRefresh={fetchVentas}
+          onOpenNewVenta={() => {
+            setVentaIdEditing(null);
+            setOpenNew(true);
+          }}
+          onOpenCotizacion={openCotManual}
+        />
+
+        <VentasSummary ventas={ventas} />
+
+        <VentasTable
+          ventas={ventas}
+          error={errorVentas}
+          loading={loadingVentas}
+          onCreateCotizacionFromVenta={onCreateCotizacionFromVenta}
+          onEditVenta={onEditVenta}
+          onDisableVenta={onDisableVenta}
+        />
+      </div>
+
+      {/* FAB mobile (como plantilla) */}
+      <button
+        onClick={() => {
           setVentaIdEditing(null);
           setOpenNew(true);
         }}
-        onOpenCotizacion={openCotManual}
-      />
-
-      <VentasSummary ventas={ventas} />
-
-      <VentasTable
-        ventas={ventas}
-        error={errorVentas}
-        loading={loadingVentas}
-        onCreateCotizacionFromVenta={onCreateCotizacionFromVenta}
-        onEditVenta={onEditVenta}
-        onDisableVenta={onDisableVenta} // ✅ NUEVO
-      />
+        className="lg:hidden fixed bottom-6 right-6 h-14 w-14 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition"
+        title="Nuevo costeo"
+      >
+        <span className="text-2xl leading-none">+</span>
+      </button>
 
       {/* CREATE */}
       <NuevaVentaDialog
@@ -153,7 +158,7 @@ export default function VentasPage() {
         onCreated={fetchVentas}
       />
 
-      {/* ✅ NUEVO: MODAL DESHABILITAR */}
+      {/* MODAL DESHABILITAR */}
       <DisableVentaModal
         open={openDisable}
         onClose={() => {
@@ -163,6 +168,6 @@ export default function VentasPage() {
         venta={ventaDisable}
         onDisabled={fetchVentas}
       />
-    </Box>
+    </main>
   );
 }

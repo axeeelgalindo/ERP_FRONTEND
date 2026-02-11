@@ -23,7 +23,7 @@ main{
 }
 
 /* Cuando hay sidebar visible */
-body.has-sidebar main{
+body.has-sidebar > main{
   padding-left: var(--app-sb);
   padding-top: var(--app-topbar);
 }
@@ -33,9 +33,9 @@ body.has-sidebar main{
 }
 
 /* Ocultar sidebar y padding cuando el body tenga la bandera .no-sidebar */
-body.no-sidebar {
-  --app-sb: 0px !important;
-  --app-topbar: 0px !important;
+body.no-sidebar > main {
+  padding-left: 0 !important;
+  padding-top: 0 !important;
 }
 
 /* Oculta el <aside> del sidebar */

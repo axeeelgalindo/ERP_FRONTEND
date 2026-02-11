@@ -1,82 +1,39 @@
 "use client";
 
-import { Box, Button, Chip, Stack, Typography } from "@mui/material";
-import RefreshIcon from "@mui/icons-material/Refresh";
-import AddIcon from "@mui/icons-material/Add";
-import DescriptionIcon from "@mui/icons-material/Description";
-
 export default function VentasHeader({
-  empresaLabel,
   loadingVentas,
   onRefresh,
   onOpenNewVenta,
-  onOpenCotizacion,
+  onOpenCotizacion, // lo dejamos disponible, aunque la plantilla no lo muestra
 }) {
   return (
-    <Box sx={{ mb: 2.5 }}>
-      <Stack
-        direction={{ xs: "column", md: "row" }}
-        alignItems={{ xs: "flex-start", md: "center" }}
-        justifyContent="space-between"
-        spacing={1.5}
-      >
-        <Box>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Typography variant="h4" fontWeight={900} letterSpacing={-0.5}>
-              Costeos
-            </Typography>
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+          Costeos
+        </h2>
+        <p className="text-slate-500 dark:text-slate-400 mt-1">
+          Gestión avanzada de costos, ítems y generación de cotizaciones.
+        </p>
+      </div>
 
-            {/*{empresaLabel ? (
-              <Chip
-                size="small"
-                label={empresaLabel}
-                variant="outlined"
-                sx={{ borderRadius: 999 }}
-              />
-            ) : null}*/}
-          </Stack>
-
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Gestión de costeos, ítems y generación de cotizaciones.
-          </Typography>
-        </Box>
-
-        <Stack
-          direction="row"
-          spacing={1}
-          useFlexGap
-          flexWrap="wrap"
-          sx={{ justifyContent: { xs: "flex-start", md: "flex-end" } }}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onRefresh}
+          disabled={loadingVentas}
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-4 py-2.5 rounded-xl font-medium flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition disabled:opacity-60"
         >
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={onRefresh}
-            disabled={loadingVentas}
-            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 800 }}
-          >
-            {loadingVentas ? "Actualizando..." : "Actualizar"}
-          </Button>
+          <span className="text-[18px]">⟳</span>
+          {loadingVentas ? "Actualizando..." : "Actualizar"}
+        </button>
 
-          <Button
-            variant="outlined"
-            startIcon={<DescriptionIcon />}
-            onClick={onOpenCotizacion}
-            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 800 }}
-          >
-            Cotización cliente
-          </Button>
-
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={onOpenNewVenta}
-            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 900 }}
-          >
-            Nuevo costeo
-          </Button>
-        </Stack>
-      </Stack>
-    </Box>
+        <button
+          onClick={onOpenNewVenta}
+          className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-blue-600/20 hover:scale-[1.02] active:scale-95 transition"
+        >
+          <span className="text-[18px]">＋</span> Nuevo costeo
+        </button>
+      </div>
+    </div>
   );
 }

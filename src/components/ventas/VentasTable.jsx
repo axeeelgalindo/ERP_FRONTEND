@@ -1,46 +1,30 @@
 "use client";
 
-import { useMemo, useState, Fragment } from "react";
-import {
-  Box,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Typography,
-  Chip,
-  IconButton,
-  Collapse,
-  Divider,
-  Menu,
-  MenuItem,
-  TablePagination,
-  useMediaQuery,
-  Card,
-  CardContent,
-  Tooltip,
-  Button,
-} from "@mui/material";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
-import DescriptionIcon from "@mui/icons-material/Description";
-import EditIcon from "@mui/icons-material/Edit";
-import WorkOutlineIcon from "@mui/icons-material/WorkOutline";
-import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
-import BlockIcon from "@mui/icons-material/Block"; // ✅ NUEVO
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { formatCLP } from "@/components/ventas/utils/money";
+//components
+import DropdownPortal from "../ui/DropdownPortal";
+import BorderColorRoundedIcon from '@mui/icons-material/BorderColorRounded';
 
-// =========================
-// Helpers (totales + %)
-// =========================
+//icons
+import DeleteForeverRoundedIcon from '@mui/icons-material/DeleteForeverRounded';
+
+
+function clp(v) {
+  const n = Number(v || 0);
+  return n.toLocaleString("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    maximumFractionDigits: 0,
+  });
+}
+
 function calcTotalVenta(venta) {
   const detalles = venta?.detalles || [];
-  return detalles.reduce((s, d) => s + (Number(d.total ?? d.ventaTotal) || 0), 0);
+  return detalles.reduce(
+    (s, d) => s + (Number(d.total ?? d.ventaTotal) || 0),
+    0,
+  );
 }
 
 function calcTotalCosto(venta) {
@@ -48,707 +32,466 @@ function calcTotalCosto(venta) {
   return detalles.reduce((s, d) => s + (Number(d.costoTotal) || 0), 0);
 }
 
-function calcUtilidadTotal(venta) {
-  return calcTotalVenta(venta) - calcTotalCosto(venta);
-}
-
-// % sobre VENTA: (venta - costo) / venta
-function calcPctUtilSobreVenta(venta) {
-  const totalVenta = calcTotalVenta(venta);
-  const utilidad = calcUtilidadTotal(venta);
-  return totalVenta > 0 ? (utilidad / totalVenta) * 100 : 0;
-}
-
-// % sobre COSTO: (venta - costo) / costo
 function calcPctUtilSobreCosto(venta) {
   const totalCosto = calcTotalCosto(venta);
-  const utilidad = calcUtilidadTotal(venta);
+  const utilidad = calcTotalVenta(venta) - totalCosto;
   return totalCosto > 0 ? (utilidad / totalCosto) * 100 : 0;
-}
-
-function getOvLabel(venta) {
-  if (venta?.ordenVenta) return `#${venta.ordenVenta.numero}`;
-  if (venta?.ordenVentaId) return String(venta.ordenVentaId);
-  return "Sin cotización/OV";
 }
 
 function getFechaLabel(venta) {
   return venta?.fecha ? new Date(venta.fecha).toLocaleDateString("es-CL") : "-";
 }
 
-function buildOrigen(det) {
-  if (det?.empleado) {
-    return `Empleado: ${det.empleado.usuario?.nombre || det.empleado.id}`;
-  }
-  if (det?.compras) {
-    const prod = det.compras.producto?.nombre;
-    const item = det.compras.item;
-    return `Compra: ${prod || item || det.compras.id}`;
-  }
-  return "-";
+function getCotLabel(venta) {
+  // tu plantilla dice “Sin Cotización” o “COT #004”
+  if (venta?.ordenVenta?.numero) return `COT #${venta.ordenVenta.numero}`;
+  if (venta?.ordenVentaId)
+    return `COT #${String(venta.ordenVentaId).slice(-4)}`;
+  return "Sin Cotización";
 }
 
-function DetallesVentaTable({ detalles, totals }) {
-  return (
-    <Box sx={{ p: { xs: 1.5, md: 2 } }}>
-      <Box
-        sx={{
-          mb: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 1,
-          flexWrap: "wrap",
-        }}
-      >
-        <Typography variant="subtitle2" color="text.secondary">
-          Detalle de ítems
-        </Typography>
-
-        <Chip
-          size="small"
-          variant="outlined"
-          label={`${(detalles || []).length} ítem(s)`}
-          sx={{ borderRadius: 999 }}
-        />
-      </Box>
-
-      {/* ✅ RESUMEN TOTAL */}
-      <Box
-        sx={{
-          mt: 1,
-          mb: 1.5,
-          display: "flex",
-          gap: 1,
-          flexWrap: "wrap",
-          alignItems: "center",
-        }}
-      >
-        <Chip
-          size="small"
-          variant="outlined"
-          sx={{ borderRadius: 999 }}
-          label={`Venta: ${formatCLP(totals?.venta || 0)}`}
-        />
-        <Chip
-          size="small"
-          variant="outlined"
-          sx={{ borderRadius: 999 }}
-          label={`Costo: ${formatCLP(totals?.costo || 0)}`}
-        />
-        <Chip
-          size="small"
-          variant="outlined"
-          sx={{ borderRadius: 999 }}
-          label={`Utilidad: ${formatCLP(totals?.utilidad || 0)}`}
-          color={(totals?.utilidad || 0) >= 0 ? "success" : "error"}
-        />
-        <Chip
-          size="small"
-          variant="outlined"
-          sx={{ borderRadius: 999 }}
-          label={`% Util (Venta): ${Number(totals?.pctVenta || 0).toFixed(1)}%`}
-          color={(totals?.pctVenta || 0) >= 0 ? "success" : "error"}
-        />
-        <Chip
-          size="small"
-          variant="outlined"
-          sx={{ borderRadius: 999 }}
-          label={`% Util (Costo): ${Number(totals?.pctCosto || 0).toFixed(1)}%`}
-          color={(totals?.pctCosto || 0) >= 0 ? "success" : "error"}
-        />
-      </Box>
-
-      <Table size="small" sx={{ minWidth: 900 }}>
-        <TableHead>
-          <TableRow>
-            <TableCell>Ítem</TableCell>
-            <TableCell>Tipo</TableCell>
-            <TableCell>Unidad</TableCell>
-            <TableCell align="right">Cant.</TableCell>
-            <TableCell>Origen</TableCell>
-            <TableCell align="right">Costo</TableCell>
-            <TableCell align="right">Venta</TableCell>
-            <TableCell align="right">% Util.</TableCell>
-          </TableRow>
-        </TableHead>
-
-        <TableBody>
-          {(detalles || []).map((det) => {
-            const tipoItemNombre = det.tipoItem?.nombre || "-";
-            const unidadNombre = det.tipoItem?.unidadItem?.nombre || "-";
-            const origen = buildOrigen(det);
-
-            const isHH = !!det?.empleado;
-            const badgeIcon = isHH ? (
-              <WorkOutlineIcon fontSize="small" />
-            ) : (
-              <Inventory2OutlinedIcon fontSize="small" />
-            );
-            const badgeLabel = isHH ? "HH" : "Compra";
-
-            return (
-              <TableRow key={det.id} hover>
-                <TableCell sx={{ maxWidth: 420 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Chip
-                      icon={badgeIcon}
-                      label={badgeLabel}
-                      size="small"
-                      variant="outlined"
-                      sx={{ borderRadius: 999 }}
-                    />
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {det.descripcion || "—"}
-                    </Typography>
-                  </Box>
-                </TableCell>
-
-                <TableCell>
-                  <Typography variant="body2" color="text.secondary">
-                    {tipoItemNombre}
-                  </Typography>
-                </TableCell>
-
-                <TableCell>{unidadNombre}</TableCell>
-
-                <TableCell align="right">
-                  <Typography fontWeight={700}>{det.cantidad}</Typography>
-                </TableCell>
-
-                <TableCell sx={{ maxWidth: 360 }}>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{
-                      display: "-webkit-box",
-                      WebkitLineClamp: 1,
-                      WebkitBoxOrient: "vertical",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {origen}
-                  </Typography>
-                </TableCell>
-
-                <TableCell align="right">
-                  <Typography variant="body2">{formatCLP(det.costoTotal)}</Typography>
-                </TableCell>
-
-                <TableCell align="right">
-                  <Typography fontWeight={800}>
-                    {formatCLP(det.total ?? det.ventaTotal)}
-                  </Typography>
-                </TableCell>
-
-                <TableCell align="right">
-                  <Chip
-                    size="small"
-                    label={
-                      det.porcentajeUtilidad != null
-                        ? `${Number(det.porcentajeUtilidad).toFixed(1)}%`
-                        : "—"
-                    }
-                    sx={{ borderRadius: 999 }}
-                    color={det.porcentajeUtilidad >= 0 ? "success" : "error"}
-                    variant="outlined"
-                  />
-                </TableCell>
-              </TableRow>
-            );
-          })}
-
-          {(!detalles || detalles.length === 0) && (
-            <TableRow>
-              <TableCell colSpan={8} align="center">
-                <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
-                  Este costeo no tiene ítems de detalle.
-                </Typography>
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </Box>
-  );
+function isCot(venta) {
+  return !!(venta?.ordenVenta || venta?.ordenVentaId);
 }
 
-/**
- * Props:
- * - ventas: Venta[]
- * - onCreateCotizacionFromVenta: (ventaId: string) => void
- * - onEditVenta: (ventaId: string) => void
- * - onDisableVenta: (venta: Venta) => void   ✅ NUEVO
- */
+function inMonth(dateLike, year, monthIndex0) {
+  const d = dateLike ? new Date(dateLike) : null;
+  if (!d || isNaN(d.getTime())) return false;
+  return d.getFullYear() === year && d.getMonth() === monthIndex0;
+}
+
 export default function VentasTable({
   ventas = [],
+  loading,
+  error,
   onCreateCotizacionFromVenta,
   onEditVenta,
-  onDisableVenta, // ✅ NUEVO
+  onDisableVenta,
 }) {
-  const isMobile = useMediaQuery("(max-width:900px)");
+  // Tabs arriba (Costeos / Cotizaciones) -> Cotizaciones placeholder
+  const [tab, setTab] = useState("costeos"); // "costeos" | "cotizaciones"
 
-  const [openMap, setOpenMap] = useState({});
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [menuVenta, setMenuVenta] = useState(null);
-  const openMenu = Boolean(anchorEl);
+  // filtros (no endpoint aún, solo UI)
+  const [range, setRange] = useState("mes"); // todo | mes | porMes | dia
+  const [q, setQ] = useState("");
+  const [estadoOpen, setEstadoOpen] = useState(false);
 
+  // paginación
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  const ventasSorted = useMemo(() => {
-    return [...ventas].sort((a, b) => {
+  // menú por card
+  const [menuOpenId, setMenuOpenId] = useState(null);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    function onDocClick(e) {
+      if (!menuRef.current) return;
+      if (!menuRef.current.contains(e.target)) {
+        setMenuOpenId(null);
+      }
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const filtered = useMemo(() => {
+    const list = [...(ventas || [])].sort((a, b) => {
       const da = a?.fecha ? new Date(a.fecha).getTime() : 0;
       const db = b?.fecha ? new Date(b.fecha).getTime() : 0;
       return db - da;
     });
-  }, [ventas]);
+
+    // si usuario cambia a “cotizaciones” (placeholder), por ahora mostramos solo los que tienen cot
+    let out = list;
+    if (tab === "cotizaciones") out = out.filter((v) => isCot(v));
+
+    // rango: mes actual (real), y otros solo UI
+    if (range === "mes") {
+      const now = new Date();
+      out = out.filter((v) =>
+        inMonth(v?.fecha, now.getFullYear(), now.getMonth()),
+      );
+    }
+
+    // búsqueda: por descripcion / numero / id (simple)
+    const qq = q.trim().toLowerCase();
+    if (qq) {
+      out = out.filter((v) => {
+        const desc = String(v?.descripcion || "").toLowerCase();
+        const num = String(v?.numero ?? "").toLowerCase();
+        const id = String(v?.id || "").toLowerCase();
+        return desc.includes(qq) || num.includes(qq) || id.includes(qq);
+      });
+    }
+
+    return out;
+  }, [ventas, tab, range, q]);
 
   const paged = useMemo(() => {
     const start = page * rowsPerPage;
-    return ventasSorted.slice(start, start + rowsPerPage);
-  }, [ventasSorted, page, rowsPerPage]);
+    return filtered.slice(start, start + rowsPerPage);
+  }, [filtered, page, rowsPerPage]);
 
-  const handleToggle = (ventaId) => {
-    setOpenMap((prev) => ({ ...prev, [ventaId]: !prev[ventaId] }));
-  };
-
-  const stopRowToggle = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleOpenMenu = (e, venta) => {
-    stopRowToggle(e);
-    setAnchorEl(e.currentTarget);
-    setMenuVenta(venta);
-  };
-
-  const handleCloseMenu = () => {
-    setAnchorEl(null);
-    setMenuVenta(null);
-  };
-
-  const handleCreateCotFromRow = (e, ventaId) => {
-    stopRowToggle(e);
-    onCreateCotizacionFromVenta?.(ventaId);
-  };
-
-  const handleCreateCotFromMenu = () => {
-    const ventaId = menuVenta?.id;
-    handleCloseMenu();
-    if (!ventaId) return;
-    onCreateCotizacionFromVenta?.(ventaId);
-  };
-
-  const handleEditFromMenu = () => {
-    const ventaId = menuVenta?.id;
-    handleCloseMenu();
-    if (!ventaId) return;
-    onEditVenta?.(ventaId);
-  };
-
-  // ✅ NUEVO: deshabilitar desde menú
-  const handleDisableFromMenu = () => {
-    const v = menuVenta;
-    handleCloseMenu();
-    if (!v?.id) return;
-    onDisableVenta?.(v);
-  };
-
-  const handleChangePage = (_, newPage) => setPage(newPage);
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
+  useEffect(() => {
+    // si cambia el filtro/busqueda, vuelve a 0 para evitar páginas vacías
     setPage(0);
-  };
+  }, [tab, range, q, rowsPerPage]);
 
-  // ===== MOBILE VIEW (cards) =====
-  if (isMobile) {
+  const showingFrom = filtered.length === 0 ? 0 : page * rowsPerPage + 1;
+  const showingTo = Math.min(filtered.length, (page + 1) * rowsPerPage);
+
+  if (error) {
     return (
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-        {paged.map((venta) => {
-          const total = calcTotalVenta(venta);
-          const totalCosto = calcTotalCosto(venta);
-          const utilidadTotal = total - totalCosto;
-          const pctVenta = calcPctUtilSobreVenta(venta);
-          const pctCosto = calcPctUtilSobreCosto(venta);
-
-          const totals = {
-            venta: total,
-            costo: totalCosto,
-            utilidad: utilidadTotal,
-            pctVenta,
-            pctCosto,
-          };
-
-          const detalles = venta?.detalles || [];
-          const opened = !!openMap[venta.id];
-
-          return (
-            <Card
-              key={venta.id}
-              variant="outlined"
-              sx={{ borderRadius: 2, cursor: "pointer" }}
-              onClick={() => handleToggle(venta.id)}
-            >
-              <CardContent>
-                <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
-                  <Box>
-                    <Typography fontWeight={900}>Costeo #{venta.numero ?? "—"}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Fecha: {getFechaLabel(venta)}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      OV/Cot: <strong>{getOvLabel(venta)}</strong>
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Ítems: <strong>{detalles.length}</strong>
-                    </Typography>
-                  </Box>
-
-                  <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.75 }}>
-                    <Chip
-                      label={formatCLP(total)}
-                      color="primary"
-                      variant="outlined"
-                      size="small"
-                      sx={{ borderRadius: 999 }}
-                    />
-
-                    <Tooltip title={`Base venta: ${pctVenta.toFixed(1)}% | Base costo: ${pctCosto.toFixed(1)}%`}>
-                      <Chip
-                        label={`Util: ${pctCosto.toFixed(1)}%`}
-                        color={pctCosto >= 0 ? "success" : "error"}
-                        variant="outlined"
-                        size="small"
-                        sx={{ borderRadius: 999 }}
-                      />
-                    </Tooltip>
-
-                    <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
-                      <Tooltip title="Crear cotización">
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<DescriptionIcon fontSize="small" />}
-                          onClick={(e) => handleCreateCotFromRow(e, venta.id)}
-                          sx={{ borderRadius: 2, textTransform: "none", fontWeight: 800 }}
-                        >
-                          Cotizar
-                        </Button>
-                      </Tooltip>
-
-                      <Box sx={{ display: "flex", alignItems: "center", px: 0.5 }}>
-                        {opened ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
-                      </Box>
-
-                      <Tooltip title="Más acciones">
-                        <IconButton size="small" onClick={(e) => handleOpenMenu(e, venta)}>
-                          <MoreVertIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  </Box>
-                </Box>
-
-                {venta.descripcion && (
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    {venta.descripcion}
-                  </Typography>
-                )}
-
-                <Collapse in={opened} timeout="auto" unmountOnExit>
-                  <Divider sx={{ my: 1.5 }} />
-                  <Box sx={{ overflowX: "auto" }}>
-                    <DetallesVentaTable detalles={detalles} totals={totals} />
-                  </Box>
-                </Collapse>
-              </CardContent>
-            </Card>
-          );
-        })}
-
-        <Paper variant="outlined" sx={{ borderRadius: 2 }}>
-          <TablePagination
-            component="div"
-            count={ventasSorted.length}
-            page={page}
-            onPageChange={handleChangePage}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-            rowsPerPageOptions={[5, 10, 25, 50]}
-          />
-        </Paper>
-
-        {/* Menú (mobile) */}
-        <Menu
-          anchorEl={anchorEl}
-          open={openMenu}
-          onClose={handleCloseMenu}
-          PaperProps={{ sx: { borderRadius: 2, minWidth: 240 } }}
-        >
-          <MenuItem onClick={handleCreateCotFromMenu} sx={{ py: 1.2, gap: 1 }}>
-            <DescriptionIcon fontSize="small" />
-            <Box>
-              <Typography fontWeight={700} variant="body2">
-                Crear cotización
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Usar este costeo como base
-              </Typography>
-            </Box>
-          </MenuItem>
-
-          <MenuItem onClick={handleEditFromMenu} sx={{ py: 1.2, gap: 1 }}>
-            <EditIcon fontSize="small" />
-            <Box>
-              <Typography fontWeight={700} variant="body2">
-                Editar costeo
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Modificar ítems y % objetivo
-              </Typography>
-            </Box>
-          </MenuItem>
-
-          {/* ✅ NUEVO: Deshabilitar */}
-          <MenuItem onClick={handleDisableFromMenu} sx={{ py: 1.2, gap: 1 }}>
-            <BlockIcon fontSize="small" />
-            <Box>
-              <Typography fontWeight={700} variant="body2">
-                Deshabilitar costeo
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Ocultarlo del listado (soft delete)
-              </Typography>
-            </Box>
-          </MenuItem>
-        </Menu>
-      </Box>
+      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-red-200 dark:border-red-900/40 text-red-600">
+        {String(error)}
+      </div>
     );
   }
 
-  // ===== DESKTOP TABLE VIEW =====
   return (
-    <Paper variant="outlined" sx={{ borderRadius: 2, overflow: "hidden" }}>
-      <TableContainer>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ width: 52 }} />
-              <TableCell>#</TableCell>
-              <TableCell>Fecha</TableCell>
-              <TableCell>OV/Cot</TableCell>
-              <TableCell>Descripción</TableCell>
-              <TableCell align="right">Ítems</TableCell>
-              <TableCell align="right">Total</TableCell>
-              <TableCell align="right">% Util. Total</TableCell>
-              <TableCell align="right" sx={{ width: 170 }}>
-                Cotización
-              </TableCell>
-              <TableCell align="right" sx={{ width: 56 }}>
-                Más
-              </TableCell>
-            </TableRow>
-          </TableHead>
+    <div>
+      {/* Filtros / Toolbar (plantilla) */}
+      <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm mb-6 flex flex-col lg:flex-row gap-6 lg:items-center">
+        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+          <button
+            onClick={() => setTab("costeos")}
+            className={`flex-1 lg:flex-none px-6 py-2 rounded-lg text-sm transition ${
+              tab === "costeos"
+                ? "font-semibold bg-white dark:bg-slate-700 text-blue-600 shadow-sm"
+                : "font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+            }`}
+          >
+            Costeos
+          </button>
 
-          <TableBody>
-            {paged.map((venta) => {
-              const opened = !!openMap[venta.id];
-              const detalles = venta?.detalles || [];
+          <button
+            onClick={() => setTab("cotizaciones")}
+            className={`flex-1 lg:flex-none px-6 py-2 rounded-lg text-sm transition ${
+              tab === "cotizaciones"
+                ? "font-semibold bg-white dark:bg-slate-700 text-blue-600 shadow-sm"
+                : "font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+            }`}
+            title="Placeholder (solo UI por ahora)"
+          >
+            Cotizaciones
+          </button>
+        </div>
 
-              const total = calcTotalVenta(venta);
-              const totalCosto = calcTotalCosto(venta);
-              const utilidadTotal = total - totalCosto;
-              const pctVenta = calcPctUtilSobreVenta(venta);
-              const pctCosto = calcPctUtilSobreCosto(venta);
+        <div className="hidden lg:block w-px h-8 bg-slate-200 dark:bg-slate-700" />
 
-              const totals = {
-                venta: total,
-                costo: totalCosto,
-                utilidad: utilidadTotal,
-                pctVenta,
-                pctCosto,
-              };
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setRange("todo")}
+            className={`px-4 py-2 text-sm rounded-lg border transition ${
+              range === "todo"
+                ? "font-semibold text-blue-600 bg-blue-600/10 border-blue-600/20"
+                : "font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-600/50"
+            }`}
+          >
+            Todo
+          </button>
 
-              return (
-                <Fragment key={venta.id}>
-                  <TableRow hover onClick={() => handleToggle(venta.id)} sx={{ cursor: "pointer" }}>
-                    <TableCell>
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          stopRowToggle(e);
-                          handleToggle(venta.id);
-                        }}
-                      >
-                        {opened ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
-                      </IconButton>
-                    </TableCell>
+          <button
+            onClick={() => setRange("mes")}
+            className={`px-4 py-2 text-sm rounded-lg border transition ${
+              range === "mes"
+                ? "font-semibold text-blue-600 bg-blue-600/10 border-blue-600/20"
+                : "font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-600/50"
+            }`}
+          >
+            Mes actual
+          </button>
 
-                    <TableCell>
-                      <Typography fontWeight={800}>{venta.numero ?? "—"}</Typography>
-                    </TableCell>
+          <button
+            onClick={() => setRange("porMes")}
+            className={`px-4 py-2 text-sm rounded-lg border transition ${
+              range === "porMes"
+                ? "font-semibold text-blue-600 bg-blue-600/10 border-blue-600/20"
+                : "font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-600/50"
+            }`}
+            title="UI lista (conectar luego)"
+          >
+            Por Mes
+          </button>
 
-                    <TableCell>{getFechaLabel(venta)}</TableCell>
+          <button
+            onClick={() => setRange("dia")}
+            className={`px-4 py-2 text-sm rounded-lg border transition ${
+              range === "dia"
+                ? "font-semibold text-blue-600 bg-blue-600/10 border-blue-600/20"
+                : "font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-600/50"
+            }`}
+            title="UI lista (conectar luego)"
+          >
+            Día
+          </button>
+        </div>
 
-                    <TableCell>
-                      <Chip
-                        label={getOvLabel(venta)}
-                        variant="outlined"
-                        size="small"
-                        sx={{ borderRadius: 999 }}
-                        onClick={stopRowToggle}
-                      />
-                    </TableCell>
+        <div className="relative flex-1">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
+            🔎
+          </span>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-transparent rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600/20 dark:placeholder-slate-500"
+            placeholder="Buscar por descripción, ID o cliente..."
+            type="text"
+          />
+        </div>
 
-                    <TableCell sx={{ maxWidth: 420 }}>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{
-                          display: "-webkit-box",
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: "vertical",
-                          overflow: "hidden",
-                        }}
-                      >
-                        {venta.descripcion || "—"}
-                      </Typography>
-                    </TableCell>
+        <div className="flex gap-2 relative">
+          <button
+            onClick={() => setEstadoOpen((s) => !s)}
+            className="bg-slate-50 dark:bg-slate-800 px-4 py-2.5 rounded-xl text-slate-600 dark:text-slate-400 font-medium flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 transition border border-transparent"
+          >
+            <span className="text-[18px]">⚙️</span> Estado
+          </button>
 
-                    <TableCell align="right">{detalles.length}</TableCell>
+          {/* Dropdown placeholder */}
+          {estadoOpen ? (
+            <div className="absolute right-0 top-[46px] z-20 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg p-2">
+              <button
+                onClick={() => setEstadoOpen(false)}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-sm"
+              >
+                (Pendiente) Conectar estados
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
 
-                    <TableCell align="right">
-                      <Typography fontWeight={900}>{formatCLP(total)}</Typography>
-                    </TableCell>
+      {/* Loading */}
+      {loading ? (
+        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 mb-6">
+          <div className="h-5 w-5 rounded-full border-2 border-slate-200 border-t-blue-600 animate-spin" />
+          Cargando costeos...
+        </div>
+      ) : null}
 
-                    <TableCell align="right" onClick={stopRowToggle}>
-                      <Tooltip
-                        title={`Utilidad: ${formatCLP(utilidadTotal)} | Base venta: ${pctVenta.toFixed(
-                          1
-                        )}% | Base costo: ${pctCosto.toFixed(1)}%`}
-                      >
-                        <Chip
-                          size="small"
-                          variant="outlined"
-                          sx={{ borderRadius: 999 }}
-                          label={`${pctCosto.toFixed(1)}%`}
-                          color={pctCosto >= 0 ? "success" : "error"}
+      {/* Lista */}
+      <div className="space-y-4 mb-8">
+        {!loading && filtered.length === 0 ? (
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400">
+            No hay registros para los filtros actuales.
+          </div>
+        ) : (
+          paged.map((venta) => {
+            const totalVenta = calcTotalVenta(venta);
+            const totalCosto = calcTotalCosto(venta);
+            const pct = calcPctUtilSobreCosto(venta);
+
+            const items = (venta?.detalles || []).length;
+
+            const cotLabel = getCotLabel(venta);
+            const cotIsReal = isCot(venta);
+
+            const pctWidth = Math.max(0, Math.min(100, pct || 0));
+
+            return (
+              <div
+                key={venta.id}
+                className="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-blue-600/30 dark:hover:border-blue-600/50 transition overflow-visible"
+              >
+                <div className="p-5 flex flex-col lg:flex-row lg:items-center gap-6">
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className="h-12 w-12 bg-slate-100 dark:bg-slate-800 flex items-center justify-center rounded-xl font-bold text-slate-700 dark:text-slate-300">
+                      #{venta.numero ?? "—"}
+                    </div>
+
+                    <div>
+                      <h4 className="font-bold text-lg group-hover:text-blue-600 transition">
+                        {venta.descripcion || "Sin descripción"}
+                      </h4>
+
+                      <p className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                        <span className="text-base">📅</span>{" "}
+                        {getFechaLabel(venta)}
+                        <span className="mx-1 text-slate-300">•</span>
+                        {!cotIsReal ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+                            {cotLabel}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                            {cotLabel}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 items-center">
+                    <div className="text-center lg:text-left">
+                      <p className="text-xs uppercase font-semibold text-slate-400 tracking-wider mb-1">
+                        Ítems
+                      </p>
+                      <p className="font-semibold">
+                        {items} {items === 1 ? "Ítem" : "Ítems"}
+                      </p>
+                    </div>
+
+                    <div className="text-center lg:text-left">
+                      <p className="text-xs uppercase font-semibold text-slate-400 tracking-wider mb-1">
+                        Total
+                      </p>
+                      <p className="font-bold text-lg">{clp(totalVenta)}</p>
+                    </div>
+
+                    <div className="flex flex-col items-center lg:items-start min-w-[140px]">
+                      <p className="text-xs uppercase font-semibold text-slate-400 tracking-wider mb-2">
+                        % Utilidad
+                      </p>
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="bg-green-500 h-full rounded-full"
+                          style={{ width: `${pctWidth}%` }}
                         />
-                      </Tooltip>
-                    </TableCell>
+                      </div>
+                      <span className="text-xs font-bold text-green-500 mt-1">
+                        {Number(pct || 0).toFixed(1)}%
+                      </span>
+                    </div>
 
-                    <TableCell align="right">
-                      <Tooltip title="Crear cotización desde este costeo">
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<DescriptionIcon fontSize="small" />}
-                          onClick={(e) => handleCreateCotFromRow(e, venta.id)}
-                          sx={{
-                            borderRadius: 2,
-                            textTransform: "none",
-                            fontWeight: 900,
-                            px: 1.25,
-                          }}
+                    <div
+                      className="flex justify-end gap-2 relative z-50"
+                      ref={menuOpenId === venta.id ? menuRef : null}
+                    >
+                      <button
+                        onClick={() => onCreateCotizacionFromVenta?.(venta.id)}
+                        className="p-2.5 text-blue-600 bg-blue-600/10 hover:bg-blue-600 hover:text-white rounded-xl transition hover:cursor-pointer"
+                        title="Ver / Crear cotización"
+                      >
+                        📄
+                      </button>
+
+                      <button
+                        ref={menuOpenId === venta.id ? menuRef : null}
+                        onClick={() =>
+                          setMenuOpenId((prev) =>
+                            prev === venta.id ? null : venta.id,
+                          )
+                        }
+                        className="p-2.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition hover:cursor-pointer"
+                        title="Más"
+                      >
+                        ⋮
+                      </button>
+
+                      {menuOpenId === venta.id ? (
+                        <DropdownPortal
+                          open={menuOpenId === venta.id}
+                          anchorRef={menuRef}
+                          onClose={() => setMenuOpenId(null)}
                         >
-                          Cotizar
-                        </Button>
-                      </Tooltip>
-                    </TableCell>
+                          {/*<button
+                              onClick={() => {
+                                setMenuOpenId(null);
+                                onCreateCotizacionFromVenta?.(venta.id);
+                              }}
+                              className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-sm hover:cursor-pointer"
+                            >
+                              Crear cotización
+                            </button>
+                          */}
+                          <button
+                            onClick={() => {
+                              setMenuOpenId(null);
+                              onEditVenta?.(venta.id);
+                            }}
+                            className="w-full flex items-center justify-between text-left px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-sm hover:cursor-pointer"
+                          >
+                            <span className="font-bold uppercase">
+                              Editar costeo
+                            </span>
+                          <BorderColorRoundedIcon/>
+                          </button>
 
-                    <TableCell align="right">
-                      <Tooltip title="Más acciones">
-                        <IconButton size="small" onClick={(e) => handleOpenMenu(e, venta)}>
-                          <MoreVertIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
+                          <button
+                            onClick={() => {
+                              setMenuOpenId(null);
+                              onDisableVenta?.(venta);
+                            }}
+                            className="w-full flex items-center justify-between text-left px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-sm text-red-600 hover:cursor-pointer"
+                          >
+                            <span className="font-bold uppercase">Eliminar costeo</span> 
+                            <DeleteForeverRoundedIcon/>
+                          </button>
+                        </DropdownPortal>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
 
-                  <TableRow>
-                    <TableCell colSpan={10} sx={{ p: 0, borderBottom: 0 }}>
-                      <Collapse in={opened} timeout="auto" unmountOnExit>
-                        <Box sx={{ px: 1, pb: 1 }}>
-                          <Divider sx={{ my: 1 }} />
-                          <Box sx={{ overflowX: "auto" }}>
-                            <DetallesVentaTable detalles={detalles} totals={totals} />
-                          </Box>
-                        </Box>
-                      </Collapse>
-                    </TableCell>
-                  </TableRow>
-                </Fragment>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TableContainer>
+                {/* mini detalle (opcional) */}
+                <div className="px-5 pb-5 -mt-2 text-xs text-slate-400">
+                  Costo:{" "}
+                  <span className="font-semibold text-slate-600 dark:text-slate-300">
+                    {clp(totalCosto)}
+                  </span>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
 
-      <TablePagination
-        component="div"
-        count={ventasSorted.length}
-        page={page}
-        onPageChange={handleChangePage}
-        rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={handleChangeRowsPerPage}
-        rowsPerPageOptions={[5, 10, 25, 50]}
-      />
+      {/* Paginación (plantilla) */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-4 border-t border-slate-200 dark:border-slate-800">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Mostrando{" "}
+          <span className="font-semibold text-slate-900 dark:text-slate-100">
+            {showingFrom} - {showingTo}
+          </span>{" "}
+          de{" "}
+          <span className="font-semibold text-slate-900 dark:text-slate-100">
+            {filtered.length}
+          </span>{" "}
+          resultados
+        </p>
 
-      {/* Menú (desktop) */}
-      <Menu
-        anchorEl={anchorEl}
-        open={openMenu}
-        onClose={handleCloseMenu}
-        PaperProps={{ sx: { borderRadius: 2, minWidth: 240 } }}
-      >
-        <MenuItem onClick={handleCreateCotFromMenu} sx={{ py: 1.2, gap: 1 }}>
-          <DescriptionIcon fontSize="small" />
-          <Box>
-            <Typography fontWeight={700} variant="body2">
-              Crear cotización
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Usar este costeo como base
-            </Typography>
-          </Box>
-        </MenuItem>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-slate-500 mr-2">Filas por página:</span>
 
-        <MenuItem onClick={handleEditFromMenu} sx={{ py: 1.2, gap: 1 }}>
-          <EditIcon fontSize="small" />
-          <Box>
-            <Typography fontWeight={700} variant="body2">
-              Editar costeo
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Modificar ítems y % objetivo
-            </Typography>
-          </Box>
-        </MenuItem>
+          <select
+            value={rowsPerPage}
+            onChange={(e) => setRowsPerPage(Number(e.target.value))}
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-600/20"
+          >
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+          </select>
 
-        {/* ✅ NUEVO: Deshabilitar */}
-        <MenuItem onClick={handleDisableFromMenu} sx={{ py: 1.2, gap: 1 }}>
-          <BlockIcon fontSize="small" />
-          <Box>
-            <Typography fontWeight={700} variant="body2">
-              Eliminar costeo
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Eliminar el costeo y sus items.
-            </Typography>
-          </Box>
-        </MenuItem>
-      </Menu>
-    </Paper>
+          <div className="flex gap-1 ml-4">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50"
+              title="Anterior"
+            >
+              ‹
+            </button>
+
+            <button
+              onClick={() => {
+                const maxPage = Math.max(
+                  0,
+                  Math.ceil(filtered.length / rowsPerPage) - 1,
+                );
+                setPage((p) => Math.min(maxPage, p + 1));
+              }}
+              disabled={(page + 1) * rowsPerPage >= filtered.length}
+              className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50"
+              title="Siguiente"
+            >
+              ›
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
