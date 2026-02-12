@@ -4,11 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 //components
 import DropdownPortal from "../ui/DropdownPortal";
-import BorderColorRoundedIcon from '@mui/icons-material/BorderColorRounded';
+import BorderColorRoundedIcon from "@mui/icons-material/BorderColorRounded";
 
 //icons
-import DeleteForeverRoundedIcon from '@mui/icons-material/DeleteForeverRounded';
-
+import DeleteForeverRoundedIcon from "@mui/icons-material/DeleteForeverRounded";
 
 function clp(v) {
   const n = Number(v || 0);
@@ -83,17 +82,6 @@ export default function VentasTable({
   // menú por card
   const [menuOpenId, setMenuOpenId] = useState(null);
   const menuRef = useRef(null);
-
-  useEffect(() => {
-    function onDocClick(e) {
-      if (!menuRef.current) return;
-      if (!menuRef.current.contains(e.target)) {
-        setMenuOpenId(null);
-      }
-    }
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
 
   const filtered = useMemo(() => {
     const list = [...(ventas || [])].sort((a, b) => {
@@ -355,10 +343,8 @@ export default function VentasTable({
                       </span>
                     </div>
 
-                    <div
-                      className="flex justify-end gap-2 relative z-50"
-                      ref={menuOpenId === venta.id ? menuRef : null}
-                    >
+                    <div className="flex justify-end gap-2 relative z-50">
+                      {/* Botón Crear Cotización */}
                       <button
                         onClick={() => onCreateCotizacionFromVenta?.(venta.id)}
                         className="p-2.5 text-blue-600 bg-blue-600/10 hover:bg-blue-600 hover:text-white rounded-xl transition hover:cursor-pointer"
@@ -367,37 +353,34 @@ export default function VentasTable({
                         📄
                       </button>
 
+                      {/* Botón menú ⋮ */}
                       <button
                         ref={menuOpenId === venta.id ? menuRef : null}
-                        onClick={() =>
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setMenuOpenId((prev) =>
                             prev === venta.id ? null : venta.id,
-                          )
-                        }
+                          );
+                        }}
                         className="p-2.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition hover:cursor-pointer"
                         title="Más"
                       >
                         ⋮
                       </button>
 
-                      {menuOpenId === venta.id ? (
+                      {/* Dropdown */}
+                      {menuOpenId === venta.id && (
                         <DropdownPortal
-                          open={menuOpenId === venta.id}
+                          open={true}
                           anchorRef={menuRef}
                           onClose={() => setMenuOpenId(null)}
                         >
-                          {/*<button
-                              onClick={() => {
-                                setMenuOpenId(null);
-                                onCreateCotizacionFromVenta?.(venta.id);
-                              }}
-                              className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-sm hover:cursor-pointer"
-                            >
-                              Crear cotización
-                            </button>
-                          */}
+                          {/* EDITAR */}
                           <button
-                            onClick={() => {
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
                               setMenuOpenId(null);
                               onEditVenta?.(venta.id);
                             }}
@@ -406,21 +389,27 @@ export default function VentasTable({
                             <span className="font-bold uppercase">
                               Editar costeo
                             </span>
-                          <BorderColorRoundedIcon/>
+                            <BorderColorRoundedIcon fontSize="small" />
                           </button>
 
+                          {/* ELIMINAR */}
                           <button
-                            onClick={() => {
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
                               setMenuOpenId(null);
                               onDisableVenta?.(venta);
                             }}
                             className="w-full flex items-center justify-between text-left px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-sm text-red-600 hover:cursor-pointer"
                           >
-                            <span className="font-bold uppercase">Eliminar costeo</span> 
-                            <DeleteForeverRoundedIcon/>
+                            <span className="font-bold uppercase">
+                              Eliminar costeo
+                            </span>
+                            <DeleteForeverRoundedIcon fontSize="small" />
                           </button>
                         </DropdownPortal>
-                      ) : null}
+                      )}
                     </div>
                   </div>
                 </div>

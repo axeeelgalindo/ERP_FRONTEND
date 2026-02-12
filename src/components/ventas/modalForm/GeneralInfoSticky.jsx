@@ -12,26 +12,28 @@ export default function GeneralInfoSticky({
   preview,
 }) {
   const pct =
-    preview?.total > 0 ? ((preview.utilidad / preview.total) * 100).toFixed(1) : "0.0";
+    preview?.total > 0
+      ? ((preview.utilidad / preview.total) * 100).toFixed(1)
+      : "0.0";
 
   return (
-  <Box
-  sx={{
-    position: "sticky",
-    top: 0,
-    zIndex: 50,
-    // importante para que tape lo que pasa por debajo mientras scrolleas
-    bgcolor:
-      theme.palette.mode === "dark"
-        ? "rgba(2,6,23,.92)"
-        : "rgba(255,255,255,.92)",
-    backdropFilter: "blur(10px)",
-    borderBottom: "1px solid",
-    borderColor: "divider",
-    px: 2.5,
-    py: 2,
-  }}
->
+    <Box
+      sx={{
+        position: "sticky",
+        top: 0,
+        zIndex: 50,
+        // importante para que tape lo que pasa por debajo mientras scrolleas
+        bgcolor:
+          theme.palette.mode === "dark"
+            ? "rgba(2,6,23,.92)"
+            : "rgba(255,255,255,.92)",
+        backdropFilter: "blur(10px)",
+        borderBottom: "1px solid",
+        borderColor: "divider",
+        px: 2.5,
+        py: 2,
+      }}
+    >
       {/* =======================
           Información General
       ======================= */}
@@ -41,7 +43,8 @@ export default function GeneralInfoSticky({
           borderRadius: 2.5,
           border: "1px solid",
           borderColor: "divider",
-          bgcolor: theme.palette.mode === "dark" ? "rgba(15,23,42,.55)" : "#fff",
+          bgcolor:
+            theme.palette.mode === "dark" ? "rgba(15,23,42,.55)" : "#fff",
         }}
       >
         <Typography
@@ -71,17 +74,35 @@ export default function GeneralInfoSticky({
             fullWidth
             size="small"
             required
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: 1.5,
+                bgcolor:
+                  theme.palette.mode === "dark"
+                    ? "rgba(2,6,23,.35)"
+                    : "rgba(15,23,42,.03)",
+              },
+            }}
           />
 
           <TextField
-            label="% Utilidad Objetivo"
+            label="% UTILIDAD"
             size="small"
             type="number"
             value={utilidadPctObjetivo}
             onChange={(e) => setUtilidadPctObjetivo(e.target.value)}
             fullWidth
             inputProps={{ step: 0.1, min: 0 }}
-            helperText="Markup sobre costo con factor alpha."
+            
+             sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 1.5,
+                      bgcolor:
+                        theme.palette.mode === "dark"
+                          ? "rgba(2,6,23,.35)"
+                          : "rgba(15,23,42,.03)",
+                    },
+                  }}
           />
         </Box>
       </Box>
@@ -168,7 +189,9 @@ export default function GeneralInfoSticky({
                 : "rgba(16,185,129,.10)",
           }}
         >
-          <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
+          <Box
+            sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}
+          >
             <Typography
               sx={{
                 fontSize: 10,
@@ -181,7 +204,9 @@ export default function GeneralInfoSticky({
               Utilidad
             </Typography>
 
-            <Typography sx={{ fontSize: 10, fontWeight: 900, color: "success.main" }}>
+            <Typography
+              sx={{ fontSize: 10, fontWeight: 900, color: "success.main" }}
+            >
               {pct}%
             </Typography>
           </Box>

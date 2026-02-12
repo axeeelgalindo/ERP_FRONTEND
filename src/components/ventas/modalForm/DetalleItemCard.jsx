@@ -44,7 +44,8 @@ export default function DetalleItemCard({
   const theme = useTheme();
   const tipoDiaEnabled = isTipoDiaEnabled(det);
 
-  const hhSelected = det.modo === "HH" ? findHHForEmpleado(det.empleadoId) : null;
+  const hhSelected =
+    det.modo === "HH" ? findHHForEmpleado(det.empleadoId) : null;
   const hhSelectedCostoHH =
     hhSelected?.costoHH != null ? Number(hhSelected.costoHH) : 0;
   const hhSelectedCIF = getHHCIFValue(hhSelected);
@@ -66,7 +67,8 @@ export default function DetalleItemCard({
           borderColor: "rgba(25,118,210,.35)",
           boxShadow: "0 10px 20px rgba(16,24,40,.08)",
         },
-        background: theme.palette.mode === "dark" ? "rgba(15,23,42,.6)" : "#fff",
+        background:
+          theme.palette.mode === "dark" ? "rgba(15,23,42,.6)" : "#fff",
       }}
     >
       <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
@@ -385,7 +387,9 @@ export default function DetalleItemCard({
                       >
                         Subtotal
                       </Typography>
-                      <Typography sx={{ fontWeight: 900, color: "primary.main" }}>
+                      <Typography
+                        sx={{ fontWeight: 900, color: "primary.main" }}
+                      >
                         {formatCLP(subtotal)}
                       </Typography>
                     </Box>
@@ -394,6 +398,15 @@ export default function DetalleItemCard({
                   {/* Costo HH display */}
                   <Box sx={{ gridColumn: { xs: "1 / -1", sm: "span 12" } }}>
                     <TextField
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: 1.5,
+                          bgcolor:
+                            theme.palette.mode === "dark"
+                              ? "rgba(2,6,23,.35)"
+                              : "rgba(15,23,42,.03)",
+                        },
+                      }}
                       label="Costo HH (según período)"
                       size="small"
                       value={
@@ -466,12 +479,18 @@ export default function DetalleItemCard({
                       <MenuItem value="">(Selecciona)</MenuItem>
 
                       {tipoItems
-                        .filter((t) => String(t?.codigo || "").toUpperCase() !== "HH")
-                        .filter((t) => String(t?.nombre || "").toUpperCase() !== "HH")
+                        .filter(
+                          (t) => String(t?.codigo || "").toUpperCase() !== "HH",
+                        )
+                        .filter(
+                          (t) => String(t?.nombre || "").toUpperCase() !== "HH",
+                        )
                         .map((t) => (
                           <MenuItem key={t.id} value={t.id}>
                             {t.nombre}
-                            {t.unidadItem?.nombre ? ` (${t.unidadItem.nombre})` : ""}
+                            {t.unidadItem?.nombre
+                              ? ` (${t.unidadItem.nombre})`
+                              : ""}
                           </MenuItem>
                         ))}
                     </TextField>
@@ -581,7 +600,9 @@ export default function DetalleItemCard({
                       >
                         Subtotal
                       </Typography>
-                      <Typography sx={{ fontWeight: 900, color: "primary.main" }}>
+                      <Typography
+                        sx={{ fontWeight: 900, color: "primary.main" }}
+                      >
                         {formatCLP(subtotal)}
                       </Typography>
                     </Box>
@@ -590,9 +611,10 @@ export default function DetalleItemCard({
                   {/* PU Manual */}
                   <Box sx={{ gridColumn: { xs: "1 / -1", sm: "span 12" } }}>
                     <TextField
-                      label="Precio unitario manual (opcional)"
+                      label="Precio unitario"
                       size="small"
                       type="text"
+                      required
                       value={det.costoUnitarioManual}
                       onChange={(e) => {
                         const raw = e.target.value;
@@ -611,6 +633,15 @@ export default function DetalleItemCard({
                           ? "Deshabilitado porque seleccionaste un CompraItem."
                           : "Ingresa PU para estimación (COMPRA manual)."
                       }
+                      sx={{
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: 1.5,
+                          bgcolor:
+                            theme.palette.mode === "dark"
+                              ? "rgba(2,6,23,.35)"
+                              : "rgba(15,23,42,.03)",
+                        },
+                      }}
                     />
                   </Box>
                 </>

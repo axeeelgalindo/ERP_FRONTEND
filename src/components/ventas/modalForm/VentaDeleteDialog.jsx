@@ -21,33 +21,32 @@ export default function VentaDeleteDialog({
   onClose,
   session,
   empresaIdFromToken,
-  ventaId,
-  onDeleted,
+  venta,        // 👈 ahora recibimos la venta completa
+  onDisabled,   // 👈 mismo callback que tu modal actual
 }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
-  const handleDelete = async () => {
+  const ventaId = venta?.id;
+
+  const handleDisable = async () => {
     if (!ventaId || !session?.user) return;
 
     try {
       setLoading(true);
       setErr("");
 
-      // OJO: makeHeaders mete Content-Type: application/json
-      // Fastify tira error si Content-Type json y body vacío.
-      // => mandamos {} para que no sea vacío.
-      const res = await fetch(`${API_URL}/ventas/${ventaId}`, {
-        method: "DELETE",
+      const res = await fetch(`${API_URL}/ventas/${ventaId}/disable`, {
+        method: "PATCH", // ✅ como tu modal que funciona
         headers: makeHeaders(session, empresaIdFromToken),
-        body: JSON.stringify({}),
+        body: JSON.stringify({}), // ✅ evita error Fastify body vacío
       });
 
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data?.message || data?.error || "Error al eliminar");
+      if (!res.ok) throw new Error(data?.message || data?.error || "No se pudo eliminar");
 
       onClose?.();
-      await onDeleted?.();
+      await onDisabled?.(); // refrescar tabla
     } catch (e) {
       setErr(e?.message || "Error al eliminar");
     } finally {
@@ -55,9 +54,13 @@ export default function VentaDeleteDialog({
     }
   };
 
+  const numero = venta?.numero ?? "—";
+  const desc = venta?.descripcion || "";
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ fontWeight: 900 }}>Eliminar costeo</DialogTitle>
+    <Dialog open={open} onClose={() => (loading ? null : onClose?.())} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ fontWeight: 900 }}>Eliminar costeo #{numero}</DialogTitle>
+
       <DialogContent dividers>
         {err ? (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -69,20 +72,28 @@ export default function VentaDeleteDialog({
           ¿Seguro que deseas eliminar este costeo? Esta acción no se puede deshacer.
         </Typography>
 
-        {ventaId ? (
+        {desc ? (
           <Typography sx={{ mt: 1, color: "text.secondary", fontSize: 13 }}>
-            ID: <b>{ventaId}</b>
+            <b>Costeo nombre/descripción:</b> {desc}
           </Typography>
         ) : null}
+
+        {/*{ventaId ? (
+          <Typography sx={{ mt: 1, color: "text.secondary", fontSize: 12 }}>
+            ID: <b>{ventaId}</b>
+          </Typography>
+        ) : null} */}
       </DialogContent>
+
       <DialogActions sx={{ px: 2.5, py: 2 }}>
         <Button onClick={onClose} color="inherit" disabled={loading}>
           Cancelar
         </Button>
+
         <Button
           variant="contained"
           color="error"
-          onClick={handleDelete}
+          onClick={handleDisable}
           disabled={loading || !ventaId}
         >
           {loading ? "Eliminando..." : "Eliminar"}

@@ -11,6 +11,7 @@ import VentasTable from "@/components/ventas/VentasTable";
 import NuevaVentaDialog from "@/components/ventas/NuevaVentaDialog";
 import NuevaCotizacionDialog from "@/components/ventas/CotizacionFromVentasDialog";
 import DisableVentaModal from "@/components/ventas/DisableVentaModal";
+import { VentaDeleteDialog } from "@/components/ventas/modalForm";
 
 import { useVentas } from "@/components/ventas/hooks/useVentas";
 
@@ -20,12 +21,12 @@ export default function VentasPage() {
 
   const empresaNombreFromToken = useMemo(
     () => session?.user?.empresa?.nombre || session?.user?.empresaNombre || "",
-    [session]
+    [session],
   );
 
   const empresaIdFromToken = useMemo(
     () => session?.user?.empresa?.id || session?.user?.empresaId || null,
-    [session]
+    [session],
   );
 
   const empresaLabel =
@@ -158,7 +159,7 @@ export default function VentasPage() {
         onCreated={fetchVentas}
       />
 
-      {/* MODAL DESHABILITAR */}
+      {/* MODAL DESHABILITAR 
       <DisableVentaModal
         open={openDisable}
         onClose={() => {
@@ -166,6 +167,17 @@ export default function VentasPage() {
           setVentaDisable(null);
         }}
         venta={ventaDisable}
+        onDisabled={fetchVentas}
+      />*/}
+      <VentaDeleteDialog
+        open={openDisable}
+        onClose={() => {
+          setOpenDisable(false);
+          setVentaDisable(null);
+        }}
+        venta={ventaDisable}
+        session={session}
+        empresaIdFromToken={empresaIdFromToken}
         onDisabled={fetchVentas}
       />
     </main>

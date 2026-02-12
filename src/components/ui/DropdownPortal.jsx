@@ -8,7 +8,7 @@ export default function DropdownPortal({
   anchorRef,
   onClose,
   children,
-  width = 224, // 56 * 4 = w-56
+  width = 224,
   offset = 8,
 }) {
   const panelRef = useRef(null);
@@ -17,7 +17,7 @@ export default function DropdownPortal({
 
   useEffect(() => setMounted(true), []);
 
-  // cerrar al click fuera / ESC
+  // ✅ cerrar al click fuera / ESC (en CAPTURE para que sea consistente)
   useEffect(() => {
     if (!open) return;
 
@@ -26,21 +26,24 @@ export default function DropdownPortal({
       const p = panelRef.current;
       if (!a || !p) return;
 
-      if (!a.contains(e.target) && !p.contains(e.target)) onClose?.();
+      // ✅ si clickeas dentro del botón o dentro del panel -> NO cerrar
+      if (a.contains(e.target) || p.contains(e.target)) return;
+
+      onClose?.();
     }
+
     function onKey(e) {
       if (e.key === "Escape") onClose?.();
     }
 
-    document.addEventListener("mousedown", onDown);
+    document.addEventListener("mousedown", onDown, true); // ✅ capture
     document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("mousedown", onDown, true);
       document.removeEventListener("keydown", onKey);
     };
   }, [open, onClose, anchorRef]);
 
-  // calcular posición (con flip si no cabe abajo)
   useLayoutEffect(() => {
     if (!open) return;
     const a = anchorRef?.current;
@@ -50,14 +53,11 @@ export default function DropdownPortal({
     const viewportW = window.innerWidth;
     const viewportH = window.innerHeight;
 
-    // preferimos abajo, alineado a la derecha del botón
     let left = r.right - width;
     let top = r.bottom + offset;
 
-    // clamp horizontal
     left = Math.max(8, Math.min(left, viewportW - width - 8));
 
-    // flip hacia arriba si no cabe abajo (estimamos altura ~140)
     const estimatedH = 140;
     if (top + estimatedH > viewportH - 8) {
       top = r.top - offset - estimatedH;
@@ -66,7 +66,6 @@ export default function DropdownPortal({
 
     setPos({ top, left });
 
-    // recalcular en scroll/resize para que no “se despegue”
     function recalc() {
       const r2 = a.getBoundingClientRect();
       let left2 = r2.right - width;
@@ -103,6 +102,8 @@ export default function DropdownPortal({
         zIndex: 9999,
       }}
       className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-2"
+      // ✅ evita que el mousedown “suba” y lo tome el listener global
+      onMouseDownCapture={(e) => e.stopPropagation()}
     >
       {children}
     </div>,

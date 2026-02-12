@@ -44,7 +44,7 @@ export default function DetalleItemsSection({
         }}
       >
         <Typography sx={{ fontWeight: 900, fontSize: 18 }}>
-          Detalle de Ítems
+          LISTADO DE ÍTEMS
         </Typography>
 
         <Button
