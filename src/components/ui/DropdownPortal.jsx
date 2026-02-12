@@ -101,7 +101,7 @@ export default function DropdownPortal({
         width,
         zIndex: 9999,
       }}
-      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-2"
+      className="bg-white border border-slate-200  rounded-xl shadow-xl p-2"
       // ✅ evita que el mousedown “suba” y lo tome el listener global
       onMouseDownCapture={(e) => e.stopPropagation()}
     >
