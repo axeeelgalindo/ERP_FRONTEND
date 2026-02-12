@@ -70,7 +70,7 @@ export default function NuevaVentaDialog({
     overflowY: "auto",
     bgcolor:
       theme.palette.mode === "dark"
-        ? "rgba(2,6,23,.45)"
+        ? "rgba(248,250,252,1)"
         : "rgba(248,250,252,1)",
   }}
 >

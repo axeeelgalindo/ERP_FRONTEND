@@ -131,7 +131,7 @@ export default function VentasTable({
 
   if (error) {
     return (
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-red-200 dark:border-red-900/40 text-red-600">
+      <div className="bg-white  p-4 rounded-2xl border border-red-200  text-red-600">
         {String(error)}
       </div>
     );
@@ -140,14 +140,14 @@ export default function VentasTable({
   return (
     <div>
       {/* Filtros / Toolbar (plantilla) */}
-      <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm mb-6 flex flex-col lg:flex-row gap-6 lg:items-center">
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+      <div className="bg-white  p-5 rounded-2xl border border-slate-200  shadow-sm mb-6 flex flex-col lg:flex-row gap-6 lg:items-center">
+        <div className="flex bg-slate-100  p-1 rounded-xl">
           <button
             onClick={() => setTab("costeos")}
             className={`flex-1 lg:flex-none px-6 py-2 rounded-lg text-sm transition ${
               tab === "costeos"
-                ? "font-semibold bg-white dark:bg-slate-700 text-blue-600 shadow-sm"
-                : "font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                ? "font-semibold bg-white  text-blue-600 shadow-sm"
+                : "font-medium text-slate-500  hover:text-slate-700 "
             }`}
           >
             Costeos
@@ -157,8 +157,8 @@ export default function VentasTable({
             onClick={() => setTab("cotizaciones")}
             className={`flex-1 lg:flex-none px-6 py-2 rounded-lg text-sm transition ${
               tab === "cotizaciones"
-                ? "font-semibold bg-white dark:bg-slate-700 text-blue-600 shadow-sm"
-                : "font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                ? "font-semibold bg-white  text-blue-600 shadow-sm"
+                : "font-medium text-slate-500  hover:text-slate-700 "
             }`}
             title="Placeholder (solo UI por ahora)"
           >
@@ -166,7 +166,7 @@ export default function VentasTable({
           </button>
         </div>
 
-        <div className="hidden lg:block w-px h-8 bg-slate-200 dark:bg-slate-700" />
+        <div className="hidden lg:block w-px h-8 bg-slate-200 " />
 
         <div className="flex flex-wrap gap-2">
           <button
@@ -174,7 +174,7 @@ export default function VentasTable({
             className={`px-4 py-2 text-sm rounded-lg border transition ${
               range === "todo"
                 ? "font-semibold text-blue-600 bg-blue-600/10 border-blue-600/20"
-                : "font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-600/50"
+                : "font-medium text-slate-600  bg-slate-50  border-slate-200  hover:border-blue-600/50"
             }`}
           >
             Todo
@@ -185,7 +185,7 @@ export default function VentasTable({
             className={`px-4 py-2 text-sm rounded-lg border transition ${
               range === "mes"
                 ? "font-semibold text-blue-600 bg-blue-600/10 border-blue-600/20"
-                : "font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-600/50"
+                : "font-medium text-slate-600  bg-slate-50  border-slate-200  hover:border-blue-600/50"
             }`}
           >
             Mes actual
@@ -196,7 +196,7 @@ export default function VentasTable({
             className={`px-4 py-2 text-sm rounded-lg border transition ${
               range === "porMes"
                 ? "font-semibold text-blue-600 bg-blue-600/10 border-blue-600/20"
-                : "font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-600/50"
+                : "font-medium text-slate-600  bg-slate-50  border-slate-200  hover:border-blue-600/50"
             }`}
             title="UI lista (conectar luego)"
           >
@@ -208,7 +208,7 @@ export default function VentasTable({
             className={`px-4 py-2 text-sm rounded-lg border transition ${
               range === "dia"
                 ? "font-semibold text-blue-600 bg-blue-600/10 border-blue-600/20"
-                : "font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-blue-600/50"
+                : "font-medium text-slate-600  bg-slate-50  border-slate-200  hover:border-blue-600/50"
             }`}
             title="UI lista (conectar luego)"
           >
@@ -223,7 +223,7 @@ export default function VentasTable({
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-transparent rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600/20 dark:placeholder-slate-500"
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50  border border-transparent rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600/20 "
             placeholder="Buscar por descripción, ID o cliente..."
             type="text"
           />
@@ -232,17 +232,17 @@ export default function VentasTable({
         <div className="flex gap-2 relative">
           <button
             onClick={() => setEstadoOpen((s) => !s)}
-            className="bg-slate-50 dark:bg-slate-800 px-4 py-2.5 rounded-xl text-slate-600 dark:text-slate-400 font-medium flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 transition border border-transparent"
+            className="bg-slate-50  px-4 py-2.5 rounded-xl text-slate-600  font-medium flex items-center gap-2 hover:bg-slate-100  transition border border-transparent"
           >
             <span className="text-[18px]">⚙️</span> Estado
           </button>
 
           {/* Dropdown placeholder */}
           {estadoOpen ? (
-            <div className="absolute right-0 top-[46px] z-20 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg p-2">
+            <div className="absolute right-0 top-[46px] z-20 w-56 bg-white  border border-slate-200  rounded-xl shadow-lg p-2">
               <button
                 onClick={() => setEstadoOpen(false)}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-sm"
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50  text-sm"
               >
                 (Pendiente) Conectar estados
               </button>
@@ -253,7 +253,7 @@ export default function VentasTable({
 
       {/* Loading */}
       {loading ? (
-        <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 mb-6">
+        <div className="flex items-center gap-2 text-slate-500  mb-6">
           <div className="h-5 w-5 rounded-full border-2 border-slate-200 border-t-blue-600 animate-spin" />
           Cargando costeos...
         </div>
@@ -262,7 +262,7 @@ export default function VentasTable({
       {/* Lista */}
       <div className="space-y-4 mb-8">
         {!loading && filtered.length === 0 ? (
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400">
+          <div className="bg-white  p-6 rounded-2xl border border-slate-200  text-slate-600 ">
             No hay registros para los filtros actuales.
           </div>
         ) : (
@@ -281,11 +281,11 @@ export default function VentasTable({
             return (
               <div
                 key={venta.id}
-                className="group bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-blue-600/30 dark:hover:border-blue-600/50 transition overflow-visible"
+                className="group bg-white  rounded-2xl border border-slate-200  shadow-sm hover:shadow-md hover:border-blue-600/30  transition overflow-visible"
               >
                 <div className="p-5 flex flex-col lg:flex-row lg:items-center gap-6">
                   <div className="flex items-center gap-4 flex-1">
-                    <div className="h-12 w-12 bg-slate-100 dark:bg-slate-800 flex items-center justify-center rounded-xl font-bold text-slate-700 dark:text-slate-300">
+                    <div className="h-12 w-12 bg-slate-100  flex items-center justify-center rounded-xl font-bold text-slate-700 ">
                       #{venta.numero ?? "—"}
                     </div>
 
@@ -294,16 +294,16 @@ export default function VentasTable({
                         {venta.descripcion || "Sin descripción"}
                       </h4>
 
-                      <p className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                      <p className="text-sm text-slate-500  flex items-center gap-2">
                         <span className="text-base">📅</span>{" "}
                         {getFechaLabel(venta)}
                         <span className="mx-1 text-slate-300">•</span>
                         {!cotIsReal ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100  text-slate-600  uppercase tracking-wider">
                             {cotLabel}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-100  text-blue-600  uppercase tracking-wider">
                             {cotLabel}
                           </span>
                         )}
@@ -332,7 +332,7 @@ export default function VentasTable({
                       <p className="text-xs uppercase font-semibold text-slate-400 tracking-wider mb-2">
                         % Utilidad
                       </p>
-                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+                      <div className="w-full bg-slate-100  rounded-full h-2 overflow-hidden">
                         <div
                           className="bg-green-500 h-full rounded-full"
                           style={{ width: `${pctWidth}%` }}
@@ -362,7 +362,7 @@ export default function VentasTable({
                             prev === venta.id ? null : venta.id,
                           );
                         }}
-                        className="p-2.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition hover:cursor-pointer"
+                        className="p-2.5 text-slate-400 hover:bg-slate-100  rounded-xl transition hover:cursor-pointer"
                         title="Más"
                       >
                         ⋮
@@ -384,7 +384,7 @@ export default function VentasTable({
                               setMenuOpenId(null);
                               onEditVenta?.(venta.id);
                             }}
-                            className="w-full flex items-center justify-between text-left px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-sm hover:cursor-pointer"
+                            className="w-full flex items-center justify-between text-left px-3 py-2 rounded-lg hover:bg-slate-50  text-sm hover:cursor-pointer"
                           >
                             <span className="font-bold uppercase">
                               Editar costeo
@@ -401,7 +401,7 @@ export default function VentasTable({
                               setMenuOpenId(null);
                               onDisableVenta?.(venta);
                             }}
-                            className="w-full flex items-center justify-between text-left px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-sm text-red-600 hover:cursor-pointer"
+                            className="w-full flex items-center justify-between text-left px-3 py-2 rounded-lg hover:bg-red-50  text-sm text-red-600 hover:cursor-pointer"
                           >
                             <span className="font-bold uppercase">
                               Eliminar costeo
@@ -417,7 +417,7 @@ export default function VentasTable({
                 {/* mini detalle (opcional) */}
                 <div className="px-5 pb-5 -mt-2 text-xs text-slate-400">
                   Costo:{" "}
-                  <span className="font-semibold text-slate-600 dark:text-slate-300">
+                  <span className="font-semibold text-slate-600 ">
                     {clp(totalCosto)}
                   </span>
                 </div>
@@ -428,14 +428,14 @@ export default function VentasTable({
       </div>
 
       {/* Paginación (plantilla) */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-4 border-t border-slate-200 dark:border-slate-800">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-4 border-t border-slate-200 ">
+        <p className="text-sm text-slate-500 ">
           Mostrando{" "}
-          <span className="font-semibold text-slate-900 dark:text-slate-100">
+          <span className="font-semibold text-slate-900 ">
             {showingFrom} - {showingTo}
           </span>{" "}
           de{" "}
-          <span className="font-semibold text-slate-900 dark:text-slate-100">
+          <span className="font-semibold text-slate-900 ">
             {filtered.length}
           </span>{" "}
           resultados
@@ -447,7 +447,7 @@ export default function VentasTable({
           <select
             value={rowsPerPage}
             onChange={(e) => setRowsPerPage(Number(e.target.value))}
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-600/20"
+            className="bg-white  border border-slate-200  text-sm rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-600/20"
           >
             <option value={10}>10</option>
             <option value={20}>20</option>
@@ -458,7 +458,7 @@ export default function VentasTable({
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50"
+              className="p-2 rounded-lg border border-slate-200  hover:bg-slate-50  disabled:opacity-50"
               title="Anterior"
             >
               ‹
@@ -473,7 +473,7 @@ export default function VentasTable({
                 setPage((p) => Math.min(maxPage, p + 1));
               }}
               disabled={(page + 1) * rowsPerPage >= filtered.length}
-              className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50"
+              className="p-2 rounded-lg border border-slate-200  hover:bg-slate-50  disabled:opacity-50"
               title="Siguiente"
             >
               ›

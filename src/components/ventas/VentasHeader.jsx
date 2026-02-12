@@ -9,10 +9,10 @@ export default function VentasHeader({
   return (
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h2 className="text-3xl font-bold tracking-tight text-slate-900 ">
           Costeos
         </h2>
-        <p className="text-slate-500 dark:text-slate-400 mt-1">
+        <p className="text-slate-500  mt-1">
           Gestión avanzada de costos, ítems y generación de cotizaciones.
         </p>
       </div>
@@ -21,7 +21,7 @@ export default function VentasHeader({
         <button
           onClick={onRefresh}
           disabled={loadingVentas}
-          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-4 py-2.5 rounded-xl font-medium flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition disabled:opacity-60"
+          className="bg-white  border border-slate-200  px-4 py-2.5 rounded-xl font-medium flex items-center gap-2 hover:bg-slate-50  transition disabled:opacity-60"
         >
           <span className="text-[18px]">⟳</span>
           {loadingVentas ? "Actualizando..." : "Actualizar"}

@@ -78,50 +78,50 @@ export default function VentasSummary({ ventas }) {
       title: "Costeos totales",
       subtitle: "(mes actual)",
       value: totals.count,
-      iconBg: "bg-blue-50 dark:bg-blue-900/20",
-      iconText: "text-blue-600 dark:text-blue-400",
+      iconBg: "bg-blue-50 ",
+      iconText: "text-blue-600 ",
       icon: "📊",
     },
     {
       title: "Costo total",
       subtitle: "Monto total costeado",
       value: shortCLP(totals.totalCosto),
-      iconBg: "bg-slate-50 dark:bg-slate-800",
-      iconText: "text-slate-600 dark:text-slate-400",
+      iconBg: "bg-slate-50 ",
+      iconText: "text-slate-600 ",
       icon: "💼",
     },
     {
       title: "Venta total",
       subtitle: "",
       value: shortCLP(totals.totalVenta),
-      valueClass: "text-green-600 dark:text-green-400",
-      iconBg: "bg-green-50 dark:bg-green-900/20",
-      iconText: "text-green-600 dark:text-green-400",
+      valueClass: "text-green-600 ",
+      iconBg: "bg-green-50 ",
+      iconText: "text-green-600 ",
       icon: "💵",
     },
     {
       title: "Utilidad proyectada",
       subtitle: "",
       value: shortCLP(totals.utilidad),
-      valueClass: "text-purple-600 dark:text-purple-400",
-      iconBg: "bg-purple-50 dark:bg-purple-900/20",
-      iconText: "text-purple-600 dark:text-purple-400",
+      valueClass: "text-purple-600 ",
+      iconBg: "bg-purple-50 ",
+      iconText: "text-purple-600 ",
       icon: "📈",
     },
     {
       title: "Venta promedio",
       subtitle: "",
       value: shortCLP(totals.ventaProm),
-      iconBg: "bg-amber-50 dark:bg-amber-900/20",
-      iconText: "text-amber-600 dark:text-amber-400",
+      iconBg: "bg-amber-50 ",
+      iconText: "text-amber-600 ",
       icon: "📉",
     },
     {
       title: "KPI pendiente",
       subtitle: "reemplazar por endpoint",
       value: kpiPendiente,
-      iconBg: "bg-rose-50 dark:bg-rose-900/20",
-      iconText: "text-rose-600 dark:text-rose-400",
+      iconBg: "bg-rose-50 ",
+      iconText: "text-rose-600 ",
       icon: "🧾",
     },
   ];
@@ -131,7 +131,7 @@ export default function VentasSummary({ ventas }) {
       {cards.map((c) => (
         <div
           key={c.title}
-          className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between"
+          className="bg-white  p-4 rounded-2xl border border-slate-200  shadow-sm flex flex-col justify-between"
         >
           <div className="flex items-start justify-between mb-2">
             <div className={`p-2 rounded-lg ${c.iconBg} ${c.iconText}`}>

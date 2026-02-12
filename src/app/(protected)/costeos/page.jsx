@@ -9,8 +9,11 @@ import VentasSummary from "@/components/ventas/VentasSummary";
 import VentasTable from "@/components/ventas/VentasTable";
 
 import NuevaVentaDialog from "@/components/ventas/NuevaVentaDialog";
-import NuevaCotizacionDialog from "@/components/ventas/CotizacionFromVentasDialog";
-import DisableVentaModal from "@/components/ventas/DisableVentaModal";
+
+// ✅ usa SOLO el nuevo modal (paso a paso)
+import { CotizacionFromVentasDialog } from "@/components/ventas/cotizacion";
+
+// import DisableVentaModal from "@/components/ventas/DisableVentaModal";
 import { VentaDeleteDialog } from "@/components/ventas/modalForm";
 
 import { useVentas } from "@/components/ventas/hooks/useVentas";
@@ -89,7 +92,7 @@ export default function VentasPage() {
   }
 
   return (
-    <main className="flex-1  overflow-y-auto">
+    <main className="flex-1 overflow-y-auto">
       <div className="w-full max-w-none px-6 md:px-8 py-6 md:py-8">
         <VentasHeader
           empresaLabel={empresaLabel}
@@ -114,7 +117,7 @@ export default function VentasPage() {
         />
       </div>
 
-      {/* FAB mobile (como plantilla) */}
+      {/* FAB mobile */}
       <button
         onClick={() => {
           setVentaIdEditing(null);
@@ -148,7 +151,8 @@ export default function VentasPage() {
         ventaId={ventaIdEditing}
       />
 
-      <NuevaCotizacionDialog
+      {/* ✅ NUEVO MODAL COTIZACIÓN (Stepper) */}
+      <CotizacionFromVentasDialog
         open={openCot}
         onClose={() => setOpenCot(false)}
         session={session}
@@ -159,16 +163,7 @@ export default function VentasPage() {
         onCreated={fetchVentas}
       />
 
-      {/* MODAL DESHABILITAR 
-      <DisableVentaModal
-        open={openDisable}
-        onClose={() => {
-          setOpenDisable(false);
-          setVentaDisable(null);
-        }}
-        venta={ventaDisable}
-        onDisabled={fetchVentas}
-      />*/}
+      {/* Eliminar costeo */}
       <VentaDeleteDialog
         open={openDisable}
         onClose={() => {
