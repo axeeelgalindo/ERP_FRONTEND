@@ -68,7 +68,7 @@ export default function DetalleItemCard({
           boxShadow: "0 10px 20px rgba(16,24,40,.08)",
         },
         background:
-          theme.palette.mode === "dark" ? "rgba(15,23,42,.6)" : "#fff",
+          theme.palette.mode === "dark" ? "#fff" : "#fff",
       }}
     >
       <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
@@ -86,7 +86,7 @@ export default function DetalleItemCard({
               color: "text.secondary",
               bgcolor:
                 theme.palette.mode === "dark"
-                  ? "rgba(148,163,184,.15)"
+                  ? "rgba(15,23,42,.04)"
                   : "rgba(15,23,42,.04)",
             }}
           >
@@ -131,7 +131,7 @@ export default function DetalleItemCard({
                       borderRadius: 1.5,
                       bgcolor:
                         theme.palette.mode === "dark"
-                          ? "rgba(2,6,23,.35)"
+                          ? "rgba(15,23,42,.03)"  
                           : "rgba(15,23,42,.03)",
                     },
                   }}
@@ -195,7 +195,7 @@ export default function DetalleItemCard({
                       borderRadius: 1.5,
                       bgcolor:
                         theme.palette.mode === "dark"
-                          ? "rgba(2,6,23,.35)"
+                          ? "rgba(15,23,42,.03)"
                           : "rgba(15,23,42,.03)",
                     },
                   }}
@@ -233,7 +233,7 @@ export default function DetalleItemCard({
                       borderRadius: 1.5,
                       bgcolor:
                         theme.palette.mode === "dark"
-                          ? "rgba(2,6,23,.35)"
+                          ? "rgba(15,23,42,.03)"
                           : "rgba(15,23,42,.03)",
                     },
                   }}
@@ -269,7 +269,7 @@ export default function DetalleItemCard({
                           borderRadius: 1.5,
                           bgcolor:
                             theme.palette.mode === "dark"
-                              ? "rgba(2,6,23,.35)"
+                              ? "rgba(15,23,42,.03)"
                               : "rgba(15,23,42,.03)",
                         },
                       }}
@@ -311,7 +311,7 @@ export default function DetalleItemCard({
                           borderRadius: 1.5,
                           bgcolor:
                             theme.palette.mode === "dark"
-                              ? "rgba(2,6,23,.35)"
+                              ? "rgba(15,23,42,.03)"
                               : "rgba(15,23,42,.03)",
                         },
                       }}
@@ -355,7 +355,7 @@ export default function DetalleItemCard({
                           borderRadius: 1.5,
                           bgcolor:
                             theme.palette.mode === "dark"
-                              ? "rgba(2,6,23,.35)"
+                              ? "rgba(15,23,42,.03)"
                               : "rgba(15,23,42,.03)",
                         },
                       }}
@@ -403,7 +403,7 @@ export default function DetalleItemCard({
                           borderRadius: 1.5,
                           bgcolor:
                             theme.palette.mode === "dark"
-                              ? "rgba(2,6,23,.35)"
+                              ? "rgba(15,23,42,.03)"
                               : "rgba(15,23,42,.03)",
                         },
                       }}
@@ -471,7 +471,7 @@ export default function DetalleItemCard({
                           borderRadius: 1.5,
                           bgcolor:
                             theme.palette.mode === "dark"
-                              ? "rgba(2,6,23,.35)"
+                              ? "rgba(15,23,42,.03)"
                               : "rgba(15,23,42,.03)",
                         },
                       }}
@@ -524,7 +524,7 @@ export default function DetalleItemCard({
                           borderRadius: 1.5,
                           bgcolor:
                             theme.palette.mode === "dark"
-                              ? "rgba(2,6,23,.35)"
+                              ? "rgba(15,23,42,.03)"
                               : "rgba(15,23,42,.03)",
                         },
                       }}
@@ -568,7 +568,7 @@ export default function DetalleItemCard({
                           borderRadius: 1.5,
                           bgcolor:
                             theme.palette.mode === "dark"
-                              ? "rgba(2,6,23,.35)"
+                              ? "rgba(15,23,42,.03)"
                               : "rgba(15,23,42,.03)",
                         },
                       }}
@@ -638,7 +638,7 @@ export default function DetalleItemCard({
                           borderRadius: 1.5,
                           bgcolor:
                             theme.palette.mode === "dark"
-                              ? "rgba(2,6,23,.35)"
+                              ? "rgba(15,23,42,.03)"
                               : "rgba(15,23,42,.03)",
                         },
                       }}

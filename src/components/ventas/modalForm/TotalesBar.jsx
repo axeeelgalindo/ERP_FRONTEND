@@ -14,7 +14,7 @@ export default function TotalesBar({ theme, preview }) {
         backdropFilter: "blur(8px)",
         bgcolor:
           theme.palette.mode === "dark"
-            ? "rgba(2,6,23,.55)"
+            ? "rgba(255,255,255,.85)"
             : "rgba(255,255,255,.85)",
         borderTop: "1px solid",
         borderBottom: "1px solid",
@@ -38,7 +38,7 @@ export default function TotalesBar({ theme, preview }) {
             borderColor: "divider",
             bgcolor:
               theme.palette.mode === "dark"
-                ? "rgba(148,163,184,.08)"
+                ? "rgba(15,23,42,.03)"
                 : "rgba(15,23,42,.03)",
           }}
         >
@@ -66,7 +66,7 @@ export default function TotalesBar({ theme, preview }) {
             borderColor: "divider",
             bgcolor:
               theme.palette.mode === "dark"
-                ? "rgba(148,163,184,.08)"
+                ? "rgba(15,23,42,.03)"
                 : "rgba(15,23,42,.03)",
           }}
         >

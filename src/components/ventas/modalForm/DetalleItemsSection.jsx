@@ -91,7 +91,7 @@ export default function DetalleItemsSection({
             border: "2px dashed",
             borderColor:
               theme.palette.mode === "dark"
-                ? "rgba(148,163,184,.25)"
+                ? "rgba(15,23,42,.12)"
                 : "rgba(15,23,42,.12)",
             borderRadius: 2.5,
             p: 3,
@@ -101,14 +101,14 @@ export default function DetalleItemsSection({
             cursor: "pointer",
             bgcolor:
               theme.palette.mode === "dark"
-                ? "rgba(2,6,23,.15)"
+                ? "rgba(248,250,252,1)"
                 : "rgba(248,250,252,1)",
             "&:hover": {
               borderColor: "rgba(25,118,210,.35)",
               color: "primary.main",
               bgcolor:
                 theme.palette.mode === "dark"
-                  ? "rgba(25,118,210,.06)"
+                  ? "rgba(25,118,210,.04)"
                   : "rgba(25,118,210,.04)",
             },
           }}

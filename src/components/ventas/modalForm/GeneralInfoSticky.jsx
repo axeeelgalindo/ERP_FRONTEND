@@ -25,7 +25,7 @@ export default function GeneralInfoSticky({
         // importante para que tape lo que pasa por debajo mientras scrolleas
         bgcolor:
           theme.palette.mode === "dark"
-            ? "rgba(2,6,23,.92)"
+            ? "rgba(255,255,255,.92)"
             : "rgba(255,255,255,.92)",
         backdropFilter: "blur(10px)",
         borderBottom: "1px solid",
@@ -44,7 +44,7 @@ export default function GeneralInfoSticky({
           border: "1px solid",
           borderColor: "divider",
           bgcolor:
-            theme.palette.mode === "dark" ? "rgba(15,23,42,.55)" : "#fff",
+            theme.palette.mode === "dark" ? "#fff" : "#fff",
         }}
       >
         <Typography
@@ -79,7 +79,7 @@ export default function GeneralInfoSticky({
                 borderRadius: 1.5,
                 bgcolor:
                   theme.palette.mode === "dark"
-                    ? "rgba(2,6,23,.35)"
+                    ? "rgba(15,23,42,.03)"
                     : "rgba(15,23,42,.03)",
               },
             }}
@@ -99,7 +99,7 @@ export default function GeneralInfoSticky({
                       borderRadius: 1.5,
                       bgcolor:
                         theme.palette.mode === "dark"
-                          ? "rgba(2,6,23,.35)"
+                          ? "rgba(15,23,42,.03)"
                           : "rgba(15,23,42,.03)",
                     },
                   }}
@@ -127,7 +127,7 @@ export default function GeneralInfoSticky({
             borderColor: "divider",
             bgcolor:
               theme.palette.mode === "dark"
-                ? "rgba(148,163,184,.08)"
+                ? "rgba(15,23,42,.03)"
                 : "rgba(15,23,42,.03)",
           }}
         >
@@ -156,7 +156,7 @@ export default function GeneralInfoSticky({
             borderColor: "divider",
             bgcolor:
               theme.palette.mode === "dark"
-                ? "rgba(148,163,184,.08)"
+                ? "rgba(15,23,42,.03)"
                 : "rgba(15,23,42,.03)",
           }}
         >

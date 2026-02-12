@@ -16,7 +16,7 @@ export default function GeneralInfoSection({
         borderRadius: 2.5,
         border: "1px solid",
         borderColor: "divider",
-        bgcolor: theme.palette.mode === "dark" ? "rgba(15,23,42,.55)" : "#fff",
+        bgcolor: theme.palette.mode === "dark" ? "#fff" : "#fff",
       }}
     >
       <Typography
