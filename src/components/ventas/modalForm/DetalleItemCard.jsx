@@ -57,18 +57,17 @@ export default function DetalleItemCard({
     <Card
       variant="outlined"
       sx={{
-        borderRadius: 2.5,
+        borderRadius: 3,
         position: "relative",
         overflow: "visible",
-        borderColor: "divider",
-        boxShadow: "0 1px 2px rgba(16,24,40,.06)",
+        borderColor: "rgba(15,23,42,.10)",
+        bgcolor: "#fff",
+        boxShadow: "0 1px 2px rgba(15,23,42,.05)",
         transition: "all .15s ease",
         "&:hover": {
-          borderColor: "rgba(25,118,210,.35)",
-          boxShadow: "0 10px 20px rgba(16,24,40,.08)",
+          borderColor: "rgba(25,118,210,.25)",
+          boxShadow: "0 12px 26px rgba(15,23,42,.10)",
         },
-        background:
-          theme.palette.mode === "dark" ? "#fff" : "#fff",
       }}
     >
       <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
@@ -81,13 +80,10 @@ export default function DetalleItemCard({
               flexShrink: 0,
               display: "grid",
               placeItems: "center",
-              fontWeight: 900,
+              fontWeight: 1000,
               fontSize: 12,
               color: "text.secondary",
-              bgcolor:
-                theme.palette.mode === "dark"
-                  ? "rgba(15,23,42,.04)"
-                  : "rgba(15,23,42,.04)",
+              bgcolor: "rgba(15,23,42,.06)",
             }}
           >
             {idx + 1}
@@ -131,7 +127,7 @@ export default function DetalleItemCard({
                       borderRadius: 1.5,
                       bgcolor:
                         theme.palette.mode === "dark"
-                          ? "rgba(15,23,42,.03)"  
+                          ? "rgba(15,23,42,.03)"
                           : "rgba(15,23,42,.03)",
                     },
                   }}

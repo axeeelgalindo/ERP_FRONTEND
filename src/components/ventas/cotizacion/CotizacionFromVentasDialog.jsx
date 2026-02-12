@@ -21,7 +21,7 @@ const round0 = (n) => Math.round(Number(n || 0));
 function calcTotalVenta(v) {
   return (v?.detalles || []).reduce(
     (s, d) => s + (Number(d.total ?? d.ventaTotal) || 0),
-    0
+    0,
   );
 }
 
@@ -30,7 +30,7 @@ function distributeGlosas(glosas, subtotalNeto) {
 
   const manualSum = glosas.reduce(
     (acc, g) => acc + (g.manual ? round0(g.monto || 0) : 0),
-    0
+    0,
   );
 
   if (manualSum > t) {
@@ -62,7 +62,7 @@ function distributeGlosas(glosas, subtotalNeto) {
   const ajuste = rem - base * autosIdx.length;
 
   const next = glosas.map((g) =>
-    g.manual ? { ...g, monto: round0(g.monto || 0) } : { ...g, monto: base }
+    g.manual ? { ...g, monto: round0(g.monto || 0) } : { ...g, monto: base },
   );
 
   const lastAuto = autosIdx[autosIdx.length - 1];
@@ -78,7 +78,10 @@ function distributeGlosas(glosas, subtotalNeto) {
 function buildAuthHeaders(session, empresaIdOverride) {
   const token = session?.user?.accessToken || session?.accessToken || "";
   const empresaId =
-    empresaIdOverride ?? session?.user?.empresaId ?? session?.user?.empresa_id ?? null;
+    empresaIdOverride ??
+    session?.user?.empresaId ??
+    session?.user?.empresa_id ??
+    null;
 
   const headers = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -120,7 +123,12 @@ export default function CotizacionFromVentasDialog({
   const [vigenciaDias, setVigenciaDias] = useState(15);
   const [ventaIds, setVentaIds] = useState([]);
 
-  const emptyGlosa = () => ({ descripcion: "", monto: 0, manual: false, orden: 0 });
+  const emptyGlosa = () => ({
+    descripcion: "",
+    monto: 0,
+    manual: false,
+    orden: 0,
+  });
   const [glosas, setGlosas] = useState([emptyGlosa()]);
   const [glosaErr, setGlosaErr] = useState("");
 
@@ -142,7 +150,7 @@ export default function CotizacionFromVentasDialog({
 
   const ventasDisponibles = useMemo(
     () => (Array.isArray(ventas) ? ventas : []),
-    [ventas]
+    [ventas],
   );
 
   const subtotalNeto = useMemo(() => {
@@ -151,16 +159,22 @@ export default function CotizacionFromVentasDialog({
     return round0(
       ventasDisponibles
         .filter((v) => setIds.has(String(v.id)))
-        .reduce((acc, v) => acc + calcTotalVenta(v), 0)
+        .reduce((acc, v) => acc + calcTotalVenta(v), 0),
     );
   }, [ventasDisponibles, ventaIds]);
 
-  const iva = useMemo(() => round0(subtotalNeto * Number(ivaRate || 0)), [subtotalNeto, ivaRate]);
-  const totalFinal = useMemo(() => round0(subtotalNeto + iva), [subtotalNeto, iva]);
+  const iva = useMemo(
+    () => round0(subtotalNeto * Number(ivaRate || 0)),
+    [subtotalNeto, ivaRate],
+  );
+  const totalFinal = useMemo(
+    () => round0(subtotalNeto + iva),
+    [subtotalNeto, iva],
+  );
 
   const sumGlosas = useMemo(
     () => glosas.reduce((acc, g) => acc + round0(g.monto || 0), 0),
-    [glosas]
+    [glosas],
   );
 
   const okCuadra = !glosaErr && subtotalNeto > 0 && sumGlosas === subtotalNeto;
@@ -204,7 +218,10 @@ export default function CotizacionFromVentasDialog({
   const removeGlosa = (idx) => {
     setGlosas((prev) => {
       const base = prev.filter((_, i) => i !== idx);
-      const next = (base.length ? base : [emptyGlosa()]).map((g, i) => ({ ...g, orden: i }));
+      const next = (base.length ? base : [emptyGlosa()]).map((g, i) => ({
+        ...g,
+        orden: i,
+      }));
       const { glosas: dist, error } = distributeGlosas(next, subtotalNeto);
       setGlosaErr(error);
       return dist;
@@ -215,7 +232,10 @@ export default function CotizacionFromVentasDialog({
   useEffect(() => {
     if (!open) return;
 
-    const { headers, token, empresaId } = buildAuthHeaders(session, empresaIdFromToken);
+    const { headers, token, empresaId } = buildAuthHeaders(
+      session,
+      empresaIdFromToken,
+    );
 
     if (!session?.user) {
       setErr("No hay sesión (session.user) disponible.");
@@ -241,17 +261,20 @@ export default function CotizacionFromVentasDialog({
 
         if (!resCli.ok) {
           throw new Error(
-            jsonCli?.detalle || jsonCli?.error || jsonCli?.message || "Error al cargar clientes"
+            jsonCli?.detalle ||
+              jsonCli?.error ||
+              jsonCli?.message ||
+              "Error al cargar clientes",
           );
         }
 
         const cliList = Array.isArray(jsonCli?.data)
           ? jsonCli.data
           : Array.isArray(jsonCli?.items)
-          ? jsonCli.items
-          : Array.isArray(jsonCli)
-          ? jsonCli
-          : [];
+            ? jsonCli.items
+            : Array.isArray(jsonCli)
+              ? jsonCli
+              : [];
 
         setClientes(cliList);
       } catch (e) {
@@ -267,17 +290,20 @@ export default function CotizacionFromVentasDialog({
     if (!empresaId) return "Falta empresaId para header x-empresa-id.";
     if (!clienteId) return "Debes seleccionar un cliente.";
     if (!ventaIds.length) return "Debes seleccionar al menos 1 venta.";
-    if (!subtotalNeto || subtotalNeto <= 0) return "El subtotal neto es 0. Revisa ventas seleccionadas.";
+    if (!subtotalNeto || subtotalNeto <= 0)
+      return "El subtotal neto es 0. Revisa ventas seleccionadas.";
 
     const vd = normalizeVigenciaDias(vigenciaDias);
-    if (!Number.isFinite(vd) || vd < 1 || vd > 365) return "Vigencia debe estar entre 1 y 365 días.";
+    if (!Number.isFinite(vd) || vd < 1 || vd > 365)
+      return "Vigencia debe estar entre 1 y 365 días.";
 
     return "";
   };
 
   const validateStep3 = () => {
     for (let i = 0; i < glosas.length; i++) {
-      if (!String(glosas[i].descripcion || "").trim()) return `Glosa #${i + 1}: Falta descripción.`;
+      if (!String(glosas[i].descripcion || "").trim())
+        return `Glosa #${i + 1}: Falta descripción.`;
     }
     if (glosaErr) return glosaErr;
     if (sumGlosas !== subtotalNeto) {
@@ -338,7 +364,12 @@ export default function CotizacionFromVentasDialog({
 
       const data = await safeJson(res);
       if (!res.ok) {
-        throw new Error(data?.detalle || data?.error || data?.message || "Error creando cotización");
+        throw new Error(
+          data?.detalle ||
+            data?.error ||
+            data?.message ||
+            "Error creando cotización",
+        );
       }
 
       onClose?.();
@@ -408,7 +439,6 @@ export default function CotizacionFromVentasDialog({
             setAcuerdoPago={setAcuerdoPago}
           />
         ) : null}
-
         {step === 3 ? (
           <StepGlosasTotales
             glosas={glosas}
@@ -417,6 +447,7 @@ export default function CotizacionFromVentasDialog({
             removeGlosa={removeGlosa}
             glosaErr={glosaErr}
             okCuadra={okCuadra}
+            subtotalNeto={subtotalNeto} // ✅ ESTA LÍNEA
           />
         ) : null}
       </Box>
