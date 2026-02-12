@@ -13,10 +13,8 @@ import {
 import { useTheme } from "@mui/material/styles";
 import CloseIcon from "@mui/icons-material/Close";
 import AddShoppingCartIcon from "@mui/icons-material/AddShoppingCart";
-import AddCircleIcon from "@mui/icons-material/AddCircle";
 
 import { formatCLP } from "@/components/ventas/utils/money";
-
 import { DetalleItemsSection, useVentaForm } from "@/components/ventas/modalForm";
 
 export default function NuevaVentaDialog({
@@ -28,7 +26,12 @@ export default function NuevaVentaDialog({
   ventaId = null,
 }) {
   const theme = useTheme();
+
+  // fullScreen solo para xs (celulares)
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
+
+  // layout 1 columna para sm/md- (tablets) y 2 columnas para md+
+  const isNarrow = useMediaQuery(theme.breakpoints.down("md"));
 
   const form = useVentaForm({
     open,
@@ -61,14 +64,20 @@ export default function NuevaVentaDialog({
           boxShadow: "0 24px 80px rgba(15,23,42,.25)",
           border: "1px solid",
           borderColor: "divider",
+
+          // ✅ clave: Paper como columna con alto controlado
+          height: { xs: "100dvh", md: "90vh" },
+          maxHeight: { xs: "100dvh", md: "90vh" },
+          display: "flex",
+          flexDirection: "column",
         },
       }}
     >
-      {/* ===== Header (como maqueta) ===== */}
+      {/* ===== Header ===== */}
       <Box
         sx={{
-          px: { xs: 2.5, md: 4 },
-          py: 2.25,
+          px: { xs: 2, md: 4 },
+          py: 2,
           borderBottom: "1px solid",
           borderColor: "divider",
           bgcolor: "background.paper",
@@ -76,6 +85,7 @@ export default function NuevaVentaDialog({
           alignItems: "flex-start",
           justifyContent: "space-between",
           gap: 2,
+          flexShrink: 0,
         }}
       >
         <Box>
@@ -91,12 +101,12 @@ export default function NuevaVentaDialog({
           >
             <AddShoppingCartIcon sx={{ color: "primary.main" }} />
             {form.isEdit
-              ? `Editar Venta / Costeo #${ventaId?.slice?.(0, 6) || ""}`
-              : "Nueva Venta / Costeo"}
+              ? `Editar costeo #${ventaId?.slice?.(0, 6) || ""}`
+              : "Nuevo costeo"}
           </Typography>
 
           <Typography sx={{ fontSize: 13, color: "text.secondary", mt: 0.25 }}>
-            Configure los detalles generales y agregue ítems a la venta.
+            Configure los detalles generales y agregue ítems al costeo.
           </Typography>
         </Box>
 
@@ -105,213 +115,273 @@ export default function NuevaVentaDialog({
         </IconButton>
       </Box>
 
-      {/* ===== Body (2 columnas) ===== */}
+      {/* ===== Body (UN SOLO SCROLL) ===== */}
       <Box
         sx={{
-          height: fullScreen ? "100%" : "calc(90vh - 140px)",
+          flex: 1,
           bgcolor: "rgba(248,250,252,1)",
-          overflow: "hidden",
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "360px 1fr" },
+          overflowY: "auto", // ✅ único scroll
         }}
       >
-        {/* ===== Left panel (fijo) ===== */}
         <Box
           sx={{
-            borderRight: { xs: "none", md: "1px solid" },
-            borderColor: "rgba(15,23,42,.08)",
-            bgcolor: "rgba(248,250,252,1)",
-            p: { xs: 2.5, md: 3.5 },
-            overflow: "hidden",
+            display: "grid",
+            gridTemplateColumns: isNarrow ? "1fr" : "360px 1fr",
+            alignItems: "start",
           }}
         >
-          <Box sx={{ display: "grid", gap: 3 }}>
-            {/* Info general */}
-            <Box sx={{ display: "grid", gap: 1.5 }}>
-              <Typography
-                sx={{
-                  fontSize: 11,
-                  fontWeight: 1000,
-                  letterSpacing: ".14em",
-                  color: "text.disabled",
-                  textTransform: "uppercase",
-                }}
-              >
-                Información General
-              </Typography>
-
+          {/* ===== Left panel ===== */}
+          <Box
+            sx={{
+              borderRight: isNarrow ? "none" : "1px solid",
+              borderBottom: isNarrow ? "1px solid" : "none",
+              borderColor: "rgba(15,23,42,.08)",
+              bgcolor: "rgba(248,250,252,1)",
+              p: { xs: 2, md: 3.5 },
+            }}
+          >
+            <Box sx={{ display: "grid", gap: 3 }}>
+              {/* Info general */}
               <Box sx={{ display: "grid", gap: 1.5 }}>
-                <Box>
-                  <Typography sx={{ fontSize: 12, fontWeight: 700, color: "text.secondary", mb: 0.5 }}>
-                    Descripción de la venta
-                  </Typography>
-                  <Box
-                    component="textarea"
-                    value={form.descripcionVenta}
-                    onChange={(e) => form.setDescripcionVenta(e.target.value)}
-                    placeholder="Ej: Proyecto Modernización Redes 2024"
-                    rows={3}
-                    style={{
-                      width: "100%",
-                      resize: "none",
-                      borderRadius: 12,
-                      border: "1px solid rgba(15,23,42,.12)",
-                      padding: 12,
-                      outline: "none",
-                      fontFamily: "inherit",
-                      fontSize: 13,
-                      background: "#fff",
-                    }}
-                  />
-                </Box>
+                <Typography
+                  sx={{
+                    fontSize: 11,
+                    fontWeight: 1000,
+                    letterSpacing: ".14em",
+                    color: "text.disabled",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Información General
+                </Typography>
 
-                <Box>
-                  <Typography sx={{ fontSize: 12, fontWeight: 700, color: "text.secondary", mb: 0.5 }}>
-                    % Utilidad Objetivo
-                  </Typography>
+                <Box sx={{ display: "grid", gap: 1.5 }}>
+                  <Box>
+                    <Typography
+                      sx={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "text.secondary",
+                        mb: 0.5,
+                      }}
+                    >
+                      Descripción de la venta
+                    </Typography>
 
-                  <Box sx={{ position: "relative" }}>
                     <Box
-                      component="input"
-                      type="number"
-                      value={form.utilidadPctObjetivo}
-                      onChange={(e) => form.setUtilidadPctObjetivo(e.target.value)}
-                      placeholder="25"
+                      component="textarea"
+                      value={form.descripcionVenta}
+                      onChange={(e) => form.setDescripcionVenta(e.target.value)}
+                      placeholder="Ej: Proyecto Modernización Redes 2024"
+                      rows={3}
                       style={{
                         width: "100%",
+                        resize: "none",
                         borderRadius: 12,
                         border: "1px solid rgba(15,23,42,.12)",
-                        padding: "10px 36px 10px 12px",
+                        padding: 12,
                         outline: "none",
                         fontFamily: "inherit",
                         fontSize: 13,
                         background: "#fff",
                       }}
-                      min={0}
-                      step={0.1}
                     />
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        right: 12,
-                        top: 9,
-                        fontSize: 13,
-                        color: "text.disabled",
-                        fontWeight: 800,
-                      }}
-                    >
-                      %
-                    </Box>
                   </Box>
 
-                  <Typography sx={{ fontSize: 11, color: "text.disabled", fontStyle: "italic", mt: 0.5 }}>
-                    Markup sobre costo con factor alpha.
-                  </Typography>
-                </Box>
-              </Box>
-            </Box>
+                  <Box>
+                    <Typography
+                      sx={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "text.secondary",
+                        mb: 0.5,
+                      }}
+                    >
+                      % Utilidad Objetivo
+                    </Typography>
 
-            {/* Resumen financiero */}
-            <Box sx={{ display: "grid", gap: 1.5, pt: 1 }}>
-              <Typography
-                sx={{
-                  fontSize: 11,
-                  fontWeight: 1000,
-                  letterSpacing: ".14em",
-                  color: "text.disabled",
-                  textTransform: "uppercase",
-                }}
-              >
-                Resumen Financiero
-              </Typography>
-
-              <Box sx={{ display: "grid", gap: 1.25 }}>
-                <Box
-                  sx={{
-                    p: 2,
-                    borderRadius: 2.5,
-                    border: "1px solid rgba(15,23,42,.10)",
-                    bgcolor: "#fff",
-                    boxShadow: "0 1px 2px rgba(15,23,42,.04)",
-                  }}
-                >
-                  <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                    Total Venta
-                  </Typography>
-                  <Typography sx={{ fontSize: 26, fontWeight: 1000, mt: 0.5 }}>
-                    {formatCLP(form.preview?.total || 0)}
-                  </Typography>
-                </Box>
-
-                <Box
-                  sx={{
-                    p: 2,
-                    borderRadius: 2.5,
-                    border: "1px solid rgba(15,23,42,.10)",
-                    bgcolor: "#fff",
-                    boxShadow: "0 1px 2px rgba(15,23,42,.04)",
-                  }}
-                >
-                  <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                    Total Costo
-                  </Typography>
-                  <Typography sx={{ fontSize: 18, fontWeight: 900, color: "text.secondary", mt: 0.5 }}>
-                    {formatCLP(form.preview?.costo || 0)}
-                  </Typography>
-                </Box>
-
-                <Box
-                  sx={{
-                    p: 2,
-                    borderRadius: 2.5,
-                    border: "1px solid rgba(16,185,129,.20)",
-                    bgcolor: "rgba(16,185,129,.10)",
-                  }}
-                >
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                    <Box>
-                      <Typography sx={{ fontSize: 12, fontWeight: 900, color: "success.main" }}>
-                        Utilidad Estimada
-                      </Typography>
-                      <Typography sx={{ fontSize: 26, fontWeight: 1000, color: "success.main", mt: 0.5 }}>
-                        {formatCLP(form.preview?.utilidad || 0)}
-                      </Typography>
+                    <Box sx={{ position: "relative" }}>
+                      <Box
+                        component="input"
+                        type="number"
+                        value={form.utilidadPctObjetivo}
+                        onChange={(e) =>
+                          form.setUtilidadPctObjetivo(e.target.value)
+                        }
+                        placeholder="25"
+                        style={{
+                          width: "100%",
+                          borderRadius: 12,
+                          border: "1px solid rgba(15,23,42,.12)",
+                          padding: "10px 36px 10px 12px",
+                          outline: "none",
+                          fontFamily: "inherit",
+                          fontSize: 13,
+                          background: "#fff",
+                        }}
+                        min={0}
+                        step={0.1}
+                      />
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          right: 12,
+                          top: 9,
+                          fontSize: 13,
+                          color: "text.disabled",
+                          fontWeight: 800,
+                        }}
+                      >
+                        %
+                      </Box>
                     </Box>
 
-                    <Typography sx={{ fontSize: 12, fontWeight: 1000, color: "success.main" }}>
-                      {utilidadPct}%
+                    <Typography
+                      sx={{
+                        fontSize: 11,
+                        color: "text.disabled",
+                        fontStyle: "italic",
+                        mt: 0.5,
+                      }}
+                    >
+                      Markup sobre costo con factor alpha.
                     </Typography>
                   </Box>
                 </Box>
               </Box>
-            </Box>
 
-            {/* Estado */}
-            <Box>
-              {(form.loadingCatalogos || form.loadingVenta) && (
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <CircularProgress size={18} />
-                  <Typography variant="body2" color="text.secondary">
-                    {form.loadingVenta ? "Cargando costeo..." : "Cargando catálogos..."}
-                  </Typography>
+              {/* Resumen financiero */}
+              <Box sx={{ display: "grid", gap: 1.5, pt: 1 }}>
+                <Typography
+                  sx={{
+                    fontSize: 11,
+                    fontWeight: 1000,
+                    letterSpacing: ".14em",
+                    color: "text.disabled",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Resumen Financiero
+                </Typography>
+
+                <Box sx={{ display: "grid", gap: 1.25 }}>
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 2.5,
+                      border: "1px solid rgba(15,23,42,.10)",
+                      bgcolor: "#fff",
+                      boxShadow: "0 1px 2px rgba(15,23,42,.04)",
+                    }}
+                  >
+                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                      Total Venta
+                    </Typography>
+                    <Typography
+                      sx={{ fontSize: 26, fontWeight: 1000, mt: 0.5 }}
+                    >
+                      {formatCLP(form.preview?.total || 0)}
+                    </Typography>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 2.5,
+                      border: "1px solid rgba(15,23,42,.10)",
+                      bgcolor: "#fff",
+                      boxShadow: "0 1px 2px rgba(15,23,42,.04)",
+                    }}
+                  >
+                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                      Total Costo
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: 18,
+                        fontWeight: 900,
+                        color: "text.secondary",
+                        mt: 0.5,
+                      }}
+                    >
+                      {formatCLP(form.preview?.costo || 0)}
+                    </Typography>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 2.5,
+                      border: "1px solid rgba(16,185,129,.20)",
+                      bgcolor: "rgba(16,185,129,.10)",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-end",
+                      }}
+                    >
+                      <Box>
+                        <Typography
+                          sx={{
+                            fontSize: 12,
+                            fontWeight: 900,
+                            color: "success.main",
+                          }}
+                        >
+                          Utilidad Estimada
+                        </Typography>
+                        <Typography
+                          sx={{
+                            fontSize: 26,
+                            fontWeight: 1000,
+                            color: "success.main",
+                            mt: 0.5,
+                          }}
+                        >
+                          {formatCLP(form.preview?.utilidad || 0)}
+                        </Typography>
+                      </Box>
+
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 1000,
+                          color: "success.main",
+                        }}
+                      >
+                        {utilidadPct}%
+                      </Typography>
+                    </Box>
+                  </Box>
                 </Box>
-              )}
-              {form.catalogosErr && (
-                <Alert severity="error" sx={{ mt: 1.25 }}>
-                  {form.catalogosErr}
-                </Alert>
-              )}
+              </Box>
+
+              {/* Estado */}
+              <Box>
+                {(form.loadingCatalogos || form.loadingVenta) && (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <CircularProgress size={18} />
+                    <Typography variant="body2" color="text.secondary">
+                      {form.loadingVenta
+                        ? "Cargando costeo..."
+                        : "Cargando catálogos..."}
+                    </Typography>
+                  </Box>
+                )}
+                {form.catalogosErr && (
+                  <Alert severity="error" sx={{ mt: 1.25 }}>
+                    {form.catalogosErr}
+                  </Alert>
+                )}
+              </Box>
             </Box>
           </Box>
-        </Box>
 
-        {/* ===== Right panel (scroll SOLO aquí) ===== */}
-        <Box sx={{ overflowY: "auto" }}>
-          <Box sx={{ p: { xs: 2.5, md: 3.5 } }}>
-            {/* Header items (Detalle + botón arriba) */}
-            
-
-            {/* Items */}
+          {/* ===== Right panel ===== */}
+          <Box sx={{ p: { xs: 2, md: 3.5 } }}>
             <DetalleItemsSection
               theme={theme}
               detalles={form.detalles}
@@ -338,10 +408,10 @@ export default function NuevaVentaDialog({
         </Box>
       </Box>
 
-      {/* ===== Footer ===== */}
+      {/* ===== Footer (siempre visible) ===== */}
       <Box
         sx={{
-          px: { xs: 2.5, md: 4 },
+          px: { xs: 2, md: 4 },
           py: 2,
           borderTop: "1px solid",
           borderColor: "divider",
@@ -349,6 +419,7 @@ export default function NuevaVentaDialog({
           display: "flex",
           justifyContent: "flex-end",
           gap: 1.5,
+          flexShrink: 0,
         }}
       >
         <Button onClick={handleClose} color="inherit" disabled={form.saving}>
@@ -366,7 +437,11 @@ export default function NuevaVentaDialog({
             boxShadow: "0 10px 22px rgba(25,118,210,.22)",
           }}
         >
-          {form.saving ? "Guardando..." : form.isEdit ? "Guardar cambios" : "CREAR VENTA"}
+          {form.saving
+            ? "Guardando..."
+            : form.isEdit
+              ? "Guardar cambios"
+              : "CREAR VENTA"}
         </Button>
       </Box>
     </Dialog>

@@ -55,11 +55,7 @@ export default function useVentaForm({
 
   function getEmpleadoRut(emp) {
     return (
-      emp?.rut ??
-      emp?.RUT ??
-      emp?.usuario?.rut ??
-      emp?.usuario?.RUT ??
-      null
+      emp?.rut ?? emp?.RUT ?? emp?.usuario?.rut ?? emp?.usuario?.RUT ?? null
     );
   }
 
@@ -246,7 +242,10 @@ export default function useVentaForm({
       const [resTipoItems, resTipoDias, resOV] = await Promise.all([
         fetch(`${API_URL}/ventas/tipoitems`, { headers, cache: "no-store" }),
         fetch(`${API_URL}/ventas/tipodias`, { headers, cache: "no-store" }),
-        fetch(`${API_URL}/ventas/ordenes-venta`, { headers, cache: "no-store" }),
+        fetch(`${API_URL}/ventas/ordenes-venta`, {
+          headers,
+          cache: "no-store",
+        }),
       ]);
 
       const [dataTipoItems, dataTipoDias, dataOV] = await Promise.all([
@@ -334,7 +333,9 @@ export default function useVentaForm({
         null;
 
       if (!isEdit && hh?.id) {
-        setDetalles((prev) => prev.map((d) => (d.modo === "HH" ? { ...d, tipoItemId: hh.id } : d)));
+        setDetalles((prev) =>
+          prev.map((d) => (d.modo === "HH" ? { ...d, tipoItemId: hh.id } : d)),
+        );
       }
     } catch (e) {
       setCatalogosErr(e?.message || "Error cargando catálogos");
@@ -565,10 +566,22 @@ export default function useVentaForm({
       return { costoConAlpha };
     });
 
-    const totalCosto = lines.reduce((acc, x) => acc + (x.costoConAlpha || 0), 0);
+    const totalCosto = lines.reduce(
+      (acc, x) => acc + (x.costoConAlpha || 0),
+      0,
+    );
 
-    const u = utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo);
-    const k = u != null && Number.isFinite(u) && u >= 0 ? 1 + u / 100 : 1;
+    const uPct =
+      utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo);
+
+    // ✅ margen: venta = costo / (1 - u)
+    let k = 1;
+    if (uPct != null && Number.isFinite(uPct) && uPct >= 0) {
+      const u = uPct / 100;
+      const denom = 1 - u;
+      // si u>=100, lo dejamos igual y la validación lo bloqueará
+      if (denom > 0) k = 1 / denom;
+    }
 
     const linesFinal = lines.map((x) => {
       const ventaTotal = (x.costoConAlpha || 0) * k;
@@ -580,16 +593,33 @@ export default function useVentaForm({
     const totalVenta = totalCosto * k;
     const utilidad = totalVenta - totalCosto;
 
-    return { k, total: totalVenta, costo: totalCosto, utilidad, lines: linesFinal };
-  }, [detalles, tipoDias, hhRegistros, empleados, tipoItemHH, utilidadPctObjetivo]);
+    return {
+      k,
+      total: totalVenta,
+      costo: totalCosto,
+      utilidad,
+      lines: linesFinal,
+    };
+  }, [
+    detalles,
+    tipoDias,
+    hhRegistros,
+    empleados,
+    tipoItemHH,
+    utilidadPctObjetivo,
+  ]);
 
   const validateForm = () => {
     if (!detalles.length) return "Debes agregar al menos un ítem.";
 
     if (utilidadPctObjetivo !== "") {
       const u = Number(utilidadPctObjetivo);
-      if (!Number.isFinite(u) || u < 0)
+      if (!Number.isFinite(u) || u < 0) {
         return "% utilidad objetivo inválido (>= 0).";
+      }
+      if (u >= 100) {
+        return "% utilidad objetivo inválido (< 100).";
+      }
     }
 
     for (let i = 0; i < detalles.length; i++) {
@@ -681,7 +711,9 @@ export default function useVentaForm({
         }),
       };
 
-      const url = isEdit ? `${API_URL}/ventas/${ventaId}` : `${API_URL}/ventas/add`;
+      const url = isEdit
+        ? `${API_URL}/ventas/${ventaId}`
+        : `${API_URL}/ventas/add`;
       const method = isEdit ? "PUT" : "POST";
 
       const res = await fetch(url, {
@@ -693,7 +725,12 @@ export default function useVentaForm({
       const data = await safeJson(res);
       if (!res.ok) {
         console.log("❌ save venta error", res.status, data, payload);
-        throw new Error(data?.detalle || data?.error || data?.message || "Error al guardar venta");
+        throw new Error(
+          data?.detalle ||
+            data?.error ||
+            data?.message ||
+            "Error al guardar venta",
+        );
       }
 
       onClose?.();

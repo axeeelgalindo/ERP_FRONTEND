@@ -10,6 +10,7 @@ import {
   MenuItem,
   TextField,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -42,12 +43,16 @@ export default function DetalleItemCard({
   previewLine,
 }) {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
   const tipoDiaEnabled = isTipoDiaEnabled(det);
 
   const hhSelected =
     det.modo === "HH" ? findHHForEmpleado(det.empleadoId) : null;
+
   const hhSelectedCostoHH =
     hhSelected?.costoHH != null ? Number(hhSelected.costoHH) : 0;
+
   const hhSelectedCIF = getHHCIFValue(hhSelected);
   const faltaHH = det.modo === "HH" && det.empleadoId && !hhSelected;
 
@@ -71,6 +76,7 @@ export default function DetalleItemCard({
       }}
     >
       <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+        {/* HEADER ROW: número + (delete inline en mobile) */}
         <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.75 }}>
           <Box
             sx={{
@@ -125,10 +131,7 @@ export default function DetalleItemCard({
                   sx={{
                     "& .MuiOutlinedInput-root": {
                       borderRadius: 1.5,
-                      bgcolor:
-                        theme.palette.mode === "dark"
-                          ? "rgba(15,23,42,.03)"
-                          : "rgba(15,23,42,.03)",
+                      bgcolor: "rgba(15,23,42,.03)",
                     },
                   }}
                 />
@@ -189,10 +192,7 @@ export default function DetalleItemCard({
                   sx={{
                     "& .MuiOutlinedInput-root": {
                       borderRadius: 1.5,
-                      bgcolor:
-                        theme.palette.mode === "dark"
-                          ? "rgba(15,23,42,.03)"
-                          : "rgba(15,23,42,.03)",
+                      bgcolor: "rgba(15,23,42,.03)",
                     },
                   }}
                 >
@@ -227,10 +227,7 @@ export default function DetalleItemCard({
                   sx={{
                     "& .MuiOutlinedInput-root": {
                       borderRadius: 1.5,
-                      bgcolor:
-                        theme.palette.mode === "dark"
-                          ? "rgba(15,23,42,.03)"
-                          : "rgba(15,23,42,.03)",
+                      bgcolor: "rgba(15,23,42,.03)",
                     },
                   }}
                 />
@@ -263,10 +260,7 @@ export default function DetalleItemCard({
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           borderRadius: 1.5,
-                          bgcolor:
-                            theme.palette.mode === "dark"
-                              ? "rgba(15,23,42,.03)"
-                              : "rgba(15,23,42,.03)",
+                          bgcolor: "rgba(15,23,42,.03)",
                         },
                       }}
                     >
@@ -305,10 +299,7 @@ export default function DetalleItemCard({
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           borderRadius: 1.5,
-                          bgcolor:
-                            theme.palette.mode === "dark"
-                              ? "rgba(15,23,42,.03)"
-                              : "rgba(15,23,42,.03)",
+                          bgcolor: "rgba(15,23,42,.03)",
                         },
                       }}
                     >
@@ -349,10 +340,7 @@ export default function DetalleItemCard({
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           borderRadius: 1.5,
-                          bgcolor:
-                            theme.palette.mode === "dark"
-                              ? "rgba(15,23,42,.03)"
-                              : "rgba(15,23,42,.03)",
+                          bgcolor: "rgba(15,23,42,.03)",
                         },
                       }}
                     />
@@ -383,9 +371,7 @@ export default function DetalleItemCard({
                       >
                         Subtotal
                       </Typography>
-                      <Typography
-                        sx={{ fontWeight: 900, color: "primary.main" }}
-                      >
+                      <Typography sx={{ fontWeight: 900, color: "primary.main" }}>
                         {formatCLP(subtotal)}
                       </Typography>
                     </Box>
@@ -397,10 +383,7 @@ export default function DetalleItemCard({
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           borderRadius: 1.5,
-                          bgcolor:
-                            theme.palette.mode === "dark"
-                              ? "rgba(15,23,42,.03)"
-                              : "rgba(15,23,42,.03)",
+                          bgcolor: "rgba(15,23,42,.03)",
                         },
                       }}
                       label="Costo HH (según período)"
@@ -465,10 +448,7 @@ export default function DetalleItemCard({
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           borderRadius: 1.5,
-                          bgcolor:
-                            theme.palette.mode === "dark"
-                              ? "rgba(15,23,42,.03)"
-                              : "rgba(15,23,42,.03)",
+                          bgcolor: "rgba(15,23,42,.03)",
                         },
                       }}
                     >
@@ -518,10 +498,7 @@ export default function DetalleItemCard({
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           borderRadius: 1.5,
-                          bgcolor:
-                            theme.palette.mode === "dark"
-                              ? "rgba(15,23,42,.03)"
-                              : "rgba(15,23,42,.03)",
+                          bgcolor: "rgba(15,23,42,.03)",
                         },
                       }}
                     >
@@ -562,10 +539,7 @@ export default function DetalleItemCard({
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           borderRadius: 1.5,
-                          bgcolor:
-                            theme.palette.mode === "dark"
-                              ? "rgba(15,23,42,.03)"
-                              : "rgba(15,23,42,.03)",
+                          bgcolor: "rgba(15,23,42,.03)",
                         },
                       }}
                     />
@@ -596,9 +570,7 @@ export default function DetalleItemCard({
                       >
                         Subtotal
                       </Typography>
-                      <Typography
-                        sx={{ fontWeight: 900, color: "primary.main" }}
-                      >
+                      <Typography sx={{ fontWeight: 900, color: "primary.main" }}>
                         {formatCLP(subtotal)}
                       </Typography>
                     </Box>
@@ -632,10 +604,7 @@ export default function DetalleItemCard({
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           borderRadius: 1.5,
-                          bgcolor:
-                            theme.palette.mode === "dark"
-                              ? "rgba(15,23,42,.03)"
-                              : "rgba(15,23,42,.03)",
+                          bgcolor: "rgba(15,23,42,.03)",
                         },
                       }}
                     />
@@ -655,29 +624,30 @@ export default function DetalleItemCard({
                 : ""}
             </Typography>
           </Box>
-        </Box>
 
-        {detallesLen > 1 ? (
-          <IconButton
-            onClick={onRemove}
-            size="small"
-            aria-label="Eliminar ítem"
-            sx={{
-              position: "absolute",
-              right: 10,
-              top: 10,
-              bgcolor: "rgba(239,68,68,.12)",
-              color: "error.main",
-              border: "1px solid rgba(239,68,68,.25)",
-              transition: "all .15s ease",
-              "&:hover": { bgcolor: "rgba(239,68,68,.18)" },
-              opacity: { xs: 1, sm: 0 },
-              ".MuiCard-root:hover &": { opacity: 1 },
-            }}
-          >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
-        ) : null}
+          {/* Delete SOLO DESKTOP: absoluto (está ok en pantallas grandes) */}
+          {!isMobile && detallesLen > 1 ? (
+            <IconButton
+              onClick={onRemove}
+              size="small"
+              aria-label="Eliminar ítem"
+              sx={{
+                position: "absolute",
+                right: 10,
+                top: 10,
+                bgcolor: "rgba(239,68,68,.12)",
+                color: "error.main",
+                border: "1px solid rgba(239,68,68,.25)",
+                transition: "all .15s ease",
+                "&:hover": { bgcolor: "rgba(239,68,68,.18)" },
+                opacity: { xs: 1, sm: 0 },
+                ".MuiCard-root:hover &": { opacity: 1 },
+              }}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          ) : null}
+        </Box>
       </CardContent>
     </Card>
   );
