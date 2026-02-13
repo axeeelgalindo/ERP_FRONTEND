@@ -537,77 +537,106 @@ export default function useVentaForm({
   const removeDetalle = (idx) =>
     setDetalles((prev) => prev.filter((_, i) => i !== idx));
 
-  const preview = useMemo(() => {
-    const lines = detalles.map((d) => {
-      const cantidad = Number(d.cantidad) || 1;
+const preview = useMemo(() => {
+  // 1) calcular costoConAlpha por ítem (esto es COSTO, no utilidad)
+  const linesBase = detalles.map((d) => {
+    const cantidad = Number(d.cantidad) || 1;
 
-      const alphaPct = normalizeAlphaPctUI(d.alphaPct);
-      const alphaMult = 1 + alphaPct / 100;
+    const alphaPct = normalizeAlphaPctUI(d.alphaPct);
+    const alphaMult = 1 + alphaPct / 100;
 
-      const tipoDia = tipoDias.find((t) => t.id === d.tipoDiaId) || null;
-      const extraFijo = tipoDia ? Number(tipoDia.valor ?? 0) : 0;
+    const tipoDia = tipoDias.find((t) => t.id === d.tipoDiaId) || null;
+    const extraFijo = tipoDia ? Number(tipoDia.valor ?? 0) : 0;
 
-      let costoSinAlpha = 0;
+    let costoSinAlpha = 0;
 
-      if (d.modo === "HH") {
-        const hh = findHHForEmpleado(d.empleadoId);
-        const costoHH = hh?.costoHH != null ? Number(hh.costoHH) : 0;
-        const cif = getHHCIFValue(hh);
-        costoSinAlpha = costoHH * cantidad + cif;
-      } else {
-        const manualPU = getManualPUNumber(d);
-        const costoUnit = Number.isFinite(manualPU) ? manualPU : 0;
-        costoSinAlpha = costoUnit * cantidad;
-      }
-
-      const costoBase = costoSinAlpha + extraFijo;
-      const costoConAlpha = costoBase * alphaMult;
-
-      return { costoConAlpha };
-    });
-
-    const totalCosto = lines.reduce(
-      (acc, x) => acc + (x.costoConAlpha || 0),
-      0,
-    );
-
-    const uPct =
-      utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo);
-
-    // ✅ margen: venta = costo / (1 - u)
-    let k = 1;
-    if (uPct != null && Number.isFinite(uPct) && uPct >= 0) {
-      const u = uPct / 100;
-      const denom = 1 - u;
-      // si u>=100, lo dejamos igual y la validación lo bloqueará
-      if (denom > 0) k = 1 / denom;
+    if (d.modo === "HH") {
+      const hh = findHHForEmpleado(d.empleadoId);
+      const costoHH = hh?.costoHH != null ? Number(hh.costoHH) : 0;
+      const cif = getHHCIFValue(hh);
+      costoSinAlpha = costoHH * cantidad + cif;
+    } else {
+      const manualPU = getManualPUNumber(d);
+      const costoUnit = Number.isFinite(manualPU) ? manualPU : 0;
+      costoSinAlpha = costoUnit * cantidad;
     }
 
-    const linesFinal = lines.map((x) => {
-      const ventaTotal = (x.costoConAlpha || 0) * k;
-      const utilidad = ventaTotal - (x.costoConAlpha || 0);
-      const pct = ventaTotal > 0 ? (utilidad / ventaTotal) * 100 : 0;
-      return { costoTotal: x.costoConAlpha, ventaTotal, utilidad, pct };
-    });
+    const costoBase = costoSinAlpha + extraFijo;
+    const costoConAlpha = costoBase * alphaMult;
 
-    const totalVenta = totalCosto * k;
-    const utilidad = totalVenta - totalCosto;
+    // en tu backend, antes del % objetivo: venta = costo
+    const ventaActual = costoConAlpha;
 
     return {
-      k,
-      total: totalVenta,
-      costo: totalCosto,
-      utilidad,
-      lines: linesFinal,
+      costoTotal: costoConAlpha,
+      ventaActual,
+      cantidad,
     };
-  }, [
-    detalles,
-    tipoDias,
-    hhRegistros,
-    empleados,
-    tipoItemHH,
-    utilidadPctObjetivo,
-  ]);
+  });
+
+  const totalCosto = linesBase.reduce((acc, x) => acc + (x.costoTotal || 0), 0);
+  const totalVentaActual = linesBase.reduce(
+    (acc, x) => acc + (x.ventaActual || 0),
+    0
+  );
+
+  // 2) aplicar MARGEN sobre venta (igual que backend)
+  const uPct = utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo);
+
+  // Igual que tu backend: base por defecto VENTA_ACTUAL
+  const base = "VENTA_ACTUAL"; // si después haces selector, cámbialo aquí
+
+  let k = 1;
+
+  if (uPct != null && Number.isFinite(uPct) && uPct >= 0) {
+    const u = uPct / 100;
+    const denom = 1 - u;
+
+    // backend: baseMonto = (base === VENTA_ACTUAL) ? totalVentaActual : totalCosto
+    const baseMonto = base === "VENTA_ACTUAL" ? totalVentaActual : totalCosto;
+
+    // ventaObjetivo = baseMonto / (1 - u)
+    const ventaObjetivo = denom > 0 ? baseMonto / denom : null;
+
+    // k = ventaObjetivo / totalVentaActual
+    if (
+      ventaObjetivo != null &&
+      Number.isFinite(ventaObjetivo) &&
+      ventaObjetivo > 0 &&
+      totalVentaActual > 0
+    ) {
+      k = ventaObjetivo / totalVentaActual;
+    }
+  }
+
+  // 3) aplicar k a cada línea (ventaFinal) y recalcular utilidad/pct
+  const linesFinal = linesBase.map((x) => {
+    const costoTotal = Number(x.costoTotal || 0);
+    const ventaTotal = Number(x.ventaActual || 0) * (Number.isFinite(k) ? k : 1);
+    const utilidad = ventaTotal - costoTotal;
+    const pct = ventaTotal > 0 ? (utilidad / ventaTotal) * 100 : 0;
+    return { costoTotal, ventaTotal, utilidad, pct };
+  });
+
+  const totalVenta = totalVentaActual * (Number.isFinite(k) ? k : 1);
+  const utilidad = totalVenta - totalCosto;
+
+  return {
+    k,
+    total: totalVenta, // venta final
+    costo: totalCosto,
+    utilidad,
+    lines: linesFinal,
+  };
+}, [
+  detalles,
+  tipoDias,
+  hhRegistros,
+  empleados,
+  tipoItemHH,
+  utilidadPctObjetivo,
+]);
+
 
   const validateForm = () => {
     if (!detalles.length) return "Debes agregar al menos un ítem.";
@@ -669,7 +698,7 @@ export default function useVentaForm({
       const payload = {
         ordenVentaId: ordenVentaId || null,
         descripcion: descripcionVenta || null,
-        utilidadObjetivoBase: "COSTO",
+        utilidadObjetivoBase: "VENTA_ACTUAL",
         utilidadPctObjetivo:
           utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo),
 
