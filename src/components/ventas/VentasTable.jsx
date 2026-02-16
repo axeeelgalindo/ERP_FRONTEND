@@ -269,14 +269,14 @@ export default function VentasTable({
           paged.map((venta) => {
             const totalVenta = calcTotalVenta(venta);
             const totalCosto = calcTotalCosto(venta);
-            const pct = calcPctUtilSobreCosto(venta);
+            const pct = Number(venta?.utilidadObjetivoPct ?? 0) || 0;
 
             const items = (venta?.detalles || []).length;
 
             const cotLabel = getCotLabel(venta);
             const cotIsReal = isCot(venta);
 
-            const pctWidth = Math.max(0, Math.min(100, pct || 0));
+            const pctWidth = Math.max(0, Math.min(100, pct));
 
             return (
               <div
@@ -339,7 +339,7 @@ export default function VentasTable({
                         />
                       </div>
                       <span className="text-xs font-bold text-green-500 mt-1">
-                        {Number(venta.utilidadObjetivoPct) || 0}%
+                        {pct}%
                       </span>
                     </div>
 
