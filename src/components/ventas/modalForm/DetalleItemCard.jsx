@@ -344,9 +344,7 @@ export default function DetalleItemCard({
                         },
                       }}
                     />
-                    <Typography variant="caption" color="text.secondary">
-                      Ej: 10 = +10%
-                    </Typography>
+                 
                   </Box>
 
                   {/* SUBTOTAL */}
@@ -615,14 +613,7 @@ export default function DetalleItemCard({
 
             <Divider sx={{ my: 1.8 }} />
 
-            <Typography variant="caption" color="text.secondary">
-              Preview ítem: costo {formatCLP(previewLine?.costoTotal)} | venta{" "}
-              {formatCLP(previewLine?.ventaTotal)} | utilidad{" "}
-              {formatCLP(previewLine?.utilidad)}{" "}
-              {previewLine?.pct != null
-                ? `(${previewLine.pct.toFixed(1)}%)`
-                : ""}
-            </Typography>
+          
           </Box>
 
           {/* Delete SOLO DESKTOP: absoluto (está ok en pantallas grandes) */}

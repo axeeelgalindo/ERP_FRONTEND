@@ -244,7 +244,6 @@ export default function NuevaVentaDialog({
                         mt: 0.5,
                       }}
                     >
-                      Markup sobre costo con factor alpha.
                     </Typography>
                   </Box>
                 </Box>
