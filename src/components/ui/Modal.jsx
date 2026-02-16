@@ -57,7 +57,7 @@ export default function Modal({ open, onClose, title, children }) {
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4"
       onMouseDown={handleBackdropClick}
     >
-      <div className="w-full max-w-xl rounded-2xl bg-white shadow-xl border border-gray-200 overflow-hidden">
+      <div className="w-full max-w-6xl rounded-2xl bg-white shadow-xl border border-gray-200 overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
           <button

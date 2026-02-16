@@ -339,7 +339,7 @@ export default function VentasTable({
                         />
                       </div>
                       <span className="text-xs font-bold text-green-500 mt-1">
-                        {Number(pct || 0).toFixed(1)}%
+                        {Number(venta.utilidadObjetivoPct) || 0}%
                       </span>
                     </div>
 
