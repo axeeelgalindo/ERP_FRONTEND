@@ -116,18 +116,11 @@ export default function VentasSummary({ ventas }) {
       iconText: "text-amber-600 ",
       icon: "📉",
     },
-    {
-      title: "KPI pendiente",
-      subtitle: "reemplazar por endpoint",
-      value: kpiPendiente,
-      iconBg: "bg-rose-50 ",
-      iconText: "text-rose-600 ",
-      icon: "🧾",
-    },
+   
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
       {cards.map((c) => (
         <div
           key={c.title}
