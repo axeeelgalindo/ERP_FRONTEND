@@ -38,6 +38,7 @@ export default function CotizacionesDesktopTable({
   expandedId,
   onToggleExpanded,
   onUpdateEstado,
+  onEditCotizacion, // ✅ NUEVO
 }) {
   const [anchorEl, setAnchorEl] = useState(null);
   const [menuCot, setMenuCot] = useState(null);
@@ -66,7 +67,6 @@ export default function CotizacionesDesktopTable({
               <TableCell width={80}>#</TableCell>
               <TableCell width={130}>Fecha</TableCell>
 
-              {/* ✅ ELIMINADO: Proyecto */}
               <TableCell width={240}>Cliente</TableCell>
 
               <TableCell width={220}>Estado</TableCell>
@@ -134,7 +134,6 @@ export default function CotizacionesDesktopTable({
 
                     <TableCell>{fechaCL(c.creada_en)}</TableCell>
 
-                    {/* ✅ Cliente (queda aquí) */}
                     <TableCell>{c.cliente?.nombre || "Sin cliente"}</TableCell>
 
                     <TableCell>
@@ -203,7 +202,6 @@ export default function CotizacionesDesktopTable({
                     </TableCell>
                   </TableRow>
 
-                  {/* ✅ DETAIL: colSpan baja a 10 */}
                   <TableRow>
                     <TableCell colSpan={10} sx={{ p: 0, borderBottom: 0 }}>
                       <Collapse in={open} timeout="auto" unmountOnExit>
@@ -227,6 +225,10 @@ export default function CotizacionesDesktopTable({
         cotizacion={menuCot}
         onClose={handleCloseMenu}
         onUpdateEstado={onUpdateEstado}
+        onEdit={(id) => {
+          handleCloseMenu();
+          onEditCotizacion?.(id);
+        }} // ✅ NUEVO
       />
     </Paper>
   );

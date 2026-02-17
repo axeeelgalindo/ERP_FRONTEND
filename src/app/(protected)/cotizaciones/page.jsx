@@ -12,6 +12,7 @@ import CotizacionesDesktopTable from "@/components/cotizaciones/CotizacionesDesk
 import CotizacionesMobileCards from "@/components/cotizaciones/CotizacionesMobileCards";
 import CotizacionesSnack from "@/components/cotizaciones/CotizacionesSnack";
 import CotizacionesState from "@/components/cotizaciones/CotizacionesState";
+import EditCotizacionDialog from "@/components/cotizaciones/EditCotizacionDialog";
 
 import ImportCotizacionPdfDialog from "@/components/cotizaciones/ImportCotizacionPdfDialog";
 
@@ -38,6 +39,9 @@ export default function CotizacionesPage() {
 
   const [expandedId, setExpandedId] = useState(null);
 
+  const [openEdit, setOpenEdit] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+
   // Modal import pdf
   const [openImport, setOpenImport] = useState(false);
 
@@ -55,7 +59,10 @@ export default function CotizacionesPage() {
     if (reason === "clickaway") return;
     setSnack((s) => ({ ...s, open: false }));
   };
-
+  const openEditCot = (id) => {
+    setEditingId(id);
+    setOpenEdit(true);
+  };
   const toggleExpanded = (id) =>
     setExpandedId((prev) => (prev === id ? null : id));
 
@@ -73,7 +80,7 @@ export default function CotizacionesPage() {
       const data = await safeJson(res);
       if (!res.ok) {
         throw new Error(
-          data?.error || data?.detalle || "Error al listar cotizaciones"
+          data?.error || data?.detalle || "Error al listar cotizaciones",
         );
       }
 
@@ -95,7 +102,7 @@ export default function CotizacionesPage() {
       const data = await safeJson(res);
       if (!res.ok)
         throw new Error(
-          data?.error || data?.detalle || "Error al listar clientes"
+          data?.error || data?.detalle || "Error al listar clientes",
         );
       setClientes(Array.isArray(data) ? data : data?.data || []);
     } catch {
@@ -120,13 +127,13 @@ export default function CotizacionesPage() {
           method: "POST",
           headers: makeHeaders(session),
           body: JSON.stringify({ estado, ...extra }),
-        }
+        },
       );
 
       const data = await safeJson(res);
       if (!res.ok) {
         throw new Error(
-          data?.error || data?.detalle || "Error al actualizar estado"
+          data?.error || data?.detalle || "Error al actualizar estado",
         );
       }
 
@@ -140,7 +147,7 @@ export default function CotizacionesPage() {
         prev.map((c) => {
           if (c.id !== cotizacionId) return c;
           return { ...c, ...data, items: data.items ?? c.items ?? [] };
-        })
+        }),
       );
     } catch (e) {
       showSnack("error", e?.message || "Error actualizando estado");
@@ -178,6 +185,7 @@ export default function CotizacionesPage() {
           expandedId={expandedId}
           onToggleExpanded={toggleExpanded}
           onUpdateEstado={updateEstado}
+          onEditCotizacion={openEditCot}
         />
       )}
 
@@ -187,6 +195,7 @@ export default function CotizacionesPage() {
           expandedId={expandedId}
           onToggleExpanded={toggleExpanded}
           onUpdateEstado={updateEstado}
+          onEditCotizacion={openEditCot}
         />
       )}
 
@@ -197,6 +206,18 @@ export default function CotizacionesPage() {
         clientes={clientes}
         showSnack={showSnack}
         onCreated={() => fetchCotizaciones()}
+      />
+
+      <EditCotizacionDialog
+        open={openEdit}
+        onClose={() => setOpenEdit(false)}
+        session={session}
+        cotizacionId={editingId}
+        clientes={clientes}
+        onUpdated={() => {
+          showSnack("success", "Cotización actualizada");
+          fetchCotizaciones();
+        }}
       />
 
       <CotizacionesSnack snack={snack} onClose={closeSnack} />

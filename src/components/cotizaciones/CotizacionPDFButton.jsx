@@ -1,10 +1,32 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { Button, CircularProgress } from "@mui/material";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 
+import { safeJson } from "@/components/ventas/utils/safeJson";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+/** Headers robustos (igual estilo que tu dialog) */
+function buildAuthHeaders(session) {
+  const token = session?.user?.accessToken || session?.accessToken || "";
+  const empresaId =
+    session?.user?.empresa?.id ||
+    session?.user?.empresaId ||
+    session?.user?.empresa_id ||
+    null;
+
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (empresaId) headers["x-empresa-id"] = String(empresaId);
+
+  return { headers, token, empresaId };
+}
+
 export default function CotizacionPDFButton({ cotizacion }) {
+  const { data: session } = useSession();
   const [busy, setBusy] = useState(false);
   if (!cotizacion) return null;
 
@@ -44,6 +66,33 @@ export default function CotizacionPDFButton({ cotizacion }) {
     });
   };
 
+  /** ✅ Si la cotización viene incompleta desde el listado, la completamos por ID */
+  const fetchCotizacionCompleta = async (id) => {
+    if (!id) return null;
+
+    const { headers, token, empresaId } = buildAuthHeaders(session);
+    if (!token) throw new Error("Falta accessToken para generar PDF.");
+    if (!empresaId)
+      throw new Error("Falta empresaId (x-empresa-id) para generar PDF.");
+
+    const res = await fetch(`${API_URL}/cotizaciones/${id}`, {
+      method: "GET",
+      headers,
+      cache: "no-store",
+    });
+
+    const data = await safeJson(res);
+    if (!res.ok) {
+      throw new Error(
+        data?.detalle ||
+          data?.error ||
+          data?.message ||
+          "No se pudo cargar la cotización",
+      );
+    }
+    return data;
+  };
+
   const generarPDF = async (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
@@ -52,6 +101,25 @@ export default function CotizacionPDFButton({ cotizacion }) {
     try {
       setBusy(true);
 
+      // 1) Asegurar cotización completa (con cliente_responsable)
+      let cot = cotizacion;
+
+      const resp0 =
+        cot?.cliente_responsable ||
+        cot?.clienteResponsable ||
+        cot?.cliente_responsable_id; // si hay id, probablemente existe responsable
+
+      // Si NO viene el objeto responsable pero hay id, o viene null, hacemos fetch por id
+      const tieneObjResponsable = !!(
+        cot?.cliente_responsable || cot?.clienteResponsable
+      );
+
+      if (!tieneObjResponsable && cot?.id) {
+        const full = await fetchCotizacionCompleta(cot.id);
+        if (full) cot = full;
+      }
+
+      // 2) Import PDF libs
       const [{ jsPDF }, autoTableMod] = await Promise.all([
         import("jspdf"),
         import("jspdf-autotable"),
@@ -61,7 +129,6 @@ export default function CotizacionPDFButton({ cotizacion }) {
       // ✅ Hoja “menos larga y un poco más ancha”
       const W = 226;
       const H = 260;
-
       const mx = 14;
 
       const C = {
@@ -74,20 +141,16 @@ export default function CotizacionPDFButton({ cotizacion }) {
         white: [255, 255, 255],
       };
 
-      const numero =
-        cotizacion?.numero != null
-          ? String(cotizacion.numero)
-          : safe(cotizacion?.id);
+      const numero = cot?.numero != null ? String(cot.numero) : safe(cot?.id);
 
       const numDoc = numero ? `S${numero.padStart(5, "0")}` : "S00000";
       const docTitle = `Cotización ${numDoc}`;
 
-      // ✅ vigencia (del model nuevo)
       const vigenciaDiasRaw =
-        cotizacion?.vigencia_dias ??
-        cotizacion?.vigenciaDias ??
-        cotizacion?.dias_vigencia ??
-        cotizacion?.diasVigencia ??
+        cot?.vigencia_dias ??
+        cot?.vigenciaDias ??
+        cot?.dias_vigencia ??
+        cot?.diasVigencia ??
         null;
 
       const vigenciaDias =
@@ -110,6 +173,12 @@ export default function CotizacionPDFButton({ cotizacion }) {
 
       const HEADER_H = 26;
       const FOOTER_H = 16;
+
+      const doc = new jsPDF({
+        orientation: "p",
+        unit: "mm",
+        format: [W, H],
+      });
 
       // ===== Wave =====
       const drawWaveBand = (yTop, height, mode = "down") => {
@@ -135,9 +204,9 @@ export default function CotizacionPDFButton({ cotizacion }) {
               ["L", 0, yTop],
               ["Z"],
             ],
-            "F"
+            "F",
           );
-        } else if (mode === "up") {
+        } else {
           doc.path(
             [
               ["M", 0, yTop + 6],
@@ -146,7 +215,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
               ["L", 0, yTop + height],
               ["Z"],
             ],
-            "F"
+            "F",
           );
         }
       };
@@ -163,7 +232,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
         doc.text(
           "Tecnología que impulsa, soluciones que transforman",
           mx,
-          22.0
+          22.0,
         );
 
         const boxW = 72;
@@ -239,27 +308,98 @@ export default function CotizacionPDFButton({ cotizacion }) {
         });
       };
 
-      // ===== Página 1 base =====
-      const doc = new jsPDF({
-        orientation: "p",
-        unit: "mm",
-        format: [W, H],
-      });
       drawHeader();
       drawFooter(1, 1);
 
-      // ===== Cliente =====
-      const yCliente = 38;
-      doc.setFont("cambria", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(...C.text);
-      const clienteLabel =
-        safe(cotizacion?.cliente?.nombre) +
-        (cotizacion?.cliente?.rut ? ` | ${safe(cotizacion?.cliente?.rut)}` : "");
-      doc.text(clienteLabel || "Cliente", mx, yCliente);
+      // =========================
+      // ✅ Cliente + Responsable (detallado) + yTitle dinámico
+      // =========================
+      const yCliente = HEADER_H + 12; // ✅ en vez de 36 fijo, así respeta header
 
-      // ===== Título + vigencia =====
-      const yTitle = 52;
+      // Cliente
+      const clienteNombre = safe(cot?.cliente?.nombre);
+      const clienteRut = safe(cot?.cliente?.rut);
+      const clienteCorreo = safe(cot?.cliente?.correo);
+      const clienteTelefono = safe(cot?.cliente?.telefono);
+
+      // Si no tienes dirección, se omitirá sola
+      const clienteDireccion = safe(
+        cot?.cliente?.direccion ||
+          cot?.cliente?.direccion_facturacion ||
+          cot?.cliente?.address ||
+          "",
+      );
+
+      // Responsable
+      const resp = cot?.cliente_responsable || cot?.clienteResponsable || null;
+      const respNombre = safe(resp?.nombre);
+      const respCargo = safe(resp?.cargo);
+      const respArea = safe(resp?.area);
+      const respCorreo = safe(resp?.correo);
+      const respTelefono = safe(resp?.telefono);
+
+      // ---- líneas (sin saturar) ----
+      const lineCliente1 =
+        (clienteNombre || "Cliente");
+
+      const lineCliente01 =
+        (clienteRut ? `${clienteRut}` : "");
+
+      const lineCliente2 = [clienteDireccion, clienteTelefono]
+        .filter(Boolean)
+        .join(" · ");
+      const lineCliente3 = [clienteCorreo].filter(Boolean).join(" · ");
+
+      const lineResp1 = respNombre
+        ? ` ${respNombre}`
+        : "";
+      const lineResp2 = [
+        respCargo ? `${respCargo}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      const lineResp3 = [respCorreo].filter(Boolean).join(" · ");
+
+      const lineResp4 = [
+        respTelefono ? `${respTelefono}` : "",
+      ]
+
+      // ---- print ----
+      doc.setFont("cambria", "normal");
+      doc.setTextColor(...C.text);
+      doc.setFontSize(9.4);
+      doc.text(lineCliente1, mx, yCliente);
+
+      doc.setFontSize(8.6);
+      doc.setTextColor(...C.muted);
+
+      let yyInfo = yCliente + 4.6;
+
+      // helper: imprime líneas y retorna el nuevo yy
+      const printLine = (text) => {
+        const t = safe(text);
+        if (!t) return;
+        const lines = doc.splitTextToSize(t, W - mx * 2);
+        doc.text(lines, mx, yyInfo);
+        yyInfo += lines.length * 3.8; // ✅ más compacto
+      };
+      printLine(lineCliente01);
+      printLine(lineCliente3);
+      printLine(lineCliente2);
+
+      // separador visual leve
+      yyInfo += 1.2;
+
+      printLine(lineResp1);
+      printLine(lineResp2);
+      printLine(lineResp3);
+      printLine(lineResp4);
+
+      // =========================
+      // ✅ Título + vigencia (DINÁMICO, nunca se pisa)
+      // =========================
+      const yTitle = Math.max(yyInfo + 8, HEADER_H + 34); // ✅ SIEMPRE debajo del bloque
+
       doc.setFont("cambria", "normal");
       doc.setFontSize(17.5);
       doc.setTextColor(...C.blue);
@@ -273,7 +413,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
       }
 
       // ===== Asunto uppercase =====
-      const asuntoText = safe(cotizacion?.asunto || cotizacion?.descripcion);
+      const asuntoText = safe(cot?.asunto || cot?.descripcion);
       const asuntoUpper = asuntoText ? String(asuntoText).toUpperCase() : "";
 
       if (asuntoUpper) {
@@ -296,7 +436,6 @@ export default function CotizacionPDFButton({ cotizacion }) {
       doc.setFillColor(...C.bar);
       doc.roundedRect(mx, barY, W - mx * 2, 12, 2.5, 2.5, "F");
 
-      // ✅ 3 columnas: Fecha | Vencimiento | Vendedor
       doc.setFont("cambria", "bold");
       doc.setFontSize(8.6);
       doc.setTextColor(...C.blue);
@@ -305,20 +444,20 @@ export default function CotizacionPDFButton({ cotizacion }) {
       doc.text("Vendedor", mx + 128, barY + 5);
 
       const vendedorNombre =
-        safe(cotizacion?.vendedor?.nombre) ||
-        safe(cotizacion?.vendedor?.correo) ||
-        safe(cotizacion?.vendedor) ||
+        safe(cot?.vendedor?.nombre) ||
+        safe(cot?.vendedor?.correo) ||
+        safe(cot?.vendedor) ||
         "-";
 
       doc.setFont("cambria", "normal");
       doc.setFontSize(9.2);
       doc.setTextColor(...C.text);
-      doc.text(fmtDate(cotizacion?.fecha_documento), mx + 4, barY + 10);
-      doc.text(fmtDate(cotizacion?.vencimiento_documento), mx + 58, barY + 10);
+      doc.text(fmtDate(cot?.fecha_documento), mx + 4, barY + 10);
+      doc.text(fmtDate(cot?.vencimiento_documento), mx + 58, barY + 10);
       doc.text(vendedorNombre, mx + 128, barY + 10);
 
       // ===== Tabla glosas =====
-      const glosas = Array.isArray(cotizacion?.glosas) ? cotizacion.glosas : [];
+      const glosas = Array.isArray(cot?.glosas) ? cot.glosas : [];
       const impuestoCell = "IVA 19%";
 
       const glosasBody = glosas.length
@@ -349,7 +488,15 @@ export default function CotizacionPDFButton({ cotizacion }) {
         startY: tableStartY,
         margin: { left: mx, right: mx, top: HEADER_H, bottom: FOOTER_H + 2 },
         tableWidth: tableW,
-        head: [["Descripción", "Cantidad", "Precio unitario", "Impuestos", "Importe"]],
+        head: [
+          [
+            "Descripción",
+            "Cantidad",
+            "Precio unitario",
+            "Impuestos",
+            "Importe",
+          ],
+        ],
         body: glosasBody,
         theme: "plain",
         styles: {
@@ -388,9 +535,9 @@ export default function CotizacionPDFButton({ cotizacion }) {
           textColor: C.text,
         },
         body: [
-          ["Subtotal", clp(cotizacion?.subtotal)],
-          ["IVA 19%", clp(cotizacion?.iva)],
-          ["Total", clp(cotizacion?.total)],
+          ["Subtotal", clp(cot?.subtotal)],
+          ["IVA 19%", clp(cot?.iva)],
+          ["Total", clp(cot?.total)],
         ],
         columnStyles: {
           0: { cellWidth: 44, halign: "left", textColor: C.muted },
@@ -441,8 +588,8 @@ export default function CotizacionPDFButton({ cotizacion }) {
         yy += lines.length * 4.0 + 6;
       };
 
-      addBlock("Términos y condiciones", cotizacion?.terminos_condiciones);
-      addBlock("Acuerdo de pago", cotizacion?.acuerdo_pago);
+      addBlock("Términos y condiciones", cot?.terminos_condiciones);
+      addBlock("Acuerdo de pago", cot?.acuerdo_pago);
 
       // ===== Redibujar header/footer en todas las páginas =====
       const pageCount = doc.internal.getNumberOfPages();
@@ -453,9 +600,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
       }
 
       const fileName = `Cotizacion_${numDoc}_${safeName(
-        cotizacion?.cliente?.nombre ||
-          cotizacion?.proyecto?.nombre ||
-          "cotizacion"
+        cot?.cliente?.nombre || cot?.proyecto?.nombre || "cotizacion",
       )}.pdf`;
 
       doc.save(fileName);

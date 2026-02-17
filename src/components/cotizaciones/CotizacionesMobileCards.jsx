@@ -33,12 +33,12 @@ export default function CotizacionesMobileCards({
   expandedId,
   onToggleExpanded,
   onUpdateEstado,
+  onEditCotizacion, // ✅ NUEVO
 }) {
   const [anchorEl, setAnchorEl] = useState(null);
   const [menuCot, setMenuCot] = useState(null);
 
   const openMenu = Boolean(anchorEl);
-  const canGoTo = nextEstados(menuCot?.estado || "COTIZACION");
 
   const openActions = (e, cot) => {
     e.stopPropagation();
@@ -49,14 +49,6 @@ export default function CotizacionesMobileCards({
   const closeActions = () => {
     setAnchorEl(null);
     setMenuCot(null);
-  };
-
-  const handleMenuAction = (action) => {
-    if (!menuCot) return;
-    if (action.startsWith("to:")) {
-      const estado = action.replace("to:", "");
-      onUpdateEstado?.(menuCot.id, estado);
-    }
   };
 
   return (
@@ -88,9 +80,12 @@ export default function CotizacionesMobileCards({
                     <Typography variant="body2" color="text.secondary">
                       Fecha: {fechaCL(c.creada_en)}
                     </Typography>
+
+                    {/* Si ya no quieres mostrar Proyecto, bórralo */}
                     <Typography variant="body2" color="text.secondary">
                       Proyecto: <strong>{c.proyecto?.nombre || "—"}</strong>
                     </Typography>
+
                     <Typography variant="body2" color="text.secondary">
                       Cliente:{" "}
                       <strong>{c.cliente?.nombre || "Sin cliente"}</strong>
@@ -111,9 +106,7 @@ export default function CotizacionesMobileCards({
                       color={estadoColor(estado)}
                       variant="outlined"
                     />
-                    <Typography fontWeight={900}>
-                      {formatCLP(c.total)}
-                    </Typography>
+                    <Typography fontWeight={900}>{formatCLP(c.total)}</Typography>
 
                     <Box onClick={(e) => e.stopPropagation()}>
                       <Tooltip title="Acciones">
@@ -173,6 +166,10 @@ export default function CotizacionesMobileCards({
         cotizacion={menuCot}
         onClose={closeActions}
         onUpdateEstado={onUpdateEstado}
+        onEdit={(id) => {
+          closeActions();
+          onEditCotizacion?.(id);
+        }} // ✅ NUEVO
       />
     </>
   );

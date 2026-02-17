@@ -21,7 +21,7 @@ const round0 = (n) => Math.round(Number(n || 0));
 function calcTotalVenta(v) {
   return (v?.detalles || []).reduce(
     (s, d) => s + (Number(d.total ?? d.ventaTotal) || 0),
-    0,
+    0
   );
 }
 
@@ -30,13 +30,15 @@ function distributeGlosas(glosas, subtotalNeto) {
 
   const manualSum = glosas.reduce(
     (acc, g) => acc + (g.manual ? round0(g.monto || 0) : 0),
-    0,
+    0
   );
 
   if (manualSum > t) {
     return {
       glosas,
-      error: `La suma manual (${formatCLP(manualSum)}) supera el subtotal (${formatCLP(t)}).`,
+      error: `La suma manual (${formatCLP(
+        manualSum
+      )}) supera el subtotal (${formatCLP(t)}).`,
     };
   }
 
@@ -48,7 +50,9 @@ function distributeGlosas(glosas, subtotalNeto) {
     if (manualSum !== t) {
       return {
         glosas,
-        error: `Falta cuadrar el subtotal: manual ${formatCLP(manualSum)} vs subtotal ${formatCLP(t)}.`,
+        error: `Falta cuadrar el subtotal: manual ${formatCLP(
+          manualSum
+        )} vs subtotal ${formatCLP(t)}.`,
       };
     }
     return {
@@ -62,7 +66,7 @@ function distributeGlosas(glosas, subtotalNeto) {
   const ajuste = rem - base * autosIdx.length;
 
   const next = glosas.map((g) =>
-    g.manual ? { ...g, monto: round0(g.monto || 0) } : { ...g, monto: base },
+    g.manual ? { ...g, monto: round0(g.monto || 0) } : { ...g, monto: base }
   );
 
   const lastAuto = autosIdx[autosIdx.length - 1];
@@ -117,6 +121,12 @@ export default function CotizacionFromVentasDialog({
 
   const [clientes, setClientes] = useState([]);
   const [clienteId, setClienteId] = useState("");
+
+  // ✅ responsables vienen por endpoint /clientes/:id/responsables
+  const [responsables, setResponsables] = useState([]);
+  const [loadingResp, setLoadingResp] = useState(false);
+  const [responsableId, setResponsableId] = useState("");
+
   const [asunto, setAsunto] = useState("");
   const [terminos, setTerminos] = useState("");
   const [acuerdoPago, setAcuerdoPago] = useState("");
@@ -138,6 +148,8 @@ export default function CotizacionFromVentasDialog({
     setStep(1);
     setErr("");
     setClienteId("");
+    setResponsables([]);
+    setResponsableId("");
     setAsunto("");
     setTerminos("");
     setAcuerdoPago("");
@@ -150,7 +162,7 @@ export default function CotizacionFromVentasDialog({
 
   const ventasDisponibles = useMemo(
     () => (Array.isArray(ventas) ? ventas : []),
-    [ventas],
+    [ventas]
   );
 
   const subtotalNeto = useMemo(() => {
@@ -159,22 +171,19 @@ export default function CotizacionFromVentasDialog({
     return round0(
       ventasDisponibles
         .filter((v) => setIds.has(String(v.id)))
-        .reduce((acc, v) => acc + calcTotalVenta(v), 0),
+        .reduce((acc, v) => acc + calcTotalVenta(v), 0)
     );
   }, [ventasDisponibles, ventaIds]);
 
   const iva = useMemo(
     () => round0(subtotalNeto * Number(ivaRate || 0)),
-    [subtotalNeto, ivaRate],
+    [subtotalNeto, ivaRate]
   );
-  const totalFinal = useMemo(
-    () => round0(subtotalNeto + iva),
-    [subtotalNeto, iva],
-  );
+  const totalFinal = useMemo(() => round0(subtotalNeto + iva), [subtotalNeto, iva]);
 
   const sumGlosas = useMemo(
     () => glosas.reduce((acc, g) => acc + round0(g.monto || 0), 0),
-    [glosas],
+    [glosas]
   );
 
   const okCuadra = !glosaErr && subtotalNeto > 0 && sumGlosas === subtotalNeto;
@@ -228,14 +237,13 @@ export default function CotizacionFromVentasDialog({
     });
   };
 
+  // =========================
   // cargar clientes
+  // =========================
   useEffect(() => {
     if (!open) return;
 
-    const { headers, token, empresaId } = buildAuthHeaders(
-      session,
-      empresaIdFromToken,
-    );
+    const { headers, token, empresaId } = buildAuthHeaders(session, empresaIdFromToken);
 
     if (!session?.user) {
       setErr("No hay sesión (session.user) disponible.");
@@ -261,20 +269,17 @@ export default function CotizacionFromVentasDialog({
 
         if (!resCli.ok) {
           throw new Error(
-            jsonCli?.detalle ||
-              jsonCli?.error ||
-              jsonCli?.message ||
-              "Error al cargar clientes",
+            jsonCli?.detalle || jsonCli?.error || jsonCli?.message || "Error al cargar clientes"
           );
         }
 
         const cliList = Array.isArray(jsonCli?.data)
           ? jsonCli.data
           : Array.isArray(jsonCli?.items)
-            ? jsonCli.items
-            : Array.isArray(jsonCli)
-              ? jsonCli
-              : [];
+          ? jsonCli.items
+          : Array.isArray(jsonCli)
+          ? jsonCli
+          : [];
 
         setClientes(cliList);
       } catch (e) {
@@ -283,12 +288,61 @@ export default function CotizacionFromVentasDialog({
     })();
   }, [open, session, empresaIdFromToken]);
 
+  // =========================
+  // ✅ cargar responsables cuando cambia cliente
+  // =========================
+  useEffect(() => {
+    if (!open) return;
+
+    // reset
+    setResponsables([]);
+    setResponsableId("");
+
+    if (!clienteId) return;
+
+    const { headers, token, empresaId } = buildAuthHeaders(session, empresaIdFromToken);
+
+    if (!session?.user || !token || !empresaId) return;
+
+    (async () => {
+      try {
+        setLoadingResp(true);
+        setErr("");
+
+        const res = await fetch(`${API_URL}/clientes/${clienteId}/responsables`, {
+          headers,
+          cache: "no-store",
+        });
+
+        const json = await safeJson(res);
+        if (!res.ok) {
+          throw new Error(
+            json?.detalle || json?.error || json?.message || "Error al cargar responsables"
+          );
+        }
+
+        const list = Array.isArray(json) ? json : [];
+        setResponsables(list);
+
+        const principal = list.find((r) => r.es_principal);
+        setResponsableId(String(principal?.id || list?.[0]?.id || ""));
+      } catch (e) {
+        setErr(e?.message || "Error cargando responsables");
+        setResponsables([]);
+        setResponsableId("");
+      } finally {
+        setLoadingResp(false);
+      }
+    })();
+  }, [clienteId, open, session, empresaIdFromToken]);
+
   const validateStep1 = () => {
     const { token, empresaId } = buildAuthHeaders(session, empresaIdFromToken);
     if (!session?.user) return "Sesión inválida";
     if (!token) return "Falta accessToken en sesión (Authorization).";
     if (!empresaId) return "Falta empresaId para header x-empresa-id.";
     if (!clienteId) return "Debes seleccionar un cliente.";
+    if (!responsableId) return "Debes seleccionar un responsable del cliente.";
     if (!ventaIds.length) return "Debes seleccionar al menos 1 venta.";
     if (!subtotalNeto || subtotalNeto <= 0)
       return "El subtotal neto es 0. Revisa ventas seleccionadas.";
@@ -331,7 +385,6 @@ export default function CotizacionFromVentasDialog({
       setSaving(true);
       setErr("");
 
-      // validar todo
       const msg1 = validateStep1();
       if (msg1) throw new Error(msg1);
 
@@ -342,6 +395,9 @@ export default function CotizacionFromVentasDialog({
 
       const payload = {
         cliente_id: clienteId,
+        // ✅ ahora sí viaja al backend
+        cliente_responsable_id: responsableId || null,
+
         asunto: asunto || null,
         vigencia_dias: normalizeVigenciaDias(vigenciaDias),
         terminos_condiciones: terminos || null,
@@ -365,10 +421,7 @@ export default function CotizacionFromVentasDialog({
       const data = await safeJson(res);
       if (!res.ok) {
         throw new Error(
-          data?.detalle ||
-            data?.error ||
-            data?.message ||
-            "Error creando cotización",
+          data?.detalle || data?.error || data?.message || "Error creando cotización"
         );
       }
 
@@ -420,6 +473,11 @@ export default function CotizacionFromVentasDialog({
             clientes={clientes}
             clienteId={clienteId}
             setClienteId={setClienteId}
+            // ✅ ahora vienen del endpoint
+            responsables={responsables}
+            loadingResp={loadingResp}
+            responsableId={responsableId}
+            setResponsableId={setResponsableId}
             asunto={asunto}
             setAsunto={setAsunto}
             vigenciaDias={vigenciaDias}
@@ -439,6 +497,7 @@ export default function CotizacionFromVentasDialog({
             setAcuerdoPago={setAcuerdoPago}
           />
         ) : null}
+
         {step === 3 ? (
           <StepGlosasTotales
             glosas={glosas}
@@ -447,7 +506,7 @@ export default function CotizacionFromVentasDialog({
             removeGlosa={removeGlosa}
             glosaErr={glosaErr}
             okCuadra={okCuadra}
-            subtotalNeto={subtotalNeto} // ✅ ESTA LÍNEA
+            subtotalNeto={subtotalNeto}
           />
         ) : null}
       </Box>

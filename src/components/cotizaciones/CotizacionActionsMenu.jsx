@@ -21,6 +21,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
 import ThumbDownAltOutlinedIcon from "@mui/icons-material/ThumbDownAltOutlined";
+import EditIcon from "@mui/icons-material/Edit"; // ✅ mejor usar MUI acá
 
 import { nextEstados } from "@/components/cotizaciones/utils/utils";
 
@@ -30,6 +31,7 @@ export default function CotizacionActionsMenu({
   cotizacion,
   onClose,
   onUpdateEstado,
+  onEdit, // ✅ NUEVO: lo pasas desde Desktop/Mobile (y estos desde Page)
 }) {
   const estado = cotizacion?.estado || "COTIZACION";
   const siguiente = nextEstados(estado)?.[0] || null;
@@ -100,7 +102,6 @@ export default function CotizacionActionsMenu({
       fecha_fin_plan: finPlan,
     });
 
-    // opcional: limpiar lock
     setCotizacionIdLocked(null);
   };
 
@@ -126,8 +127,15 @@ export default function CotizacionActionsMenu({
       motivo_rechazo: clean || null,
     });
 
-    // opcional: limpiar lock
     setCotizacionIdLocked(null);
+  };
+
+  const handleEdit = () => {
+    const id = cotizacionIdLocked || cotizacion?.id;
+    if (!id) return;
+
+    onClose?.();
+    onEdit?.(id);
   };
 
   const puedeRechazar = estado === "COTIZACION";
@@ -194,8 +202,20 @@ export default function CotizacionActionsMenu({
           </ListItemIcon>
           <ListItemText primary="Ver detalle" secondary="Abrir/mostrar ítems" />
         </MenuItem>
+
+        {/* ✅ EDITAR */}
+        <MenuItem onClick={handleEdit} disabled={!cotizacion?.id}>
+          <ListItemIcon>
+            <EditIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary="Editar cotización"
+            secondary="Editar datos de la cotización"
+          />
+        </MenuItem>
       </Menu>
 
+      {/* ===== Modal Aceptada ===== */}
       <Dialog
         open={openAceptada}
         onClose={() => {
@@ -251,6 +271,7 @@ export default function CotizacionActionsMenu({
         </DialogActions>
       </Dialog>
 
+      {/* ===== Modal Rechazar ===== */}
       <Dialog
         open={openRechazar}
         onClose={() => {

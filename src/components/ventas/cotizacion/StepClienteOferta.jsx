@@ -7,6 +7,14 @@ export default function StepClienteOferta({
   clientes,
   clienteId,
   setClienteId,
+
+  // ✅ NUEVO (vienen desde el padre)
+  responsables = [],
+  loadingResp = false,
+
+  responsableId,
+  setResponsableId,
+
   asunto,
   setAsunto,
   vigenciaDias,
@@ -16,11 +24,30 @@ export default function StepClienteOferta({
   setVentaIds,
   preselectedVentaIds,
 }) {
+  const listResponsables = Array.isArray(responsables) ? responsables : [];
+
+  const helperResp = !clienteId
+    ? "Selecciona un cliente para ver sus responsables."
+    : loadingResp
+      ? "Cargando responsables..."
+      : listResponsables.length
+        ? "Selecciona el contacto responsable."
+        : "Este cliente no tiene responsables registrados.";
+
   return (
     <Box sx={{ display: "grid", gap: 3 }}>
       {/* Cliente */}
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
-        <Typography sx={{ fontSize: 14, fontWeight: 900, color: "text.primary" }}>Cliente</Typography>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 2,
+        }}
+      >
+        <Typography sx={{ fontSize: 14, fontWeight: 900, color: "text.primary" }}>
+          Cliente
+        </Typography>
         <Button
           size="small"
           startIcon={<PersonAddAltIcon />}
@@ -40,16 +67,54 @@ export default function StepClienteOferta({
         placeholder="Seleccionar un cliente de la lista..."
       >
         <MenuItem value="">Seleccionar un cliente de la lista...</MenuItem>
-        {clientes.map((c) => (
+        {(clientes || []).map((c) => (
           <MenuItem key={c.id} value={c.id}>
             {c.nombre || c.razonSocial || c.id}
           </MenuItem>
         ))}
       </TextField>
 
+      {/* ✅ Responsable del cliente */}
+      <Box>
+        <Typography sx={{ fontSize: 14, fontWeight: 900, mb: 1 }}>
+          Responsable del cliente
+        </Typography>
+
+        <TextField
+          select
+          size="small"
+          fullWidth
+          value={responsableId}
+          onChange={(e) => setResponsableId(e.target.value)}
+          disabled={!clienteId || loadingResp}
+          helperText={helperResp}
+        >
+          <MenuItem value="">
+            {!clienteId
+              ? "Selecciona cliente primero"
+              : loadingResp
+                ? "Cargando..."
+                : listResponsables.length
+                  ? "Seleccionar responsable..."
+                  : "Sin responsables"}
+          </MenuItem>
+
+          {listResponsables.map((r) => (
+            <MenuItem key={r.id} value={r.id}>
+              {r.nombre}
+              {r.cargo ? ` — ${r.cargo}` : ""}
+              {r.correo ? ` (${r.correo})` : ""}
+              {r.es_principal ? " ⭐" : ""}
+            </MenuItem>
+          ))}
+        </TextField>
+      </Box>
+
       {/* Asunto */}
       <Box>
-        <Typography sx={{ fontSize: 14, fontWeight: 900, mb: 1 }}>Asunto de la cotización</Typography>
+        <Typography sx={{ fontSize: 14, fontWeight: 900, mb: 1 }}>
+          Asunto de la cotización
+        </Typography>
         <TextField
           size="small"
           fullWidth
@@ -69,13 +134,37 @@ export default function StepClienteOferta({
           bgcolor: "rgba(0,97,223,.06)",
         }}
       >
-        <Typography sx={{ fontSize: 12, fontWeight: 1000, color: "primary.main", letterSpacing: ".14em", textTransform: "uppercase", mb: 2 }}>
+        <Typography
+          sx={{
+            fontSize: 12,
+            fontWeight: 1000,
+            color: "primary.main",
+            letterSpacing: ".14em",
+            textTransform: "uppercase",
+            mb: 2,
+          }}
+        >
           Condiciones comerciales
         </Typography>
 
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+            gap: 2,
+          }}
+        >
           <Box>
-            <Typography sx={{ fontSize: 11, fontWeight: 1000, color: "text.secondary", letterSpacing: ".12em", textTransform: "uppercase", mb: 1 }}>
+            <Typography
+              sx={{
+                fontSize: 11,
+                fontWeight: 1000,
+                color: "text.secondary",
+                letterSpacing: ".12em",
+                textTransform: "uppercase",
+                mb: 1,
+              }}
+            >
               Vigencia (días)
             </Typography>
             <TextField
@@ -90,7 +179,16 @@ export default function StepClienteOferta({
           </Box>
 
           <Box>
-            <Typography sx={{ fontSize: 11, fontWeight: 1000, color: "text.secondary", letterSpacing: ".12em", textTransform: "uppercase", mb: 1 }}>
+            <Typography
+              sx={{
+                fontSize: 11,
+                fontWeight: 1000,
+                color: "text.secondary",
+                letterSpacing: ".12em",
+                textTransform: "uppercase",
+                mb: 1,
+              }}
+            >
               Venta relacionada
             </Typography>
 
@@ -110,7 +208,7 @@ export default function StepClienteOferta({
                   : "Define el subtotal base"
               }
             >
-              {ventasDisponibles.map((v) => (
+              {(ventasDisponibles || []).map((v) => (
                 <MenuItem key={v.id} value={v.id}>
                   Venta #{v.numero ?? "—"}
                 </MenuItem>
