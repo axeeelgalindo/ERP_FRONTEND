@@ -65,6 +65,9 @@ function normalizeGlosasClient(glosas = []) {
   return cleaned.map((g, idx) => ({ ...g, orden: idx }));
 }
 
+const hasVentas = (ventaIds) =>
+  Array.isArray(ventaIds) && ventaIds.length > 0;
+
 export default function EditCotizacionDialog({
   open,
   onClose,
@@ -144,7 +147,7 @@ export default function EditCotizacionDialog({
           }))
         );
 
-        // ✅ si no hay glosas válidas, dejamos 1 vacía por ahora (la auto la haremos según subtotal)
+        // ✅ si no hay glosas válidas, dejamos 1 vacía por ahora
         setGlosas(normalized.length ? normalized : [emptyGlosa()]);
       } catch (e) {
         setErr(e?.message || "Error cargando cotización");
@@ -205,15 +208,13 @@ export default function EditCotizacionDialog({
     );
   }, [ventasDisponibles, ventaIds]);
 
-  // ========= “misma lógica create”: si NO tocaron glosas y hay 1 glosa, auto-ajusta al subtotal =========
+  // ========= Auto-ajuste SOLO cuando hay ventas =========
   useEffect(() => {
     if (!open) return;
+    if (!hasVentas(ventaIds)) return; // ✅ SOLO si hay ventas
     if (subtotalNeto <= 0) return;
-
-    // Solo auto-ajustar si el usuario no ha tocado glosas
     if (glosasTouched) return;
 
-    // si hay 0 o 1 glosa, lo dejamos listo
     setGlosas((prev) => {
       const normalized = normalizeGlosasClient(prev);
 
@@ -244,32 +245,59 @@ export default function EditCotizacionDialog({
         ];
       }
 
-      // si hay varias glosas, NO tocamos nada
-      return prev;
+      return prev; // varias glosas: no tocamos
     });
-  }, [open, subtotalNeto, asunto, glosasTouched]);
+  }, [open, subtotalNeto, asunto, glosasTouched, ventaIds]);
 
   const sumG = useMemo(() => sumGlosas(glosas), [glosas]);
 
+  // ========= Validación glosas: 2 modos =========
   const glosasOk = useMemo(() => {
-    if (subtotalNeto <= 0) return false;
-
     const normalized = normalizeGlosasClient(glosas);
 
-    // misma regla: si el usuario deja todo vacío, se auto crea 1 (en submit).
-    // para el preview: si no hay glosas válidas, lo consideramos OK “pendiente auto”
+    // si está todo vacío, lo consideramos OK (en submit la autogeneramos)
     if (normalized.length === 0) return true;
 
-    return sumGlosas(normalized) === subtotalNeto;
-  }, [glosas, subtotalNeto]);
+    // no negativos
+    if (normalized.some((g) => round0(g.monto) < 0)) return false;
+
+    // ✅ con ventas => suma debe ser EXACTA al subtotal
+    if (hasVentas(ventaIds)) {
+      if (subtotalNeto <= 0) return false;
+      return sumGlosas(normalized) === subtotalNeto;
+    }
+
+    // ✅ sin ventas => el total lo definen las glosas (permitimos > 0)
+    const suma = sumGlosas(normalized);
+    return suma > 0; // si quieres permitir 0, cambia a: suma >= 0
+  }, [glosas, subtotalNeto, ventaIds]);
 
   // ========= handlers glosas =========
   const setGlosa = (idx, patch) => {
     setGlosasTouched(true);
+
+    // ✅ si hay ventas: no permitir que un monto supere el "restante"
     setGlosas((prev) => {
       const next = [...prev];
-      next[idx] = { ...next[idx], ...patch, orden: idx };
-      if (patch.monto !== undefined) next[idx].monto = round0(patch.monto);
+      const current = { ...next[idx], ...patch, orden: idx };
+
+      // normaliza monto
+      if (patch.monto !== undefined) current.monto = round0(patch.monto);
+
+      if (hasVentas(ventaIds)) {
+        const target = subtotalNeto;
+
+        // suma de otros
+        const others = next.reduce((acc, g, i) => {
+          if (i === idx) return acc;
+          return acc + round0(g?.monto || 0);
+        }, 0);
+
+        const maxAllowed = Math.max(0, target - others);
+        current.monto = Math.min(round0(current.monto || 0), maxAllowed);
+      }
+
+      next[idx] = current;
       return next;
     });
   };
@@ -302,21 +330,15 @@ export default function EditCotizacionDialog({
       setErr("");
 
       if (!clienteId) throw new Error("Selecciona un cliente.");
-      //if (!ventaIds.length)
-      //  throw new Error("Debe existir al menos 1 venta seleccionada.");
       if (!vigenciaDias || vigenciaDias < 1 || vigenciaDias > 365)
         throw new Error("Vigencia debe estar entre 1 y 365 días.");
 
-      //if (subtotalNeto <= 0) {
-      //  throw new Error(
-      //    "El subtotal neto calculado desde ventas es 0. Revisa ventas seleccionadas."
-      //  );
-      //}
+      const conVentas = hasVentas(ventaIds);
 
-      // ✅ MISMA LÓGICA CREATE
+      // glosas finales
       let glosasFinal = normalizeGlosasClient(glosas);
 
-      // Si no hay glosas válidas => 1 automática con subtotal
+      // Si no hay glosas válidas => 1 automática
       if (glosasFinal.length === 0) {
         glosasFinal = [
           {
@@ -324,21 +346,35 @@ export default function EditCotizacionDialog({
               0,
               250
             ),
-            monto: subtotalNeto,
+            monto: conVentas ? subtotalNeto : 0,
             manual: true,
             orden: 0,
           },
         ];
       }
 
-      // validación: todas con descripción (ya está garantizado), y suma exacta
       const suma = sumGlosas(glosasFinal);
-      if (suma !== subtotalNeto) {
-        throw new Error(
-          `Las glosas deben sumar el subtotal neto (${formatCLP(
-            subtotalNeto
-          )}). Actualmente suman ${formatCLP(suma)}.`
-        );
+
+      if (conVentas) {
+        if (subtotalNeto <= 0) {
+          throw new Error(
+            "El subtotal neto calculado desde ventas es 0. Revisa ventas seleccionadas."
+          );
+        }
+        if (suma !== subtotalNeto) {
+          throw new Error(
+            `Las glosas deben sumar el subtotal neto (${formatCLP(
+              subtotalNeto
+            )}). Actualmente suman ${formatCLP(suma)}.`
+          );
+        }
+      } else {
+        // sin ventas: glosas definen el total, exigir > 0
+        if (suma <= 0) {
+          throw new Error(
+            "En cotizaciones sin ventas, las glosas deben sumar un monto mayor a 0."
+          );
+        }
       }
 
       const payload = {
@@ -348,7 +384,10 @@ export default function EditCotizacionDialog({
         vigencia_dias: Number(vigenciaDias),
         terminos_condiciones: terminos || null,
         acuerdo_pago: acuerdoPago || null,
+
+        // ✅ puede ser [] (importadas)
         ventaIds,
+
         glosas: glosasFinal.map((g, i) => ({
           descripcion: g.descripcion,
           monto: round0(g.monto || 0),
@@ -510,7 +549,9 @@ export default function EditCotizacionDialog({
           SelectProps={{ multiple: true }}
           helperText={
             ventasDisponibles.length
-              ? `Subtotal neto preview: ${formatCLP(subtotalNeto)}`
+              ? hasVentas(ventaIds)
+                ? `Subtotal neto preview: ${formatCLP(subtotalNeto)}`
+                : "Cotización sin ventas (importada). El total se define por las glosas."
               : "No hay ventas disponibles en la cotización."
           }
         >
@@ -578,19 +619,30 @@ export default function EditCotizacionDialog({
             <Typography
               sx={{
                 fontSize: 12,
-                color:
-                  subtotalNeto <= 0
-                    ? "error.main"
-                    : glosasOk
-                    ? "success.main"
-                    : "error.main",
+                color: glosasOk ? "success.main" : "error.main",
               }}
             >
-              {subtotalNeto <= 0
-                ? "❌ Subtotal neto es 0 (revisa ventas)."
-                : glosasOk
-                ? `✅ Glosas cuadran: ${formatCLP(sumGlosas(normalizeGlosasClient(glosas)) || subtotalNeto)}`
-                : `❌ Glosas: ${formatCLP(sumGlosas(normalizeGlosasClient(glosas)))} · Subtotal neto: ${formatCLP(subtotalNeto)}`}
+              {hasVentas(ventaIds) ? (
+                <>
+                  {subtotalNeto <= 0
+                    ? "❌ Subtotal neto es 0 (revisa ventas)."
+                    : glosasOk
+                    ? `✅ Glosas cuadran: ${formatCLP(
+                        sumGlosas(normalizeGlosasClient(glosas))
+                      )}`
+                    : `❌ Glosas: ${formatCLP(
+                        sumGlosas(normalizeGlosasClient(glosas))
+                      )} · Subtotal neto: ${formatCLP(subtotalNeto)}`}
+                </>
+              ) : (
+                <>
+                  {glosasOk
+                    ? `✅ Total por glosas: ${formatCLP(
+                        sumGlosas(normalizeGlosasClient(glosas))
+                      )}`
+                    : "❌ Revisa glosas (montos no negativos y total > 0)."}
+                </>
+              )}
             </Typography>
           </Box>
         </Box>
@@ -624,7 +676,7 @@ export default function EditCotizacionDialog({
         <Button
           variant="contained"
           onClick={submit}
-          disabled={saving || loading || subtotalNeto <= 0 || !glosasOk}
+          disabled={saving || loading || !glosasOk}
           startIcon={saving ? <CircularProgress size={16} /> : null}
         >
           {saving ? "Guardando..." : "Guardar cambios"}
