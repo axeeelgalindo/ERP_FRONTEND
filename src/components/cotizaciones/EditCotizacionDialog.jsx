@@ -425,7 +425,7 @@ export default function EditCotizacionDialog({
       maxWidth="md"
       fullWidth
       PaperProps={{
-        sx: { borderRadius: 3, overflow: "hidden" },
+        sx: { borderRadius: 3,  },
       }}
     >
       {/* Header */}
