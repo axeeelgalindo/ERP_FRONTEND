@@ -302,16 +302,16 @@ export default function EditCotizacionDialog({
       setErr("");
 
       if (!clienteId) throw new Error("Selecciona un cliente.");
-      if (!ventaIds.length)
-        throw new Error("Debe existir al menos 1 venta seleccionada.");
+      //if (!ventaIds.length)
+      //  throw new Error("Debe existir al menos 1 venta seleccionada.");
       if (!vigenciaDias || vigenciaDias < 1 || vigenciaDias > 365)
         throw new Error("Vigencia debe estar entre 1 y 365 días.");
 
-      if (subtotalNeto <= 0) {
-        throw new Error(
-          "El subtotal neto calculado desde ventas es 0. Revisa ventas seleccionadas."
-        );
-      }
+      //if (subtotalNeto <= 0) {
+      //  throw new Error(
+      //    "El subtotal neto calculado desde ventas es 0. Revisa ventas seleccionadas."
+      //  );
+      //}
 
       // ✅ MISMA LÓGICA CREATE
       let glosasFinal = normalizeGlosasClient(glosas);
