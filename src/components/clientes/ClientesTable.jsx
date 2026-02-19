@@ -134,33 +134,33 @@ export default function ClientesTable({
   const totalPages = Math.max(1, Math.ceil((total || 0) / pageSize));
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+    <div className="bg-white  rounded-xl border border-slate-200  shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
-            <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <tr className="bg-slate-50  border-b border-slate-200 ">
+              <th className="px-6 py-4 text-xs font-bold text-slate-500  uppercase tracking-wider">
                 Cliente
               </th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <th className="px-6 py-4 text-xs font-bold text-slate-500  uppercase tracking-wider">
                 RUT
               </th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <th className="px-6 py-4 text-xs font-bold text-slate-500  uppercase tracking-wider">
                 Contacto
               </th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">
+              <th className="px-6 py-4 text-xs font-bold text-slate-500  uppercase tracking-wider text-center">
                 Banco
               </th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <th className="px-6 py-4 text-xs font-bold text-slate-500  uppercase tracking-wider">
                 Responsables
               </th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">
+              <th className="px-6 py-4 text-xs font-bold text-slate-500  uppercase tracking-wider text-right">
                 Acciones
               </th>
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          <tbody className="divide-y divide-slate-100 ">
             {!rows?.length ? (
               <tr>
                 <td className="px-6 py-6 text-sm text-slate-500" colSpan={6}>
@@ -179,7 +179,7 @@ export default function ClientesTable({
                 return (
                   <tr
                     key={row.id}
-                    className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors"
+                    className="hover:bg-slate-50  transition-colors"
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -187,30 +187,30 @@ export default function ClientesTable({
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             alt={`Logo ${row.nombre}`}
-                            className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-800 object-cover bg-white"
+                            className="w-10 h-10 rounded-full border border-slate-200 object-cover bg-white"
                             src={logoSrc(row.logo_url)}
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center font-bold text-sm">
+                          <div className="w-10 h-10 rounded-full bg-blue-100  text-blue-600 flex items-center justify-center font-bold text-sm">
                             {initials(row.nombre)}
                           </div>
                         )}
-                        <span className="font-semibold text-slate-900 dark:text-slate-100">
+                        <span className="font-semibold text-slate-900 ">
                           {row.nombre}
                         </span>
                       </div>
                     </td>
 
-                    <td className="px-6 py-4 text-slate-600 dark:text-slate-400 text-sm">
+                    <td className="px-6 py-4 text-slate-600  text-sm">
                       {row.rut || "—"}
                     </td>
 
                     <td className="px-6 py-4">
                       <div className="flex flex-col text-sm">
-                        <span className="text-slate-900 dark:text-slate-200">
+                        <span className="text-slate-900 ">
                           {row.correo || "—"}
                         </span>
-                        <span className="text-slate-500 dark:text-slate-400 font-medium">
+                        <span className="text-slate-500  font-medium">
                           {row.telefono || "—"}
                         </span>
                       </div>
@@ -221,7 +221,7 @@ export default function ClientesTable({
                     </td>
 
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100  text-slate-700 ">
                         <Person fontSize="small" />
                         {responsablesCount}{" "}
                         {responsablesCount === 1
@@ -264,18 +264,18 @@ export default function ClientesTable({
         </table>
       </div>
 
-      <div className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 flex-wrap">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+      <div className="bg-slate-50  px-6 py-4 border-t border-slate-200  flex items-center justify-between gap-4 flex-wrap">
+        <p className="text-sm text-slate-500  ">
           Mostrando{" "}
-          <span className="font-semibold text-slate-900 dark:text-white">
+          <span className="font-semibold text-slate-900 ">
             {from}
           </span>{" "}
           a{" "}
-          <span className="font-semibold text-slate-900 dark:text-white">
+          <span className="font-semibold text-slate-900 ">
             {to}
           </span>{" "}
           de{" "}
-          <span className="font-semibold text-slate-900 dark:text-white">
+          <span className="font-semibold text-slate-900 ">
             {total}
           </span>{" "}
           resultados

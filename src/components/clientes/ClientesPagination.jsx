@@ -21,7 +21,7 @@ export default function ClientesPagination({ page, totalPages, onPageChange }) {
   return (
     <div className="flex items-center gap-2">
       <button
-        className="p-2 border border-slate-300 dark:border-slate-700 rounded-lg hover:bg-white dark:hover:bg-slate-900 transition-colors disabled:opacity-50"
+        className="p-2 border border-slate-300  rounded-lg hover:bg-white  transition-colors disabled:opacity-50"
         disabled={!canPrev}
         onClick={() => go(page - 1)}
         type="button"
@@ -37,7 +37,7 @@ export default function ClientesPagination({ page, totalPages, onPageChange }) {
           className={
             p === page
               ? "px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium"
-              : "px-4 py-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors"
+              : "px-4 py-1.5 hover:bg-slate-200  rounded-lg text-sm font-medium transition-colors"
           }
         >
           {p}
@@ -53,7 +53,7 @@ export default function ClientesPagination({ page, totalPages, onPageChange }) {
             className={
               tail === page
                 ? "px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium"
-                : "px-4 py-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors"
+                : "px-4 py-1.5 hover:bg-slate-200  rounded-lg text-sm font-medium transition-colors"
             }
           >
             {tail}
@@ -62,7 +62,7 @@ export default function ClientesPagination({ page, totalPages, onPageChange }) {
       ) : null}
 
       <button
-        className="p-2 border border-slate-300 dark:border-slate-700 rounded-lg hover:bg-white dark:hover:bg-slate-900 transition-colors disabled:opacity-50"
+        className="p-2 border border-slate-300  rounded-lg hover:bg-white  transition-colors disabled:opacity-50"
         disabled={!canNext}
         onClick={() => go(page + 1)}
         type="button"

@@ -8,12 +8,12 @@ import { Verified } from "lucide-react";
 function Field({ label, value, onChange, required, type = "text", placeholder }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+      <span className="text-[11px] font-bold text-slate-500  uppercase tracking-wider">
         {label} {required ? "*" : ""}
       </span>
       <input
         type={type}
-        className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all py-2 px-3"
+        className="w-full text-sm rounded-lg border border-slate-200  bg-white  text-slate-900  focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all py-2 px-3"
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
@@ -156,10 +156,10 @@ export default function StepResponsables({
   return (
     <div className="space-y-6">
       <div className="mb-2">
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-white">
+        <h2 className="text-lg font-semibold text-slate-800 ">
           Equipo
         </h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className="text-sm text-slate-500 ">
           Contactos clave asignados a este cliente
         </p>
       </div>
@@ -168,10 +168,10 @@ export default function StepResponsables({
         {/* LISTA IZQ */}
         <div className="lg:col-span-2 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-slate-800 dark:text-slate-200">
+            <h3 className="font-semibold text-slate-800 ">
               Equipo Responsable
             </h3>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700  ">
               {responsables?.length || 0} ASIGNADOS
             </span>
           </div>
@@ -183,30 +183,30 @@ export default function StepResponsables({
                 return (
                   <div
                     key={row.id}
-                    className="p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800/40 hover:border-blue-400/40 transition-all group"
+                    className="p-3 border border-slate-200  rounded-xl bg-white  hover:border-blue-400/40 transition-all group"
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-200 font-bold shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-slate-100  flex items-center justify-center text-slate-600  font-bold shrink-0">
                         {initials(row.nombre)}
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                          <p className="text-sm font-semibold text-slate-900  truncate">
                             {row.nombre}
                           </p>
                           {principal ? (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 uppercase">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700   uppercase">
                               Principal
                             </span>
                           ) : null}
                         </div>
 
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                        <p className="text-[11px] text-slate-500  leading-tight">
                           {row.cargo || "—"}
                           {row.area ? ` • ${row.area}` : ""}
                         </p>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                        <p className="text-[11px] text-slate-500 leading-tight">
                           {row.correo || "—"}
                           {row.telefono ? ` • ${row.telefono}` : ""}
                         </p>
@@ -253,7 +253,7 @@ export default function StepResponsables({
                 );
               })
             ) : (
-              <div className="text-sm text-slate-500 dark:text-slate-400">
+              <div className="text-sm text-slate-500 ">
                 Aún no hay responsables.
               </div>
             )}
@@ -262,9 +262,9 @@ export default function StepResponsables({
 
         {/* FORM DER */}
         <div className="lg:col-span-3">
-          <div className="p-6 border border-slate-200 dark:border-slate-700 rounded-2xl bg-slate-50 dark:bg-slate-800/20">
+          <div className="p-6 border border-slate-200  rounded-2xl bg-slate-50 ">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-slate-800 dark:text-slate-200">
+              <h3 className="font-semibold text-slate-800 ">
                 {editingId ? "Editar responsable" : "Añadir responsable"}
               </h3>
 
@@ -275,7 +275,7 @@ export default function StepResponsables({
                     setEditingId(null);
                     reset();
                   }}
-                  className="text-sm text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                  className="text-sm text-slate-500 hover:text-slate-900 "
                   disabled={disabled}
                 >
                   Cancelar edición
@@ -322,7 +322,7 @@ export default function StepResponsables({
               </div>
 
               <div className="flex items-center justify-between">
-                <label className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <label className="inline-flex items-center gap-2 text-sm text-slate-700 ">
                   <input
                     type="checkbox"
                     checked={!!form.es_principal}

@@ -12,23 +12,23 @@ import {
 
 function StatCard({ Icon, label, value, tone }) {
   const tones = {
-    blue: "bg-blue-50 dark:bg-blue-900/20 text-blue-600",
-    emerald: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600",
-    amber: "bg-amber-50 dark:bg-amber-900/20 text-amber-600",
-    purple: "bg-purple-50 dark:bg-purple-900/20 text-purple-600",
+    blue: "bg-blue-50  text-blue-600",
+    emerald: "bg-emerald-50  text-emerald-600",
+    amber: "bg-amber-50  text-amber-600",
+    purple: "bg-purple-50  text-purple-600",
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow">
+    <div className="bg-white  p-6 rounded-xl border border-slate-200  shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-center gap-4">
         <div className={cx("p-3 rounded-lg", tones[tone] || tones.blue)}>
           <Icon fontSize="small" />
         </div>
         <div>
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+          <p className="text-sm font-medium text-slate-500 ">
             {label}
           </p>
-          <p className="text-2xl font-bold text-slate-900 dark:text-white">
+          <p className="text-2xl font-bold text-slate-900 ">
             {value}
           </p>
         </div>

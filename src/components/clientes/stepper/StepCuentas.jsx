@@ -8,12 +8,12 @@ import { Verified } from "lucide-react";
 function Field({ label, value, onChange, required, type = "text", placeholder }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+      <span className="text-[11px] font-bold text-slate-500  uppercase tracking-wider">
         {label} {required ? "*" : ""}
       </span>
       <input
         type={type}
-        className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all py-2 px-3"
+        className="w-full text-sm rounded-lg border border-slate-200  bg-white  text-slate-900  focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all py-2 px-3"
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
@@ -159,10 +159,10 @@ export default function StepCuentas({
   return (
     <div className="space-y-6">
       <div className="mb-2">
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-white">
+        <h2 className="text-lg font-semibold text-slate-800 ">
           Finanzas
         </h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className="text-sm text-slate-500 ">
           Cuentas bancarias para pagos y transferencias
         </p>
       </div>
@@ -171,10 +171,10 @@ export default function StepCuentas({
         {/* LISTA IZQ */}
         <div className="lg:col-span-1 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-slate-800 dark:text-slate-200">
+            <h3 className="font-semibold text-slate-800 ">
               Cuentas Bancarias
             </h3>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700  ">
               {cuentas?.length || 0} GUARDADAS
             </span>
           </div>
@@ -189,18 +189,18 @@ export default function StepCuentas({
                     className={cx(
                       "p-4 rounded-xl border transition-all",
                       principal
-                        ? "border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-900/10"
-                        : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/40"
+                        ? "border-blue-200  bg-blue-50/50 "
+                        : "border-slate-200  bg-white "
                     )}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0">
+                      <div className="w-10 h-10 rounded-lg bg-white  border border-slate-200  flex items-center justify-center shrink-0">
                         <AccountBalance fontSize="small" />
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-bold text-slate-900 dark:text-white uppercase truncate">
+                          <p className="text-xs font-bold text-slate-900  uppercase truncate">
                             {row.banco}
                           </p>
                           <button
@@ -219,18 +219,18 @@ export default function StepCuentas({
                           </button>
                         </div>
 
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 uppercase leading-tight">
+                        <p className="text-[10px] text-slate-500  mt-1 uppercase leading-tight">
                           {(row.tipo_cuenta || "—")} • N° {row.numero}
                         </p>
                         {row.titular ? (
-                          <p className="text-[10px] font-medium text-slate-600 dark:text-slate-300 mt-0.5 uppercase">
+                          <p className="text-[10px] font-medium text-slate-600  mt-0.5 uppercase">
                             {row.titular}
                           </p>
                         ) : null}
                       </div>
                     </div>
 
-                    <div className="mt-3 flex gap-2 border-t border-slate-100 dark:border-slate-800 pt-2">
+                    <div className="mt-3 flex gap-2 border-t border-slate-100  pt-2">
                       <button
                         type="button"
                         className="text-slate-400 hover:text-blue-600 transition-colors"
@@ -254,7 +254,7 @@ export default function StepCuentas({
                 );
               })
             ) : (
-              <div className="text-sm text-slate-500 dark:text-slate-400">
+              <div className="text-sm text-slate-500 ">
                 Aún no hay cuentas bancarias.
               </div>
             )}
@@ -262,9 +262,9 @@ export default function StepCuentas({
         </div>
 
         {/* FORM DER */}
-        <div className="lg:col-span-2 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/30">
+        <div className="lg:col-span-2 rounded-2xl p-6 border border-slate-200  bg-slate-50 ">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="font-semibold text-slate-800 dark:text-slate-200">
+            <h3 className="font-semibold text-slate-800 ">
               {editingId ? "Editar cuenta" : "Añadir nueva cuenta"}
             </h3>
 
@@ -275,7 +275,7 @@ export default function StepCuentas({
                   setEditingId(null);
                   reset();
                 }}
-                className="text-sm text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                className="text-sm text-slate-500 hover:text-slate-900 "
                 disabled={disabled}
               >
                 Cancelar edición
@@ -337,7 +337,7 @@ export default function StepCuentas({
             </div>
 
             <div className="flex items-center justify-between">
-              <label className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700 ">
                 <input
                   type="checkbox"
                   checked={!!form.es_principal}

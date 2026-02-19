@@ -13,13 +13,13 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+      <label className="text-[11px] font-bold text-slate-500  uppercase tracking-wider">
         {label}
       </label>
 
       {textarea ? (
         <textarea
-          className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all resize-none py-2 px-4"
+          className="w-full text-sm rounded-lg border border-slate-200  bg-white  text-slate-900  focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all resize-none py-2 px-4"
           rows={4}
           value={value ?? ""}
           onChange={(e) => onChange(e.target.value)}
@@ -28,7 +28,7 @@ function Field({
       ) : (
         <input
           type={type}
-          className="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all py-2 px-4"
+          className="w-full text-sm rounded-lg border border-slate-200  bg-white  text-slate-900  focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all py-2 px-4"
           value={value ?? ""}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
@@ -106,15 +106,15 @@ export default function StepDatos({ editing, setEditing, saving }) {
         </div>
 
         <div className="md:col-span-5 space-y-1.5">
-          <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+          <label className="text-[11px] font-bold text-slate-500  uppercase tracking-wider">
             Logo del Cliente
           </label>
 
           <div
             onClick={() => fileRef.current?.click()}
-            className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col items-center justify-center gap-3 bg-slate-50/50 dark:bg-slate-800/30 min-h-[180px] cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="border-2 border-dashed border-slate-200  rounded-xl p-4 flex flex-col items-center justify-center gap-3 bg-slate-50/50  min-h-[180px] cursor-pointer hover:bg-slate-100  transition-colors"
           >
-            <div className="w-16 h-16 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center border border-slate-200 dark:border-slate-600 overflow-hidden">
+            <div className="w-16 h-16 rounded-lg bg-white  flex items-center justify-center border border-slate-200  overflow-hidden">
               {preview ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -130,7 +130,7 @@ export default function StepDatos({ editing, setEditing, saving }) {
             </div>
 
             <div className="text-center">
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="text-[11px] text-slate-500 ">
                 PNG o JPG (máx. 5MB)
               </p>
 
@@ -141,7 +141,7 @@ export default function StepDatos({ editing, setEditing, saving }) {
                   fileRef.current?.click();
                 }}
                 disabled={saving}
-                className="mt-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                className="mt-2 bg-white  border border-slate-200  text-slate-700  px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-slate-50  transition-colors"
               >
                 Subir logo
               </button>
