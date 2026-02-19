@@ -9,13 +9,18 @@ import {
   IconButton,
   Typography,
   useMediaQuery,
+  Switch,
+  FormControlLabel,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import CloseIcon from "@mui/icons-material/Close";
 import AddShoppingCartIcon from "@mui/icons-material/AddShoppingCart";
 
 import { formatCLP } from "@/components/ventas/utils/money";
-import { DetalleItemsSection, useVentaForm } from "@/components/ventas/modalForm";
+import {
+  DetalleItemsSection,
+  useVentaForm,
+} from "@/components/ventas/modalForm";
 
 export default function NuevaVentaDialog({
   open,
@@ -45,10 +50,15 @@ export default function NuevaVentaDialog({
     onClose?.();
   };
 
+  // ✅ % utilidad real sobre TOTAL FINAL (incluye extraCosteo)
   const utilidadPct =
     form.preview?.total > 0
       ? ((form.preview.utilidad / form.preview.total) * 100).toFixed(1)
       : "0.0";
+
+  const extraCosteo = Number(
+    form.preview?.extraCosteo || form.extraCosteo || 0,
+  );
 
   return (
     <Dialog
@@ -244,7 +254,72 @@ export default function NuevaVentaDialog({
                         mt: 0.5,
                       }}
                     >
+                      {/* aquí puedes mostrar un hint si quieres */}
                     </Typography>
+                  </Box>
+
+                  {/* ✅ NUEVO: Tipo día por costeo (1 vez) */}
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 2.5,
+                      border: "1px solid rgba(15,23,42,.10)",
+                      bgcolor: "#fff",
+                      boxShadow: "0 1px 2px rgba(15,23,42,.04)",
+                      display: "grid",
+                      gap: 1,
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: 12,
+                        fontWeight: 900,
+                        color: "text.secondary",
+                      }}
+                    >
+                      Tipo día (costeo)
+                    </Typography>
+
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                      <FormControlLabel
+                        sx={{ m: 0 }}
+                        control={
+                          <Switch
+                            checked={!!form.isFeriado}
+                            onChange={(e) =>
+                              form.setIsFeriado(e.target.checked)
+                            }
+                          />
+                        }
+                        label={
+                          <Typography sx={{ fontSize: 12, fontWeight: 800 }}>
+                            Feriado
+                          </Typography>
+                        }
+                      />
+
+                      <FormControlLabel
+                        sx={{ m: 0 }}
+                        control={
+                          <Switch
+                            checked={!!form.isUrgencia}
+                            onChange={(e) =>
+                              form.setIsUrgencia(e.target.checked)
+                            }
+                          />
+                        }
+                        label={
+                          <Typography sx={{ fontSize: 12, fontWeight: 800 }}>
+                            Urgencia
+                          </Typography>
+                        }
+                      />
+                    </Box>
+                    {/* 
+                    <Typography sx={{ fontSize: 11, color: "text.disabled" }}>
+                      Se suma 1 vez al total (no por ítem).
+                    </Typography>
+                      */}
                   </Box>
                 </Box>
               </Box>
@@ -281,6 +356,15 @@ export default function NuevaVentaDialog({
                     >
                       {formatCLP(form.preview?.total || 0)}
                     </Typography>
+
+                    {/* ✅ NUEVO: extraCosteo visible */}
+                    {extraCosteo > 0 && (
+                      <Typography
+                        sx={{ fontSize: 12, color: "text.disabled", mt: 0.75 }}
+                      >
+                        Incluye extra costeo: <b>{formatCLP(extraCosteo)}</b>
+                      </Typography>
+                    )}
                   </Box>
 
                   <Box
@@ -305,6 +389,14 @@ export default function NuevaVentaDialog({
                     >
                       {formatCLP(form.preview?.costo || 0)}
                     </Typography>
+
+                    {/* 
+                    {extraCosteo > 0 && (
+                      <Typography sx={{ fontSize: 12, color: "text.disabled", mt: 0.5 }}>
+                        Extra (passthrough): <b>{formatCLP(extraCosteo)}</b>
+                      </Typography>
+                    )}
+                        */}
                   </Box>
 
                   <Box
@@ -354,6 +446,13 @@ export default function NuevaVentaDialog({
                         {utilidadPct}%
                       </Typography>
                     </Box>
+
+                    {/* ✅ opcional: mostrar k 
+                    {Number.isFinite(form.preview?.k) && form.preview?.k !== 1 && (
+                      <Typography sx={{ fontSize: 12, color: "success.main", mt: 0.75, fontWeight: 900 }}>
+                        Factor k aplicado: {Number(form.preview.k).toFixed(4)}
+                      </Typography>
+                    )} */}
                   </Box>
                 </Box>
               </Box>

@@ -22,6 +22,10 @@ export default function useVentaForm({
   const [ordenVentaId, setOrdenVentaId] = useState("");
   const [utilidadPctObjetivo, setUtilidadPctObjetivo] = useState("");
 
+  // ✅ NUEVO: tipo día por costeo
+  const [isFeriado, setIsFeriado] = useState(false);
+  const [isUrgencia, setIsUrgencia] = useState(false);
+
   const now = useMemo(() => new Date(), []);
   const [anio, setAnio] = useState(String(now.getFullYear()));
   const [mes, setMes] = useState(String(now.getMonth() + 1));
@@ -155,7 +159,7 @@ export default function useVentaForm({
     modo: "HH",
     cantidad: 1,
     tipoItemId: "",
-    tipoDiaId: "",
+    tipoDiaId: "", // (lo dejamos por compat, aunque ya no se usa para extra por costeo)
     alphaPct: 10,
     empleadoId: "",
     compraId: "",
@@ -169,6 +173,8 @@ export default function useVentaForm({
     setDescripcionVenta("");
     setOrdenVentaId("");
     setUtilidadPctObjetivo("");
+    setIsFeriado(false);
+    setIsUrgencia(false);
     setAnio(String(d.getFullYear()));
     setMes(String(d.getMonth() + 1));
     setDetalles([emptyDet()]);
@@ -424,6 +430,10 @@ export default function useVentaForm({
       setDescripcionVenta(data?.descripcion || "");
       setOrdenVentaId(data?.ordenVentaId || "");
 
+      // ✅ NUEVO: cabecera
+      setIsFeriado(!!data?.isFeriado);
+      setIsUrgencia(!!data?.isUrgencia);
+
       if (data?.utilidadObjetivoPct != null) {
         const utilidadNum = Number(data.utilidadObjetivoPct);
         setUtilidadPctObjetivo(
@@ -454,7 +464,7 @@ export default function useVentaForm({
             modo: "HH",
             cantidad: Number(d?.cantidad) || 1,
             tipoItemId: hhTipoItem?.id || "",
-            tipoDiaId: d?.tipoDiaId || "",
+            tipoDiaId: d?.tipoDiaId || "", // compat
             alphaPct: d?.alpha == null ? 10 : Number(d.alpha),
             empleadoId: d?.empleadoId || "",
             compraId: "",
@@ -473,7 +483,7 @@ export default function useVentaForm({
           modo: "COMPRA",
           cantidad: Number(d?.cantidad) || 1,
           tipoItemId: d?.tipoItemId || "",
-          tipoDiaId: d?.tipoDiaId || "",
+          tipoDiaId: d?.tipoDiaId || "", // compat
           alphaPct: d?.alpha == null ? 10 : Number(d.alpha),
           empleadoId: "",
           compraId: d?.compraId || "",
@@ -537,118 +547,140 @@ export default function useVentaForm({
   const removeDetalle = (idx) =>
     setDetalles((prev) => prev.filter((_, i) => i !== idx));
 
-const preview = useMemo(() => {
-  // 1) calcular costoConAlpha por ítem (esto es COSTO, no utilidad)
-  const linesBase = detalles.map((d) => {
-    const cantidad = Number(d.cantidad) || 1;
+  // ===========================
+  // ✅ EXTRA POR COSTEO (1 vez)
+  // ===========================
+  const extraCosteo = useMemo(() => {
+    const pickValor = (keys) => {
+      const found =
+        tipoDias.find((t) => keys.includes(normalizeText(t?.codigo))) ||
+        tipoDias.find((t) => keys.includes(normalizeText(t?.nombre))) ||
+        null;
+      const v = found ? Number(found.valor ?? 0) : 0;
+      return Number.isFinite(v) ? v : 0;
+    };
 
-    const alphaPct = normalizeAlphaPctUI(d.alphaPct);
-    const alphaMult = 1 + alphaPct / 100;
+    const vFeriado = pickValor(["FERIADO", "FESTIVO"]);
+    const vUrgencia = pickValor(["URGENCIA", "URGENTE"]);
 
-    const tipoDia = tipoDias.find((t) => t.id === d.tipoDiaId) || null;
-    const extraFijo = tipoDia ? Number(tipoDia.valor ?? 0) : 0;
+    return (isFeriado ? vFeriado : 0) + (isUrgencia ? vUrgencia : 0);
+  }, [tipoDias, isFeriado, isUrgencia]);
 
-    let costoSinAlpha = 0;
+  const preview = useMemo(() => {
+    // 1) calculo por ítem (BASE, sin extraCosteo)
+    const linesBase = (detalles || []).map((d) => {
+      const cantidad = Number(d?.cantidad) || 1;
 
-    if (d.modo === "HH") {
-      const hh = findHHForEmpleado(d.empleadoId);
-      const costoHH = hh?.costoHH != null ? Number(hh.costoHH) : 0;
-      const cif = getHHCIFValue(hh);
-      costoSinAlpha = costoHH * cantidad + cif;
-    } else {
-      const manualPU = getManualPUNumber(d);
-      const costoUnit = Number.isFinite(manualPU) ? manualPU : 0;
-      costoSinAlpha = costoUnit * cantidad;
+      const alphaPct = normalizeAlphaPctUI(d?.alphaPct);
+      const alphaMult = 1 + alphaPct / 100;
+
+      let costoSinAlpha = 0;
+
+      if (d?.modo === "HH") {
+        const hh = findHHForEmpleado(d?.empleadoId);
+        const costoHH = hh?.costoHH != null ? Number(hh.costoHH) : 0;
+        const cif = getHHCIFValue(hh);
+        costoSinAlpha = costoHH * cantidad + cif;
+      } else {
+        const manualPU = getManualPUNumber(d);
+        const costoUnit = Number.isFinite(manualPU) ? manualPU : 0;
+        costoSinAlpha = costoUnit * cantidad;
+      }
+
+      const costoBase = costoSinAlpha * alphaMult;
+      const ventaBaseActual = costoBase; // base venta actual antes de k
+
+      return { costoBase, ventaBaseActual };
+    });
+
+    const totalCostoBase = linesBase.reduce(
+      (acc, x) => acc + (Number(x.costoBase) || 0),
+      0,
+    );
+    const totalVentaActualBase = linesBase.reduce(
+      (acc, x) => acc + (Number(x.ventaBaseActual) || 0),
+      0,
+    );
+
+    // 2) calcular k por margen sobre venta (SOLO BASE)
+    const uPct =
+      utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo);
+    let k = 1;
+
+    if (uPct != null && Number.isFinite(uPct) && uPct >= 0) {
+      const u = uPct / 100;
+      const denom = 1 - u;
+
+      const ventaObjetivoBase = denom > 0 ? totalVentaActualBase / denom : null;
+
+      if (
+        ventaObjetivoBase != null &&
+        Number.isFinite(ventaObjetivoBase) &&
+        ventaObjetivoBase > 0 &&
+        totalVentaActualBase > 0
+      ) {
+        k = ventaObjetivoBase / totalVentaActualBase;
+      }
     }
 
-    const costoBase = costoSinAlpha + extraFijo;
-    const costoConAlpha = costoBase * alphaMult;
+    const kk = Number.isFinite(k) ? k : 1;
 
-    // en tu backend, antes del % objetivo: venta = costo
-    const ventaActual = costoConAlpha;
+    // 3) líneas finales por ítem (con k, sin extraCosteo)
+    const lines = linesBase.map((x) => {
+      const costoTotal = Number(x.costoBase) || 0;
+      const ventaTotal = (Number(x.ventaBaseActual) || 0) * kk;
+
+      const utilidad = ventaTotal - costoTotal;
+      const pct = ventaTotal > 0 ? (utilidad / ventaTotal) * 100 : 0;
+
+      return { costoTotal, ventaTotal, utilidad, pct };
+    });
+
+    // 4) totales (sumando extraCosteo SOLO 1 VEZ)
+    const totalVentaBaseFinal = totalVentaActualBase * kk;
+
+    const extra = Number(extraCosteo || 0);
+
+    const totalCostoFinal = totalCostoBase + extra;
+    const totalVentaFinal = totalVentaBaseFinal + extra;
+
+    const utilidad = totalVentaFinal - totalCostoFinal;
+    const pct = totalVentaFinal > 0 ? (utilidad / totalVentaFinal) * 100 : 0;
 
     return {
-      costoTotal: costoConAlpha,
-      ventaActual,
-      cantidad,
+      k: kk,
+
+      // ✅ totales finales incluyen extra 1 vez
+      total: totalVentaFinal,
+      costo: totalCostoFinal,
+      utilidad,
+      pct,
+
+      // ✅ subtotal por ítem vuelve
+      lines,
+
+      // extras informativos
+      extraCosteo: extra,
+      baseVenta: totalVentaBaseFinal,
+      baseCosto: totalCostoBase,
     };
-  });
-
-  const totalCosto = linesBase.reduce((acc, x) => acc + (x.costoTotal || 0), 0);
-  const totalVentaActual = linesBase.reduce(
-    (acc, x) => acc + (x.ventaActual || 0),
-    0
-  );
-
-  // 2) aplicar MARGEN sobre venta (igual que backend)
-  const uPct = utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo);
-
-  // Igual que tu backend: base por defecto VENTA_ACTUAL
-  const base = "VENTA_ACTUAL"; // si después haces selector, cámbialo aquí
-
-  let k = 1;
-
-  if (uPct != null && Number.isFinite(uPct) && uPct >= 0) {
-    const u = uPct / 100;
-    const denom = 1 - u;
-
-    // backend: baseMonto = (base === VENTA_ACTUAL) ? totalVentaActual : totalCosto
-    const baseMonto = base === "VENTA_ACTUAL" ? totalVentaActual : totalCosto;
-
-    // ventaObjetivo = baseMonto / (1 - u)
-    const ventaObjetivo = denom > 0 ? baseMonto / denom : null;
-
-    // k = ventaObjetivo / totalVentaActual
-    if (
-      ventaObjetivo != null &&
-      Number.isFinite(ventaObjetivo) &&
-      ventaObjetivo > 0 &&
-      totalVentaActual > 0
-    ) {
-      k = ventaObjetivo / totalVentaActual;
-    }
-  }
-
-  // 3) aplicar k a cada línea (ventaFinal) y recalcular utilidad/pct
-  const linesFinal = linesBase.map((x) => {
-    const costoTotal = Number(x.costoTotal || 0);
-    const ventaTotal = Number(x.ventaActual || 0) * (Number.isFinite(k) ? k : 1);
-    const utilidad = ventaTotal - costoTotal;
-    const pct = ventaTotal > 0 ? (utilidad / ventaTotal) * 100 : 0;
-    return { costoTotal, ventaTotal, utilidad, pct };
-  });
-
-  const totalVenta = totalVentaActual * (Number.isFinite(k) ? k : 1);
-  const utilidad = totalVenta - totalCosto;
-
-  return {
-    k,
-    total: totalVenta, // venta final
-    costo: totalCosto,
-    utilidad,
-    lines: linesFinal,
-  };
-}, [
-  detalles,
-  tipoDias,
-  hhRegistros,
-  empleados,
-  tipoItemHH,
-  utilidadPctObjetivo,
-]);
-
+  }, [
+    detalles,
+    hhRegistros,
+    empleados,
+    utilidadPctObjetivo,
+    extraCosteo,
+    findHHForEmpleado,
+  ]);
 
   const validateForm = () => {
     if (!detalles.length) return "Debes agregar al menos un ítem.";
 
     if (utilidadPctObjetivo !== "") {
       const u = Number(utilidadPctObjetivo);
-      if (!Number.isFinite(u) || u < 0) {
+      if (!Number.isFinite(u) || u < 0)
         return "% utilidad objetivo inválido (>= 0).";
-      }
-      if (u >= 100) {
-        return "% utilidad objetivo inválido (< 100).";
-      }
+      if (u >= 100) return "% utilidad objetivo inválido (< 100).";
     }
 
     for (let i = 0; i < detalles.length; i++) {
@@ -675,7 +707,6 @@ const preview = useMemo(() => {
 
         const tieneManual =
           manualPU != null && Number.isFinite(manualPU) && manualPU > 0;
-
         if (!tieneManual)
           return `Ítem #${i + 1}: En COMPRA debes ingresar un Precio Unitario manual.`;
       }
@@ -702,6 +733,10 @@ const preview = useMemo(() => {
         utilidadPctObjetivo:
           utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo),
 
+        // ✅ NUEVO: tipo día por costeo
+        isFeriado: !!isFeriado,
+        isUrgencia: !!isUrgencia,
+
         detalles: detalles.map((d) => {
           const alpha = normalizeAlphaPctUI(d.alphaPct);
 
@@ -712,6 +747,7 @@ const preview = useMemo(() => {
               cantidad: Number(d.cantidad) || 1,
               modo: "HH",
               tipoItemId: null,
+              // tipoDiaId lo dejamos por compat, pero ya no define el extra del costeo
               tipoDiaId: d.tipoDiaId || null,
               alpha,
               empleadoId: d.empleadoId || null,
@@ -787,6 +823,13 @@ const preview = useMemo(() => {
     setOrdenVentaId,
     utilidadPctObjetivo,
     setUtilidadPctObjetivo,
+
+    // ✅ NUEVO
+    isFeriado,
+    setIsFeriado,
+    isUrgencia,
+    setIsUrgencia,
+    extraCosteo,
 
     anio,
     setAnio,

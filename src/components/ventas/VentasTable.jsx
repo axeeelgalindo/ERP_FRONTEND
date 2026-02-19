@@ -19,6 +19,9 @@ function clp(v) {
 }
 
 function calcTotalVenta(venta) {
+  // ✅ si el backend ya entrega totalFinal, úsalo
+  if (venta?.totalFinal != null) return Number(venta.totalFinal) || 0;
+
   const detalles = venta?.detalles || [];
   return detalles.reduce(
     (s, d) => s + (Number(d.total ?? d.ventaTotal) || 0),
@@ -27,6 +30,9 @@ function calcTotalVenta(venta) {
 }
 
 function calcTotalCosto(venta) {
+  // ✅ si el backend ya entrega costoFinal, úsalo
+  if (venta?.costoFinal != null) return Number(venta.costoFinal) || 0;
+
   const detalles = venta?.detalles || [];
   return detalles.reduce((s, d) => s + (Number(d.costoTotal) || 0), 0);
 }
@@ -136,6 +142,17 @@ export default function VentasTable({
       </div>
     );
   }
+
+  function calcPctUtilSobreVenta(venta) {
+    const totalVenta = calcTotalVenta(venta);
+    const totalCosto = calcTotalCosto(venta);
+    const utilidad = totalVenta - totalCosto;
+
+    // %u = (venta - costo) / venta
+    return totalVenta > 0 ? (utilidad / totalVenta) * 100 : 0;
+  }
+
+  //console.log("venta:", venta.id, venta.totalFinal, venta.costoFinal, venta.extraVenta);
 
   return (
     <div>
@@ -270,13 +287,17 @@ export default function VentasTable({
             const totalVenta = calcTotalVenta(venta);
             const totalCosto = calcTotalCosto(venta);
             const pct = Number(venta?.utilidadObjetivoPct ?? 0) || 0;
+            //const pct = Number(venta?.ordenVenta?.subtotal ?? 3);
 
             const items = (venta?.detalles || []).length;
 
             const cotLabel = getCotLabel(venta);
             const cotIsReal = isCot(venta);
 
-            const pctWidth = Math.max(0, Math.min(100, pct));
+            //const pctWidth = Math.max(0, Math.min(100, pct));
+
+            const pctReal = calcPctUtilSobreVenta(venta); // ✅ real según venta/costo finales
+            const pctWidth = Math.max(0, Math.min(100, pctReal));
 
             return (
               <div
@@ -339,7 +360,7 @@ export default function VentasTable({
                         />
                       </div>
                       <span className="text-xs font-bold text-green-500 mt-1">
-                        {pct}%
+                        {pctReal.toFixed(1)}%
                       </span>
                     </div>
 

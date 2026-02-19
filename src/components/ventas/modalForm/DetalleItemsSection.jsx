@@ -58,7 +58,7 @@ export default function DetalleItemsSection({
       </Box>
 
       <Stack spacing={2}>
-        {detalles.map((det, idx) => (
+        {(detalles || []).map((det, idx) => (
           <DetalleItemCard
             key={idx}
             idx={idx}
@@ -79,7 +79,7 @@ export default function DetalleItemsSection({
             isTipoDiaEnabled={isTipoDiaEnabled}
             mes={mes}
             anio={anio}
-            previewLine={preview.lines[idx]}
+            previewLine={preview?.lines?.[idx]}
           />
         ))}
 

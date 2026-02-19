@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Typography, TextField } from "@mui/material";
+import { Box, Typography, TextField, FormControlLabel, Checkbox } from "@mui/material";
 
 export default function GeneralInfoSection({
   theme,
@@ -8,6 +8,12 @@ export default function GeneralInfoSection({
   setDescripcionVenta,
   utilidadPctObjetivo,
   setUtilidadPctObjetivo,
+
+  // ✅ NUEVO
+  isFeriado,
+  setIsFeriado,
+  isUrgencia,
+  setIsUrgencia,
 }) {
   return (
     <Box
@@ -40,7 +46,7 @@ export default function GeneralInfoSection({
         }}
       >
         <TextField
-          label="Descripción de la venta"
+          label="Descripción del costeo"
           value={descripcionVenta}
           onChange={(e) => setDescripcionVenta(e.target.value)}
           fullWidth
@@ -56,8 +62,43 @@ export default function GeneralInfoSection({
           onChange={(e) => setUtilidadPctObjetivo(e.target.value)}
           fullWidth
           inputProps={{ step: 0.1, min: 0 }}
-          helperText="Markup sobre costo con factor alpha."
+          helperText="Objetivo (no es el % real; el real se calcula con venta/costo)."
         />
+      </Box>
+
+      {/* ✅ Tipo día por costeo */}
+      <Box
+        sx={{
+          mt: 1.5,
+          display: "flex",
+          gap: 2,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={!!isFeriado}
+              onChange={(e) => setIsFeriado(e.target.checked)}
+            />
+          }
+          label="Feriado"
+        />
+
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={!!isUrgencia}
+              onChange={(e) => setIsUrgencia(e.target.checked)}
+            />
+          }
+          label="Urgencia"
+        />
+
+        <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+          Se suman 1 vez al costeo (máximo 1 feriado + 1 urgencia).
+        </Typography>
       </Box>
     </Box>
   );
