@@ -1,6 +1,12 @@
 "use client";
 
-import { Box, Typography, TextField, FormControlLabel, Checkbox } from "@mui/material";
+import {
+  Box,
+  Typography,
+  TextField,
+  FormControlLabel,
+  Checkbox,
+} from "@mui/material";
 
 export default function GeneralInfoSection({
   theme,
@@ -64,6 +70,61 @@ export default function GeneralInfoSection({
           inputProps={{ step: 0.1, min: 0 }}
           helperText="Objetivo (no es el % real; el real se calcula con venta/costo)."
         />
+      </Box>
+
+      {/* ✅ NUEVO: Fecha HH (Período) */}
+      <Box>
+        <Typography
+          sx={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: "text.secondary",
+            mb: 0.5,
+          }}
+        >
+          Fecha HH (Período)
+        </Typography>
+
+        <Box sx={{ display: "grid", gap: 0.75 }}>
+          <Box
+            component="select"
+            value={form.hhPeriodoKey}
+            onChange={(e) => form.setHhPeriodoKey(e.target.value)}
+            style={{
+              width: "100%",
+              borderRadius: 12,
+              border: "1px solid rgba(15,23,42,.12)",
+              padding: "10px 12px",
+              outline: "none",
+              fontFamily: "inherit",
+              fontSize: 13,
+              background: "#fff",
+            }}
+            disabled={form.loadingHHPeriodos}
+          >
+            <option value="">
+              {form.loadingHHPeriodos
+                ? "Cargando períodos..."
+                : "Selecciona un período HH"}
+            </option>
+
+            {form.hhPeriodos.map((p) => (
+              <option key={`${p.anio}-${p.mes}`} value={`${p.anio}-${p.mes}`}>
+                {p.nombre || `${String(p.mes).padStart(2, "0")}/${p.anio}`}
+              </option>
+            ))}
+          </Box>
+
+          {!!form.hhPeriodosErr && (
+            <Typography sx={{ fontSize: 11, color: "error.main" }}>
+              {form.hhPeriodosErr}
+            </Typography>
+          )}
+
+          <Typography sx={{ fontSize: 11, color: "text.disabled" }}>
+            Este período se usará para validar los HH del costeo.
+          </Typography>
+        </Box>
       </Box>
 
       {/* ✅ Tipo día por costeo */}

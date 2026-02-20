@@ -22,7 +22,7 @@ export default function useVentaForm({
   const [ordenVentaId, setOrdenVentaId] = useState("");
   const [utilidadPctObjetivo, setUtilidadPctObjetivo] = useState("");
 
-  // ✅ NUEVO: tipo día por costeo
+  // ✅ tipo día por costeo
   const [isFeriado, setIsFeriado] = useState(false);
   const [isUrgencia, setIsUrgencia] = useState(false);
 
@@ -43,7 +43,11 @@ export default function useVentaForm({
   const [loadingVenta, setLoadingVenta] = useState(false);
   const [ventaCargada, setVentaCargada] = useState(false);
 
-  const [periodoAuto, setPeriodoAuto] = useState({ loading: false, err: "" });
+  // ✅ NUEVO: periodos HH disponibles
+  const [hhPeriodos, setHhPeriodos] = useState([]); // [{anio,mes,nombre}]
+  const [hhPeriodoKey, setHhPeriodoKey] = useState(""); // "YYYY-M"
+  const [loadingHHPeriodos, setLoadingHHPeriodos] = useState(false);
+  const [hhPeriodosErr, setHhPeriodosErr] = useState("");
 
   const empleadoLabel = (emp) =>
     emp?.usuario?.nombre || emp?.nombre || emp?.rut || emp?.id || "Empleado";
@@ -159,7 +163,7 @@ export default function useVentaForm({
     modo: "HH",
     cantidad: 1,
     tipoItemId: "",
-    tipoDiaId: "", // (lo dejamos por compat, aunque ya no se usa para extra por costeo)
+    tipoDiaId: "",
     alphaPct: 10,
     empleadoId: "",
     compraId: "",
@@ -175,13 +179,22 @@ export default function useVentaForm({
     setUtilidadPctObjetivo("");
     setIsFeriado(false);
     setIsUrgencia(false);
+
+    // ✅ ya NO auto-seleccionamos periodo
+    setHhPeriodoKey("");
+    setHhRegistros([]);
+
     setAnio(String(d.getFullYear()));
     setMes(String(d.getMonth() + 1));
     setDetalles([emptyDet()]);
     setFormErr("");
     setCatalogosErr("");
     setVentaCargada(false);
-    setPeriodoAuto({ loading: false, err: "" });
+
+    // reset lista periodos
+    setHhPeriodos([]);
+    setHhPeriodosErr("");
+    setLoadingHHPeriodos(false);
   };
 
   const shiftYM = (anio, mes, delta) => {
@@ -190,49 +203,55 @@ export default function useVentaForm({
     return { anio: String(d.getFullYear()), mes: String(d.getMonth() + 1) };
   };
 
-  const autoPickHHPeriodo = async () => {
+  // ===========================
+  // ✅ NUEVO: cargar periodos HH disponibles (sin endpoint nuevo)
+  // ===========================
+  const loadHHPeriodos = async () => {
     if (!session?.user) return;
-    if (isEdit && ventaCargada) return;
 
     try {
-      setPeriodoAuto({ loading: true, err: "" });
+      setLoadingHHPeriodos(true);
+      setHhPeriodosErr("");
 
       const headers = makeHeaders(session, empresaIdFromToken);
 
+      // buscamos hacia atrás desde mes anterior (comportamiento típico)
       let cur = {
         anio: String(now.getFullYear()),
         mes: String(now.getMonth() + 1),
       };
       cur = shiftYM(cur.anio, cur.mes, -1);
 
+      const found = [];
+
       for (let i = 0; i < 24; i++) {
         const res = await fetch(
-          `${API_URL}/ventas/hh-empleados?anio=${cur.anio}&mes=${cur.mes}`,
+          `${API_URL}/hh/periodos?anio=${cur.anio}&mes=${cur.mes}`,
           { headers, cache: "no-store" },
         );
         const data = await safeJson(res);
         const arr = Array.isArray(data) ? data : [];
 
         if (res.ok && arr.length > 0) {
-          setAnio(cur.anio);
-          setMes(cur.mes);
-          setHhRegistros(arr);
-          setPeriodoAuto({ loading: false, err: "" });
-          return;
+          found.push({
+            anio: Number(cur.anio),
+            mes: Number(cur.mes),
+            nombre: `${String(cur.mes).padStart(2, "0")}/${cur.anio}`,
+          });
         }
 
         cur = shiftYM(cur.anio, cur.mes, -1);
       }
 
-      setPeriodoAuto({
-        loading: false,
-        err: "No se encontró HHEmpleado en los últimos 24 meses.",
-      });
+      setHhPeriodos(found);
+
+      if (!found.length) {
+        setHhPeriodosErr("No se encontró HHEmpleado en los últimos 24 meses.");
+      }
     } catch (e) {
-      setPeriodoAuto({
-        loading: false,
-        err: e?.message || "Error buscando período HH.",
-      });
+      setHhPeriodosErr(e?.message || "Error cargando períodos HH.");
+    } finally {
+      setLoadingHHPeriodos(false);
     }
   };
 
@@ -248,10 +267,7 @@ export default function useVentaForm({
       const [resTipoItems, resTipoDias, resOV] = await Promise.all([
         fetch(`${API_URL}/ventas/tipoitems`, { headers, cache: "no-store" }),
         fetch(`${API_URL}/ventas/tipodias`, { headers, cache: "no-store" }),
-        fetch(`${API_URL}/ventas/ordenes-venta`, {
-          headers,
-          cache: "no-store",
-        }),
+        fetch(`${API_URL}/ventas/ordenes-venta`, { headers, cache: "no-store" }),
       ]);
 
       const [dataTipoItems, dataTipoDias, dataOV] = await Promise.all([
@@ -268,14 +284,10 @@ export default function useVentaForm({
         );
       if (!resTipoDias.ok)
         throw new Error(
-          dataTipoDias?.error ||
-            dataTipoDias?.message ||
-            "Error cargando tipoDias",
+          dataTipoDias?.error || dataTipoDias?.message || "Error cargando tipoDias",
         );
       if (!resOV.ok)
-        throw new Error(
-          dataOV?.error || dataOV?.message || "Error cargando ordenesVenta",
-        );
+        throw new Error(dataOV?.error || dataOV?.message || "Error cargando ordenesVenta");
 
       const ti = Array.isArray(dataTipoItems) ? dataTipoItems : [];
       setTipoItems(ti);
@@ -284,10 +296,7 @@ export default function useVentaForm({
 
       const [resEmpleados, resCompraDisp] = await Promise.all([
         fetch(`${API_URL}/ventas/empleados`, { headers, cache: "no-store" }),
-        fetch(`${API_URL}/compras/disponibles-venta`, {
-          headers,
-          cache: "no-store",
-        }),
+        fetch(`${API_URL}/compras/disponibles-venta`, { headers, cache: "no-store" }),
       ]);
 
       const [dataEmpleados, dataCompraDisp] = await Promise.all([
@@ -297,16 +306,12 @@ export default function useVentaForm({
 
       if (!resEmpleados.ok)
         throw new Error(
-          dataEmpleados?.error ||
-            dataEmpleados?.message ||
-            "Error cargando empleados",
+          dataEmpleados?.error || dataEmpleados?.message || "Error cargando empleados",
         );
 
       if (!resCompraDisp.ok)
         throw new Error(
-          dataCompraDisp?.error ||
-            dataCompraDisp?.message ||
-            "Error compras disponibles",
+          dataCompraDisp?.error || dataCompraDisp?.message || "Error compras disponibles",
         );
 
       setEmpleados(Array.isArray(dataEmpleados) ? dataEmpleados : []);
@@ -333,6 +338,7 @@ export default function useVentaForm({
         setCompraItems(itemsFlat);
       }
 
+      // por defecto, si es nueva venta, set tipoItemId HH en líneas HH
       const hh =
         ti.find((t) => String(t?.codigo || "").toUpperCase() === "HH") ||
         ti.find((t) => String(t?.nombre || "").toUpperCase() === "HH") ||
@@ -355,59 +361,64 @@ export default function useVentaForm({
 
     setFormErr("");
     setCatalogosErr("");
+    setHhPeriodosErr("");
 
     if (!isEdit) resetForm();
     else setVentaCargada(false);
 
     fetchCatalogos();
+    loadHHPeriodos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // ✅ cuando el usuario elige el período HH, seteamos anio/mes y recargamos hhRegistros
   useEffect(() => {
     if (!open) return;
     if (!session?.user) return;
-    if (isEdit) return;
 
-    autoPickHHPeriodo();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, session, isEdit]);
+    if (!hhPeriodoKey) {
+      setHhRegistros([]);
+      return;
+    }
 
-  useEffect(() => {
-    if (!open) return;
-    if (!session?.user) return;
+    const [a, m] = String(hhPeriodoKey).split("-");
+    if (!a || !m) return;
+
+    const aStr = String(Number(a));
+    const mStr = String(Number(m));
+
+    setAnio(aStr);
+    setMes(mStr);
 
     (async () => {
       try {
         const headers = makeHeaders(session, empresaIdFromToken);
         const resHH = await fetch(
-          `${API_URL}/ventas/hh-empleados?anio=${anio}&mes=${mes}`,
+          `${API_URL}/hh/periodos?anio=${aStr}&mes=${mStr}`,
           { headers, cache: "no-store" },
         );
         const dataHH = await safeJson(resHH);
         if (!resHH.ok) throw new Error(dataHH?.error || "Error HHEmpleado");
         setHhRegistros(Array.isArray(dataHH) ? dataHH : []);
       } catch {
-        // silencioso
+        setHhRegistros([]);
       }
     })();
-  }, [anio, mes, open, session, empresaIdFromToken]);
+  }, [hhPeriodoKey, open, session, empresaIdFromToken]);
 
   const findHHForEmpleado = (empleadoId) => {
     if (!empleadoId) return null;
     const idStr = String(empleadoId);
 
     const byId =
-      hhRegistros.find((hh) => String(getHHEmpleadoEmpleadoId(hh)) === idStr) ||
-      null;
+      hhRegistros.find((hh) => String(getHHEmpleadoEmpleadoId(hh)) === idStr) || null;
     if (byId) return byId;
 
     const emp = empleados.find((e) => String(e.id) === idStr);
     const empRut = normalizeRut(getEmpleadoRut(emp));
     if (!empRut) return null;
 
-    return (
-      hhRegistros.find((hh) => normalizeRut(getHHRut(hh)) === empRut) || null
-    );
+    return hhRegistros.find((hh) => normalizeRut(getHHRut(hh)) === empRut) || null;
   };
 
   const loadVentaToEdit = async () => {
@@ -424,30 +435,31 @@ export default function useVentaForm({
       });
       const data = await safeJson(res);
 
-      if (!res.ok)
-        throw new Error(data?.error || data?.message || "Error cargando venta");
+      if (!res.ok) throw new Error(data?.error || data?.message || "Error cargando venta");
 
       setDescripcionVenta(data?.descripcion || "");
       setOrdenVentaId(data?.ordenVentaId || "");
 
-      // ✅ NUEVO: cabecera
       setIsFeriado(!!data?.isFeriado);
       setIsUrgencia(!!data?.isUrgencia);
 
       if (data?.utilidadObjetivoPct != null) {
         const utilidadNum = Number(data.utilidadObjetivoPct);
-        setUtilidadPctObjetivo(
-          Number.isFinite(utilidadNum) ? String(utilidadNum) : "",
-        );
+        setUtilidadPctObjetivo(Number.isFinite(utilidadNum) ? String(utilidadNum) : "");
       } else {
         setUtilidadPctObjetivo("");
       }
 
-      const anyHH = (data?.detalles || []).find(
-        (d) => d?.modo === "HH" && d?.hhEmpleado,
-      );
-      if (anyHH?.hhEmpleado?.anio) setAnio(String(anyHH.hhEmpleado.anio));
-      if (anyHH?.hhEmpleado?.mes) setMes(String(anyHH.hhEmpleado.mes));
+      // inferir periodo desde el primer HH
+      const anyHH = (data?.detalles || []).find((d) => d?.modo === "HH" && d?.hhEmpleado);
+      const editAnio = anyHH?.hhEmpleado?.anio ? String(anyHH.hhEmpleado.anio) : "";
+      const editMes = anyHH?.hhEmpleado?.mes ? String(anyHH.hhEmpleado.mes) : "";
+
+      if (editAnio && editMes) {
+        setAnio(editAnio);
+        setMes(editMes);
+        setHhPeriodoKey(`${Number(editAnio)}-${Number(editMes)}`); // ✅ selecciona en el select
+      }
 
       const hhTipoItem = tipoItems.find(
         (t) =>
@@ -464,7 +476,7 @@ export default function useVentaForm({
             modo: "HH",
             cantidad: Number(d?.cantidad) || 1,
             tipoItemId: hhTipoItem?.id || "",
-            tipoDiaId: d?.tipoDiaId || "", // compat
+            tipoDiaId: d?.tipoDiaId || "",
             alphaPct: d?.alpha == null ? 10 : Number(d.alpha),
             empleadoId: d?.empleadoId || "",
             compraId: "",
@@ -483,7 +495,7 @@ export default function useVentaForm({
           modo: "COMPRA",
           cantidad: Number(d?.cantidad) || 1,
           tipoItemId: d?.tipoItemId || "",
-          tipoDiaId: d?.tipoDiaId || "", // compat
+          tipoDiaId: d?.tipoDiaId || "",
           alphaPct: d?.alpha == null ? 10 : Number(d.alpha),
           empleadoId: "",
           compraId: d?.compraId || "",
@@ -517,8 +529,7 @@ export default function useVentaForm({
     if (tipoItemHH?.id) {
       setDetalles((prev) =>
         prev.map((det) => {
-          if (det.modo === "HH" && !det.tipoItemId)
-            return { ...det, tipoItemId: tipoItemHH.id };
+          if (det.modo === "HH" && !det.tipoItemId) return { ...det, tipoItemId: tipoItemHH.id };
           return det;
         }),
       );
@@ -539,13 +550,9 @@ export default function useVentaForm({
   };
 
   const addDetalle = () =>
-    setDetalles((prev) => [
-      ...prev,
-      { ...emptyDet(), tipoItemId: tipoItemHH?.id || "" },
-    ]);
+    setDetalles((prev) => [...prev, { ...emptyDet(), tipoItemId: tipoItemHH?.id || "" }]);
 
-  const removeDetalle = (idx) =>
-    setDetalles((prev) => prev.filter((_, i) => i !== idx));
+  const removeDetalle = (idx) => setDetalles((prev) => prev.filter((_, i) => i !== idx));
 
   // ===========================
   // ✅ EXTRA POR COSTEO (1 vez)
@@ -567,10 +574,8 @@ export default function useVentaForm({
   }, [tipoDias, isFeriado, isUrgencia]);
 
   const preview = useMemo(() => {
-    // 1) calculo por ítem (BASE, sin extraCosteo)
     const linesBase = (detalles || []).map((d) => {
       const cantidad = Number(d?.cantidad) || 1;
-
       const alphaPct = normalizeAlphaPctUI(d?.alphaPct);
       const alphaMult = 1 + alphaPct / 100;
 
@@ -588,29 +593,23 @@ export default function useVentaForm({
       }
 
       const costoBase = costoSinAlpha * alphaMult;
-      const ventaBaseActual = costoBase; // base venta actual antes de k
+      const ventaBaseActual = costoBase;
 
       return { costoBase, ventaBaseActual };
     });
 
-    const totalCostoBase = linesBase.reduce(
-      (acc, x) => acc + (Number(x.costoBase) || 0),
-      0,
-    );
+    const totalCostoBase = linesBase.reduce((acc, x) => acc + (Number(x.costoBase) || 0), 0);
     const totalVentaActualBase = linesBase.reduce(
       (acc, x) => acc + (Number(x.ventaBaseActual) || 0),
       0,
     );
 
-    // 2) calcular k por margen sobre venta (SOLO BASE)
-    const uPct =
-      utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo);
+    const uPct = utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo);
     let k = 1;
 
     if (uPct != null && Number.isFinite(uPct) && uPct >= 0) {
       const u = uPct / 100;
       const denom = 1 - u;
-
       const ventaObjetivoBase = denom > 0 ? totalVentaActualBase / denom : null;
 
       if (
@@ -625,20 +624,15 @@ export default function useVentaForm({
 
     const kk = Number.isFinite(k) ? k : 1;
 
-    // 3) líneas finales por ítem (con k, sin extraCosteo)
     const lines = linesBase.map((x) => {
       const costoTotal = Number(x.costoBase) || 0;
       const ventaTotal = (Number(x.ventaBaseActual) || 0) * kk;
-
       const utilidad = ventaTotal - costoTotal;
       const pct = ventaTotal > 0 ? (utilidad / ventaTotal) * 100 : 0;
-
       return { costoTotal, ventaTotal, utilidad, pct };
     });
 
-    // 4) totales (sumando extraCosteo SOLO 1 VEZ)
     const totalVentaBaseFinal = totalVentaActualBase * kk;
-
     const extra = Number(extraCosteo || 0);
 
     const totalCostoFinal = totalCostoBase + extra;
@@ -649,37 +643,27 @@ export default function useVentaForm({
 
     return {
       k: kk,
-
-      // ✅ totales finales incluyen extra 1 vez
       total: totalVentaFinal,
       costo: totalCostoFinal,
       utilidad,
       pct,
-
-      // ✅ subtotal por ítem vuelve
       lines,
-
-      // extras informativos
       extraCosteo: extra,
       baseVenta: totalVentaBaseFinal,
       baseCosto: totalCostoBase,
     };
-  }, [
-    detalles,
-    hhRegistros,
-    empleados,
-    utilidadPctObjetivo,
-    extraCosteo,
-    findHHForEmpleado,
-  ]);
+  }, [detalles, empleados, utilidadPctObjetivo, extraCosteo, findHHForEmpleado]);
 
   const validateForm = () => {
     if (!detalles.length) return "Debes agregar al menos un ítem.";
 
+    // ✅ si hay HH en el costeo, exige periodo seleccionado
+    const hasHH = detalles.some((d) => d?.modo === "HH");
+    if (hasHH && !hhPeriodoKey) return "Selecciona la Fecha HH (Período).";
+
     if (utilidadPctObjetivo !== "") {
       const u = Number(utilidadPctObjetivo);
-      if (!Number.isFinite(u) || u < 0)
-        return "% utilidad objetivo inválido (>= 0).";
+      if (!Number.isFinite(u) || u < 0) return "% utilidad objetivo inválido (>= 0).";
       if (u >= 100) return "% utilidad objetivo inválido (< 100).";
     }
 
@@ -697,8 +681,7 @@ export default function useVentaForm({
       if (d.modo === "HH") {
         if (!d.empleadoId) return `Ítem #${i + 1}: Selecciona empleado.`;
         const hh = findHHForEmpleado(d.empleadoId);
-        if (!hh)
-          return `Ítem #${i + 1}: Falta HH del período para este empleado (${mes}/${anio}).`;
+        if (!hh) return `Ítem #${i + 1}: Falta HH del período para este empleado.`;
       } else {
         if (!d.tipoItemId) return `Ítem #${i + 1}: Selecciona Tipo ítem.`;
 
@@ -730,10 +713,8 @@ export default function useVentaForm({
         ordenVentaId: ordenVentaId || null,
         descripcion: descripcionVenta || null,
         utilidadObjetivoBase: "VENTA_ACTUAL",
-        utilidadPctObjetivo:
-          utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo),
+        utilidadPctObjetivo: utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo),
 
-        // ✅ NUEVO: tipo día por costeo
         isFeriado: !!isFeriado,
         isUrgencia: !!isUrgencia,
 
@@ -747,7 +728,6 @@ export default function useVentaForm({
               cantidad: Number(d.cantidad) || 1,
               modo: "HH",
               tipoItemId: null,
-              // tipoDiaId lo dejamos por compat, pero ya no define el extra del costeo
               tipoDiaId: d.tipoDiaId || null,
               alpha,
               empleadoId: d.empleadoId || null,
@@ -776,9 +756,7 @@ export default function useVentaForm({
         }),
       };
 
-      const url = isEdit
-        ? `${API_URL}/ventas/${ventaId}`
-        : `${API_URL}/ventas/add`;
+      const url = isEdit ? `${API_URL}/ventas/${ventaId}` : `${API_URL}/ventas/add`;
       const method = isEdit ? "PUT" : "POST";
 
       const res = await fetch(url, {
@@ -791,10 +769,7 @@ export default function useVentaForm({
       if (!res.ok) {
         console.log("❌ save venta error", res.status, data, payload);
         throw new Error(
-          data?.detalle ||
-            data?.error ||
-            data?.message ||
-            "Error al guardar venta",
+          data?.detalle || data?.error || data?.message || "Error al guardar venta",
         );
       }
 
@@ -824,12 +799,18 @@ export default function useVentaForm({
     utilidadPctObjetivo,
     setUtilidadPctObjetivo,
 
-    // ✅ NUEVO
     isFeriado,
     setIsFeriado,
     isUrgencia,
     setIsUrgencia,
     extraCosteo,
+
+    // ✅ periodos HH
+    hhPeriodos,
+    hhPeriodoKey,
+    setHhPeriodoKey,
+    loadingHHPeriodos,
+    hhPeriodosErr,
 
     anio,
     setAnio,
@@ -846,8 +827,6 @@ export default function useVentaForm({
     loadingCatalogos,
     catalogosErr,
     loadingVenta,
-
-    periodoAuto,
 
     tipoItemHH,
 

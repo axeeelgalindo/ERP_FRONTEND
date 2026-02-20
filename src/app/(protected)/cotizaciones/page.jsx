@@ -1,20 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Box } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
-import useMediaQuery from "@mui/material/useMediaQuery";
 
 import { makeHeaders } from "@/lib/api";
-import CotizacionesHeader from "@/components/cotizaciones/CotizacionesHeader";
-import CotizacionesDesktopTable from "@/components/cotizaciones/CotizacionesDesktopTable";
-import CotizacionesMobileCards from "@/components/cotizaciones/CotizacionesMobileCards";
+
+// ✅ Mantén tus dialogs actuales
+import EditCotizacionDialog from "@/components/cotizaciones/EditCotizacionDialog";
+import ImportCotizacionPdfDialog from "@/components/cotizaciones/ImportCotizacionPdfDialog";
 import CotizacionesSnack from "@/components/cotizaciones/CotizacionesSnack";
 import CotizacionesState from "@/components/cotizaciones/CotizacionesState";
-import EditCotizacionDialog from "@/components/cotizaciones/EditCotizacionDialog";
 
-import ImportCotizacionPdfDialog from "@/components/cotizaciones/ImportCotizacionPdfDialog";
+// ✅ Nuevos componentes (los creas abajo)
+import CotizacionesTableLight from "@/components/cotizaciones/CotizacionesTableLight";
+import CotizacionDrawerLight from "@/components/cotizaciones/CotizacionDrawerLight";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -28,8 +27,6 @@ async function safeJson(res) {
 
 export default function CotizacionesPage() {
   const { data: session, status } = useSession();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   const [cotizaciones, setCotizaciones] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -37,15 +34,19 @@ export default function CotizacionesPage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
-  const [expandedId, setExpandedId] = useState(null);
+  // UI: drawer + seleccion
+  const [openDrawer, setOpenDrawer] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
 
+  // UI: search (solo frontend)
+  const [q, setQ] = useState("");
+
+  // Dialogs
   const [openEdit, setOpenEdit] = useState(false);
   const [editingId, setEditingId] = useState(null);
-
-  // Modal import pdf
   const [openImport, setOpenImport] = useState(false);
 
-  // Snackbar
+  // Snackbar (mantienes tu snack MUI)
   const [snack, setSnack] = useState({
     open: false,
     severity: "success",
@@ -59,12 +60,11 @@ export default function CotizacionesPage() {
     if (reason === "clickaway") return;
     setSnack((s) => ({ ...s, open: false }));
   };
+
   const openEditCot = (id) => {
     setEditingId(id);
     setOpenEdit(true);
   };
-  const toggleExpanded = (id) =>
-    setExpandedId((prev) => (prev === id ? null : id));
 
   const fetchCotizaciones = async () => {
     if (!session) return;
@@ -118,7 +118,7 @@ export default function CotizacionesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
-  // ✅ IMPORTANTE: ahora soporta "extra"
+  // ✅ IMPORTANTE: tu updateEstado (igual)
   const updateEstado = async (cotizacionId, estado, extra = {}) => {
     try {
       const res = await fetch(
@@ -154,51 +154,123 @@ export default function CotizacionesPage() {
     }
   };
 
+  // Selección actual para el drawer
+  const selected = useMemo(
+    () => cotizaciones.find((c) => c.id === selectedId) || null,
+    [cotizaciones, selectedId],
+  );
+
+  // Filtro local (cliente / id / estado / numero)
+  const filtered = useMemo(() => {
+    const qq = q.trim().toLowerCase();
+    if (!qq) return cotizaciones;
+
+    return (cotizaciones || []).filter((c) => {
+      const cliente = String(c?.cliente?.nombre || "").toLowerCase();
+      const id = String(c?.id || "").toLowerCase();
+      const estado = String(c?.estado || "").toLowerCase();
+      const numero = String(c?.numero ?? "").toLowerCase();
+      return (
+        cliente.includes(qq) ||
+        id.includes(qq) ||
+        estado.includes(qq) ||
+        numero.includes(qq)
+      );
+    });
+  }, [cotizaciones, q]);
+
   const stateUI = (
     <CotizacionesState status={status} loading={loading} err={err} />
   );
   if (status !== "authenticated") return stateUI;
 
   return (
-    <Box sx={{ maxWidth: "3xl", mx: "auto", p: { xs: 2, md: 3 } }}>
-      <CotizacionesHeader loading={loading} onRefresh={fetchCotizaciones} />
+    <div className="bg-slate-50 min-h-[calc(100vh-0px)]">
+      {/* Header como el ejemplo */}
+      <div className="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-6 md:px-8">
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-bold">Cotizaciones</h2>
+        </div>
 
-      <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2, mb: 2 }}>
-        <button
-          onClick={() => setOpenImport(true)}
-          className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-        >
-          Importar PDF
-        </button>
-      </Box>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={fetchCotizaciones}
+            className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
+          >
+            <span className="text-lg">⟳</span> Actualizar
+          </button>
 
-      <CotizacionesState
-        status={status}
-        loading={loading}
-        err={err}
-        empty={!loading && !cotizaciones.length && !err}
+          <button
+            onClick={() => setOpenImport(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors"
+          >
+            <span className="text-lg">⬆</span> Importar PDF
+          </button>
+        </div>
+      </div>
+
+      {/* Contenido */}
+      <div className="p-6 md:p-8">
+        <p className="text-slate-500 mb-6">
+          Gestiona estados, revisa detalle y exporta a PDF de manera centralizada.
+        </p>
+
+        {/* Toolbar búsqueda + filtros */}
+        <div className="mb-6 flex flex-wrap items-center gap-4">
+          <div className="relative flex-1 min-w-[260px]">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              🔎
+            </span>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all"
+              placeholder="Buscar por cliente, ID o estado..."
+              type="text"
+            />
+          </div>
+
+          <button
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium hover:bg-slate-50"
+            title="(Pendiente) conectar filtros reales"
+            onClick={() => showSnack("info", "Filtros: pendiente de conectar")}
+          >
+            <span className="text-lg">⏷</span> Filtros
+          </button>
+        </div>
+
+        {/* Estado general (loading/error/empty) */}
+        <CotizacionesState
+          status={status}
+          loading={loading}
+          err={err}
+          empty={!loading && !filtered.length && !err}
+        />
+
+        {/* Tabla */}
+        {!loading && filtered.length > 0 && (
+          <CotizacionesTableLight
+            cotizaciones={filtered}
+            onRowClick={(cot) => {
+              setSelectedId(cot.id);
+              setOpenDrawer(true);
+            }}
+            onEdit={(id) => openEditCot(id)}
+          />
+        )}
+      </div>
+
+      {/* Drawer + Overlay */}
+      <CotizacionDrawerLight
+        open={openDrawer}
+        cotizacion={selected}
+        onClose={() => setOpenDrawer(false)}
+        onEdit={(id) => openEditCot(id)}
+        onUpdateEstado={updateEstado}
+        showSnack={showSnack}
       />
 
-      {!loading && cotizaciones.length > 0 && !isMobile && (
-        <CotizacionesDesktopTable
-          cotizaciones={cotizaciones}
-          expandedId={expandedId}
-          onToggleExpanded={toggleExpanded}
-          onUpdateEstado={updateEstado}
-          onEditCotizacion={openEditCot}
-        />
-      )}
-
-      {!loading && cotizaciones.length > 0 && isMobile && (
-        <CotizacionesMobileCards
-          cotizaciones={cotizaciones}
-          expandedId={expandedId}
-          onToggleExpanded={toggleExpanded}
-          onUpdateEstado={updateEstado}
-          onEditCotizacion={openEditCot}
-        />
-      )}
-
+      {/* Dialogs que ya tienes */}
       <ImportCotizacionPdfDialog
         open={openImport}
         onClose={() => setOpenImport(false)}
@@ -221,6 +293,6 @@ export default function CotizacionesPage() {
       />
 
       <CotizacionesSnack snack={snack} onClose={closeSnack} />
-    </Box>
+    </div>
   );
 }

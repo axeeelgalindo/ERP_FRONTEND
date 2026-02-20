@@ -210,6 +210,7 @@ export default function GeneralInfoSticky({
               {pct}%
             </Typography>
           </Box>
+          
 
           <Typography sx={{ fontWeight: 900, color: "success.main" }}>
             {formatCLP(preview?.utilidad || 0)}
