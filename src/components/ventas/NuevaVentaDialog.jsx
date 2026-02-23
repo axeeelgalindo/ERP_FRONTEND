@@ -245,6 +245,7 @@ export default function NuevaVentaDialog({
                         %
                       </Box>
                     </Box>
+                    
 
                     <Typography
                       sx={{

@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Button, MenuItem, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, MenuItem, TextField, Typography } from "@mui/material";
 import PersonAddAltIcon from "@mui/icons-material/PersonAddAlt";
 
 export default function StepClienteOferta({
@@ -8,7 +8,6 @@ export default function StepClienteOferta({
   clienteId,
   setClienteId,
 
-  // ✅ NUEVO (vienen desde el padre)
   responsables = [],
   loadingResp = false,
 
@@ -19,6 +18,16 @@ export default function StepClienteOferta({
   setAsunto,
   vigenciaDias,
   setVigenciaDias,
+
+  // ✅ descuento general
+  descuentoPct,
+  setDescuentoPct,
+
+  // ✅ NUEVO: flags desde el padre
+  hasGlosaDiscount = false,     // true si alguna glosa tiene descuento > 0
+  conflict = false,            // true si hay general y glosas al mismo tiempo
+  conflictMsg = "",
+
   ventasDisponibles,
   ventaIds,
   setVentaIds,
@@ -29,13 +38,20 @@ export default function StepClienteOferta({
   const helperResp = !clienteId
     ? "Selecciona un cliente para ver sus responsables."
     : loadingResp
-      ? "Cargando responsables..."
-      : listResponsables.length
-        ? "Selecciona el contacto responsable."
-        : "Este cliente no tiene responsables registrados.";
+    ? "Cargando responsables..."
+    : listResponsables.length
+    ? "Selecciona el contacto responsable."
+    : "Este cliente no tiene responsables registrados.";
 
   return (
     <Box sx={{ display: "grid", gap: 3 }}>
+      {/* ✅ alerta de conflicto */}
+      {conflict ? (
+        <Alert severity="error">
+          {conflictMsg || "No puedes usar descuento general y por glosas a la vez."}
+        </Alert>
+      ) : null}
+
       {/* Cliente */}
       <Box
         sx={{
@@ -74,7 +90,7 @@ export default function StepClienteOferta({
         ))}
       </TextField>
 
-      {/* ✅ Responsable del cliente */}
+      {/* Responsable del cliente */}
       <Box>
         <Typography sx={{ fontSize: 14, fontWeight: 900, mb: 1 }}>
           Responsable del cliente
@@ -93,10 +109,10 @@ export default function StepClienteOferta({
             {!clienteId
               ? "Selecciona cliente primero"
               : loadingResp
-                ? "Cargando..."
-                : listResponsables.length
-                  ? "Seleccionar responsable..."
-                  : "Sin responsables"}
+              ? "Cargando..."
+              : listResponsables.length
+              ? "Seleccionar responsable..."
+              : "Sin responsables"}
           </MenuItem>
 
           {listResponsables.map((r) => (
@@ -178,7 +194,37 @@ export default function StepClienteOferta({
             />
           </Box>
 
+          {/* ✅ Descuento general */}
           <Box>
+            <Typography
+              sx={{
+                fontSize: 11,
+                fontWeight: 1000,
+                color: "text.secondary",
+                letterSpacing: ".12em",
+                textTransform: "uppercase",
+                mb: 1,
+              }}
+            >
+              Descuento (%)
+            </Typography>
+            <TextField
+              size="small"
+              type="number"
+              value={descuentoPct}
+              onChange={(e) => setDescuentoPct(e.target.value)}
+              fullWidth
+              inputProps={{ min: 0, max: 99.99, step: 0.1 }}
+              disabled={hasGlosaDiscount} // ✅ bloqueo si ya hay descuento por glosa
+              helperText={
+                hasGlosaDiscount
+                  ? "Deshabilitado: ya tienes descuento por glosa."
+                  : "Aplica sobre el subtotal neto de glosas (antes de IVA)"
+              }
+            />
+          </Box>
+
+          <Box sx={{ gridColumn: { xs: "1 / -1", md: "1 / -1" } }}>
             <Typography
               sx={{
                 fontSize: 11,

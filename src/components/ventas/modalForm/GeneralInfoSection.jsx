@@ -15,11 +15,18 @@ export default function GeneralInfoSection({
   utilidadPctObjetivo,
   setUtilidadPctObjetivo,
 
-  // ✅ NUEVO
+  // ✅ NUEVO: descuento general
+  descuentoPct,
+  setDescuentoPct,
+
+  // ✅ flags por costeo
   isFeriado,
   setIsFeriado,
   isUrgencia,
   setIsUrgencia,
+
+  // ✅ si estás usando "form" adentro, necesitas pasarlo
+  form,
 }) {
   return (
     <Box
@@ -47,7 +54,7 @@ export default function GeneralInfoSection({
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "2fr 1fr" },
+          gridTemplateColumns: { xs: "1fr", md: "2fr 1fr 1fr" },
           gap: 2,
         }}
       >
@@ -67,13 +74,25 @@ export default function GeneralInfoSection({
           value={utilidadPctObjetivo}
           onChange={(e) => setUtilidadPctObjetivo(e.target.value)}
           fullWidth
-          inputProps={{ step: 0.1, min: 0 }}
+          inputProps={{ step: 0.1, min: 0, max: 99.99 }}
           helperText="Objetivo (no es el % real; el real se calcula con venta/costo)."
+        />
+
+        {/* ✅ NUEVO: Descuento general */}
+        <TextField
+          label="% Descuento general"
+          size="small"
+          type="number"
+          value={descuentoPct}
+          onChange={(e) => setDescuentoPct(e.target.value)}
+          fullWidth
+          inputProps={{ step: 0.1, min: 0, max: 99.99 }}
+          helperText="Se aplica a toda la venta (post-utilidad objetivo)."
         />
       </Box>
 
-      {/* ✅ NUEVO: Fecha HH (Período) */}
-      <Box>
+      {/* ✅ Fecha HH (Período) */}
+      <Box sx={{ mt: 2 }}>
         <Typography
           sx={{
             fontSize: 12,

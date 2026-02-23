@@ -25,8 +25,17 @@ function calcTotalVenta(v) {
   );
 }
 
-function distributeGlosas(glosas, subtotalNeto) {
-  const t = round0(subtotalNeto);
+const clampPct = (v) => {
+  if (v === "" || v == null) return 0;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  if (n >= 100) return 99.99;
+  return n;
+};
+
+// Distribuye MONTOS BRUTOS para cuadrar con subtotalBase (ventas)
+function distributeGlosasBrutas(glosas, subtotalBase) {
+  const t = round0(subtotalBase);
 
   const manualSum = glosas.reduce(
     (acc, g) => acc + (g.manual ? round0(g.monto || 0) : 0),
@@ -36,9 +45,9 @@ function distributeGlosas(glosas, subtotalNeto) {
   if (manualSum > t) {
     return {
       glosas,
-      error: `La suma manual (${formatCLP(
-        manualSum
-      )}) supera el subtotal (${formatCLP(t)}).`,
+      error: `La suma manual (${formatCLP(manualSum)}) supera el subtotal base (${formatCLP(
+        t
+      )}).`,
     };
   }
 
@@ -50,7 +59,7 @@ function distributeGlosas(glosas, subtotalNeto) {
     if (manualSum !== t) {
       return {
         glosas,
-        error: `Falta cuadrar el subtotal: manual ${formatCLP(
+        error: `Falta cuadrar el subtotal base: manual ${formatCLP(
           manualSum
         )} vs subtotal ${formatCLP(t)}.`,
       };
@@ -122,7 +131,6 @@ export default function CotizacionFromVentasDialog({
   const [clientes, setClientes] = useState([]);
   const [clienteId, setClienteId] = useState("");
 
-  // ✅ responsables vienen por endpoint /clientes/:id/responsables
   const [responsables, setResponsables] = useState([]);
   const [loadingResp, setLoadingResp] = useState(false);
   const [responsableId, setResponsableId] = useState("");
@@ -131,14 +139,20 @@ export default function CotizacionFromVentasDialog({
   const [terminos, setTerminos] = useState("");
   const [acuerdoPago, setAcuerdoPago] = useState("");
   const [vigenciaDias, setVigenciaDias] = useState(15);
+
   const [ventaIds, setVentaIds] = useState([]);
+
+  // ✅ descuento general cotización
+  const [descuentoPct, setDescuentoPct] = useState("");
 
   const emptyGlosa = () => ({
     descripcion: "",
-    monto: 0,
+    monto: 0, // BRUTO
     manual: false,
     orden: 0,
+    descuento_pct: 0, // descuento por glosa
   });
+
   const [glosas, setGlosas] = useState([emptyGlosa()]);
   const [glosaErr, setGlosaErr] = useState("");
 
@@ -156,6 +170,8 @@ export default function CotizacionFromVentasDialog({
     setVigenciaDias(15);
 
     setVentaIds(preselectedVentaIds?.length ? preselectedVentaIds : []);
+    setDescuentoPct("");
+
     setGlosas([emptyGlosa()]);
     setGlosaErr("");
   }, [open, preselectedVentaIds]);
@@ -165,7 +181,8 @@ export default function CotizacionFromVentasDialog({
     [ventas]
   );
 
-  const subtotalNeto = useMemo(() => {
+  // ✅ subtotal BASE desde ventas (sin descuentos)
+  const subtotalBase = useMemo(() => {
     if (!ventasDisponibles.length || !ventaIds.length) return 0;
     const setIds = new Set(ventaIds.map(String));
     return round0(
@@ -175,33 +192,95 @@ export default function CotizacionFromVentasDialog({
     );
   }, [ventasDisponibles, ventaIds]);
 
-  const iva = useMemo(
-    () => round0(subtotalNeto * Number(ivaRate || 0)),
-    [subtotalNeto, ivaRate]
-  );
-  const totalFinal = useMemo(() => round0(subtotalNeto + iva), [subtotalNeto, iva]);
+  // ✅ subtotal neto de glosas aplicando descuento por glosa
+  const subtotalNetoGlosas = useMemo(() => {
+    return round0(
+      (glosas || []).reduce((acc, g) => {
+        const bruto = round0(g.monto || 0);
+        const d = clampPct(g.descuento_pct);
+        const neto = round0(bruto * (1 - d / 100));
+        return acc + neto;
+      }, 0)
+    );
+  }, [glosas]);
 
-  const sumGlosas = useMemo(
-    () => glosas.reduce((acc, g) => acc + round0(g.monto || 0), 0),
+  // ✅ aplicar descuento general al subtotal neto glosas
+  const subtotalFinal = useMemo(() => {
+    const dG = clampPct(descuentoPct);
+    return round0(subtotalNetoGlosas * (1 - dG / 100));
+  }, [subtotalNetoGlosas, descuentoPct]);
+
+  const iva = useMemo(
+    () => round0(subtotalFinal * Number(ivaRate || 0)),
+    [subtotalFinal, ivaRate]
+  );
+
+  const totalFinal = useMemo(
+    () => round0(subtotalFinal + iva),
+    [subtotalFinal, iva]
+  );
+
+  // ✅ suma BRUTA glosas (debe cuadrar con subtotalBase)
+  const sumGlosasBrutas = useMemo(
+    () => round0(glosas.reduce((acc, g) => acc + round0(g.monto || 0), 0)),
     [glosas]
   );
 
-  const okCuadra = !glosaErr && subtotalNeto > 0 && sumGlosas === subtotalNeto;
+  const okCuadra = !glosaErr && subtotalBase > 0 && sumGlosasBrutas === subtotalBase;
 
+  // =========================================================
+  // ✅ REGLA: NO SE PUEDE DESCUENTO GENERAL + DESCUENTO GLOSA
+  // =========================================================
+  const hasGeneralDiscount = useMemo(() => {
+    const n = Number(descuentoPct);
+    return Number.isFinite(n) && n > 0;
+  }, [descuentoPct]);
+
+  const hasGlosaDiscount = useMemo(() => {
+    return (glosas || []).some((g) => Number(g?.descuento_pct || 0) > 0);
+  }, [glosas]);
+
+  const conflict = hasGeneralDiscount && hasGlosaDiscount;
+
+  const conflictMsg =
+    "No puedes usar descuento general y descuento por glosa al mismo tiempo. " +
+    "Deja solo uno (general o por glosas).";
+
+  // Si hay descuento general, resetea descuentos por glosa
+  useEffect(() => {
+    if (!hasGeneralDiscount) return;
+    setGlosas((prev) =>
+      prev.map((g) => ({
+        ...g,
+        descuento_pct: 0,
+      }))
+    );
+  }, [hasGeneralDiscount]);
+
+  // Si hay descuento por glosa, resetea descuento general
+  useEffect(() => {
+    if (!hasGlosaDiscount) return;
+    if (descuentoPct !== "" && Number(descuentoPct) > 0) {
+      setDescuentoPct("");
+    }
+  }, [hasGlosaDiscount, descuentoPct]);
+
+  // Auto-distribuir glosas BRUTAS para cuadrar con subtotalBase
   useEffect(() => {
     if (!open) return;
     setGlosas((prev) => {
-      const { glosas: dist, error } = distributeGlosas(prev, subtotalNeto);
+      const { glosas: dist, error } = distributeGlosasBrutas(prev, subtotalBase);
       setGlosaErr(error);
       return dist;
     });
-  }, [subtotalNeto, open]);
+  }, [subtotalBase, open]);
 
   const setGlosa = (idx, patch) => {
     setGlosas((prev) => {
       const next = [...prev];
       next[idx] = { ...next[idx], ...patch, orden: idx };
 
+      // monto bruto => marca manual
       if (patch.monto !== undefined) {
         const raw = patch.monto;
         const hasValue = String(raw ?? "").trim() !== "";
@@ -209,7 +288,12 @@ export default function CotizacionFromVentasDialog({
         next[idx].monto = hasValue ? round0(raw) : 0;
       }
 
-      const { glosas: dist, error } = distributeGlosas(next, subtotalNeto);
+      // descuento por glosa
+      if (patch.descuento_pct !== undefined) {
+        next[idx].descuento_pct = clampPct(patch.descuento_pct);
+      }
+
+      const { glosas: dist, error } = distributeGlosasBrutas(next, subtotalBase);
       setGlosaErr(error);
       return dist;
     });
@@ -218,7 +302,7 @@ export default function CotizacionFromVentasDialog({
   const addGlosa = () => {
     setGlosas((prev) => {
       const next = [...prev, emptyGlosa()].map((g, i) => ({ ...g, orden: i }));
-      const { glosas: dist, error } = distributeGlosas(next, subtotalNeto);
+      const { glosas: dist, error } = distributeGlosasBrutas(next, subtotalBase);
       setGlosaErr(error);
       return dist;
     });
@@ -231,7 +315,7 @@ export default function CotizacionFromVentasDialog({
         ...g,
         orden: i,
       }));
-      const { glosas: dist, error } = distributeGlosas(next, subtotalNeto);
+      const { glosas: dist, error } = distributeGlosasBrutas(next, subtotalBase);
       setGlosaErr(error);
       return dist;
     });
@@ -269,7 +353,10 @@ export default function CotizacionFromVentasDialog({
 
         if (!resCli.ok) {
           throw new Error(
-            jsonCli?.detalle || jsonCli?.error || jsonCli?.message || "Error al cargar clientes"
+            jsonCli?.detalle ||
+              jsonCli?.error ||
+              jsonCli?.message ||
+              "Error al cargar clientes"
           );
         }
 
@@ -289,19 +376,17 @@ export default function CotizacionFromVentasDialog({
   }, [open, session, empresaIdFromToken]);
 
   // =========================
-  // ✅ cargar responsables cuando cambia cliente
+  // cargar responsables
   // =========================
   useEffect(() => {
     if (!open) return;
 
-    // reset
     setResponsables([]);
     setResponsableId("");
 
     if (!clienteId) return;
 
     const { headers, token, empresaId } = buildAuthHeaders(session, empresaIdFromToken);
-
     if (!session?.user || !token || !empresaId) return;
 
     (async () => {
@@ -342,14 +427,20 @@ export default function CotizacionFromVentasDialog({
     if (!token) return "Falta accessToken en sesión (Authorization).";
     if (!empresaId) return "Falta empresaId para header x-empresa-id.";
     if (!clienteId) return "Debes seleccionar un cliente.";
-    if (!responsableId) return "Debes seleccionar un responsable del cliente.";
+    // if (!responsableId) return "Debes seleccionar un responsable del cliente.";
     if (!ventaIds.length) return "Debes seleccionar al menos 1 venta.";
-    if (!subtotalNeto || subtotalNeto <= 0)
-      return "El subtotal neto es 0. Revisa ventas seleccionadas.";
+    if (!subtotalBase || subtotalBase <= 0)
+      return "El subtotal base es 0. Revisa ventas seleccionadas.";
 
     const vd = normalizeVigenciaDias(vigenciaDias);
     if (!Number.isFinite(vd) || vd < 1 || vd > 365)
       return "Vigencia debe estar entre 1 y 365 días.";
+
+    if (descuentoPct !== "") {
+      const d = Number(descuentoPct);
+      if (!Number.isFinite(d) || d < 0) return "Descuento inválido (>= 0).";
+      if (d >= 100) return "Descuento inválido (< 100).";
+    }
 
     return "";
   };
@@ -358,10 +449,15 @@ export default function CotizacionFromVentasDialog({
     for (let i = 0; i < glosas.length; i++) {
       if (!String(glosas[i].descripcion || "").trim())
         return `Glosa #${i + 1}: Falta descripción.`;
+      const d = clampPct(glosas[i].descuento_pct);
+      if (d < 0 || d >= 100)
+        return `Glosa #${i + 1}: Descuento % inválido (<100).`;
     }
     if (glosaErr) return glosaErr;
-    if (sumGlosas !== subtotalNeto) {
-      return `Las glosas suman ${formatCLP(sumGlosas)} y el subtotal es ${formatCLP(subtotalNeto)}.`;
+    if (sumGlosasBrutas !== subtotalBase) {
+      return `Las glosas BRUTAS suman ${formatCLP(
+        sumGlosasBrutas
+      )} y el subtotal base es ${formatCLP(subtotalBase)}.`;
     }
     return "";
   };
@@ -391,11 +487,13 @@ export default function CotizacionFromVentasDialog({
       const msg3 = validateStep3();
       if (msg3) throw new Error(msg3);
 
+      // ✅ por si acaso (aunque ya auto-resetea), bloquea submit si conflicto
+      if (conflict) throw new Error(conflictMsg);
+
       const { headers } = buildAuthHeaders(session, empresaIdFromToken);
 
       const payload = {
         cliente_id: clienteId,
-        // ✅ ahora sí viaja al backend
         cliente_responsable_id: responsableId || null,
 
         asunto: asunto || null,
@@ -403,12 +501,17 @@ export default function CotizacionFromVentasDialog({
         terminos_condiciones: terminos || null,
         acuerdo_pago: acuerdoPago || null,
         ivaRate: Number(ivaRate || 0),
+
+        // ✅ descuento general (backend espera descuento_pct)
+        descuento_pct: descuentoPct === "" ? 0 : Number(descuentoPct),
+
         ventaIds,
         glosas: glosas.map((g, i) => ({
           descripcion: String(g.descripcion || "").trim(),
-          monto: round0(g.monto || 0),
+          monto: round0(g.monto || 0), // BRUTO
           manual: !!g.manual,
           orden: i,
+          descuento_pct: clampPct(g.descuento_pct),
         })),
       };
 
@@ -452,7 +555,6 @@ export default function CotizacionFromVentasDialog({
     >
       <CotizacionStepperHeader step={step} onClose={onClose} />
 
-      {/* Body */}
       <Box
         sx={{
           px: { xs: 3, md: 5 },
@@ -468,12 +570,18 @@ export default function CotizacionFromVentasDialog({
           </Alert>
         ) : null}
 
+        {/* ✅ Si quieres también mostrar alerta global acá */}
+        {conflict ? (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {conflictMsg}
+          </Alert>
+        ) : null}
+
         {step === 1 ? (
           <StepClienteOferta
             clientes={clientes}
             clienteId={clienteId}
             setClienteId={setClienteId}
-            // ✅ ahora vienen del endpoint
             responsables={responsables}
             loadingResp={loadingResp}
             responsableId={responsableId}
@@ -482,10 +590,16 @@ export default function CotizacionFromVentasDialog({
             setAsunto={setAsunto}
             vigenciaDias={vigenciaDias}
             setVigenciaDias={setVigenciaDias}
+            descuentoPct={descuentoPct}
+            setDescuentoPct={setDescuentoPct}
             ventasDisponibles={ventasDisponibles}
             ventaIds={ventaIds}
             setVentaIds={setVentaIds}
             preselectedVentaIds={preselectedVentaIds}
+            // ✅ flags para bloquear/alertar
+            hasGlosaDiscount={hasGlosaDiscount}
+            conflict={conflict}
+            conflictMsg={conflictMsg}
           />
         ) : null}
 
@@ -506,19 +620,22 @@ export default function CotizacionFromVentasDialog({
             removeGlosa={removeGlosa}
             glosaErr={glosaErr}
             okCuadra={okCuadra}
-            subtotalNeto={subtotalNeto}
+            subtotalNeto={subtotalBase} // base BRUTO
+            // ✅ flags para bloquear/alertar
+            hasGeneralDiscount={hasGeneralDiscount}
+            conflict={conflict}
+            conflictMsg={conflictMsg}
           />
         ) : null}
       </Box>
 
-      {/* Footer fijo */}
       <CotizacionFooterTotals
         step={step}
         onPrev={prev}
         onNext={next}
         onCreate={submit}
         saving={saving}
-        subtotalNetoLabel={formatCLP(subtotalNeto)}
+        subtotalNetoLabel={formatCLP(subtotalFinal)}
         ivaLabel={formatCLP(iva)}
         totalLabel={formatCLP(totalFinal)}
       />

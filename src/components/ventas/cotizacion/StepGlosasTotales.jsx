@@ -19,13 +19,18 @@ import { formatCLP } from "@/components/ventas/utils/money";
 const round0 = (n) => Math.round(Number(n || 0));
 
 function formatCLPNumberOnly(n) {
-  // "174326" -> "174.326"
   if (n == null || Number.isNaN(Number(n))) return "";
   return Number(n).toLocaleString("es-CL", { maximumFractionDigits: 0 });
 }
 
 function onlyDigits(str) {
   return String(str || "").replace(/[^\d]/g, "");
+}
+
+function clampPct(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(99.99, n));
 }
 
 export default function StepGlosasTotales({
@@ -35,15 +40,18 @@ export default function StepGlosasTotales({
   removeGlosa,
   glosaErr,
   okCuadra,
-  subtotalNeto, // ✅ NUEVO: necesario para validar máximo
+  subtotalNeto, // subtotal base BRUTO
+
+  // ✅ NUEVO: flags desde el padre
+  hasGeneralDiscount = false,
+  conflict = false,
+  conflictMsg = "",
 }) {
-  // suma manual total (según flag manual)
   const manualSum = useMemo(
     () => glosas.reduce((acc, g) => acc + (g.manual ? round0(g.monto) : 0), 0),
     [glosas]
   );
 
-  // calcula cuánto máximo puede tener ESTA glosa, para no pasarse del subtotal
   const maxForIdx = (idx) => {
     const t = round0(subtotalNeto);
     const othersManual = glosas.reduce((acc, g, i) => {
@@ -57,29 +65,50 @@ export default function StepGlosasTotales({
 
   const handleMontoChange = (idx) => (e) => {
     const raw = e.target.value;
-
-    // permitir "vacío" -> vuelve a auto (remanente)
     const digits = onlyDigits(raw);
+
     if (digits === "") {
-      setGlosa(idx, { monto: "" }); // parent lo tratará como no-manual
+      setGlosa(idx, { monto: "" });
       return;
     }
 
     let value = parseInt(digits, 10);
     if (!Number.isFinite(value)) value = 0;
-
-    // ❌ no negativos
     if (value < 0) value = 0;
 
-    // ✅ clamp al máximo permitido para esta glosa
     const max = maxForIdx(idx);
     if (value > max) value = max;
 
     setGlosa(idx, { monto: value });
   };
 
+  const handleDescPctChange = (idx) => (e) => {
+    const raw = String(e.target.value ?? "");
+    if (raw.trim() === "") {
+      setGlosa(idx, { descuento_pct: 0 });
+      return;
+    }
+    let n = Number(raw);
+    if (!Number.isFinite(n)) n = 0;
+    n = clampPct(n);
+    setGlosa(idx, { descuento_pct: n });
+  };
+
   return (
     <Box sx={{ display: "grid", gap: 2 }}>
+      {/* ✅ alerta de conflicto */}
+      {conflict ? (
+        <Alert severity="error">
+          {conflictMsg || "No puedes usar descuento general y por glosas a la vez."}
+        </Alert>
+      ) : null}
+
+      {hasGeneralDiscount ? (
+        <Alert severity="info">
+          Tienes <b>descuento general</b>. Los descuentos por glosa están deshabilitados.
+        </Alert>
+      ) : null}
+
       <Box
         sx={{
           display: "flex",
@@ -111,7 +140,13 @@ export default function StepGlosasTotales({
       <Box sx={{ display: "grid", gap: 1.5 }}>
         {glosas.map((g, idx) => {
           const max = maxForIdx(idx);
-          const showValue = g.manual ? formatCLPNumberOnly(g.monto) : formatCLPNumberOnly(g.monto);
+
+          const bruto = round0(g.monto || 0);
+          const descPct = clampPct(g.descuento_pct || 0);
+          const descMonto = round0(bruto * (descPct / 100));
+          const neto = round0(bruto - descMonto);
+
+          const showValue = formatCLPNumberOnly(g.monto);
 
           return (
             <Box
@@ -125,9 +160,10 @@ export default function StepGlosasTotales({
                 display: "flex",
                 gap: 2,
                 alignItems: "flex-start",
+                flexWrap: "wrap",
               }}
             >
-              <Box sx={{ flex: 1 }}>
+              <Box sx={{ flex: 1, minWidth: 260 }}>
                 <Typography
                   sx={{
                     fontSize: 10,
@@ -148,7 +184,7 @@ export default function StepGlosasTotales({
                 />
               </Box>
 
-              <Box sx={{ width: 190 }}>
+              <Box sx={{ width: 190, minWidth: 190 }}>
                 <Typography
                   sx={{
                     fontSize: 10,
@@ -158,7 +194,7 @@ export default function StepGlosasTotales({
                     textTransform: "uppercase",
                   }}
                 >
-                  Precio (CLP)
+                  Bruto (CLP)
                 </Typography>
 
                 <TextField
@@ -179,20 +215,82 @@ export default function StepGlosasTotales({
                     ),
                   }}
                   helperText={
-                    g.manual
-                      ? `Manual (máx ${formatCLP(max)})`
-                      : "Auto (remanente)"
+                    g.manual ? `Manual (máx ${formatCLP(max)})` : "Auto (remanente)"
                   }
                 />
+              </Box>
+
+              <Box sx={{ width: 140, minWidth: 140 }}>
+                <Typography
+                  sx={{
+                    fontSize: 10,
+                    fontWeight: 1000,
+                    color: "text.disabled",
+                    letterSpacing: ".16em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  % Descuento
+                </Typography>
+
+                <TextField
+                  variant="standard"
+                  type="number"
+                  value={descPct}
+                  onChange={handleDescPctChange(idx)}
+                  fullWidth
+                  disabled={hasGeneralDiscount} // ✅ bloqueo
+                  inputProps={{
+                    min: 0,
+                    max: 99.99,
+                    step: 0.01,
+                    style: { textAlign: "right", fontWeight: 800 },
+                  }}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end" sx={{ ml: 0.5 }}>
+                        %
+                      </InputAdornment>
+                    ),
+                  }}
+                  helperText={
+                    hasGeneralDiscount
+                      ? "Deshabilitado por descuento general"
+                      : descPct > 0
+                      ? "Con descuento"
+                      : "Sin descuento"
+                  }
+                />
+              </Box>
+
+              <Box sx={{ width: 220, minWidth: 220 }}>
+                <Typography
+                  sx={{
+                    fontSize: 10,
+                    fontWeight: 1000,
+                    color: "text.disabled",
+                    letterSpacing: ".16em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Neto (info)
+                </Typography>
+
+                <Typography sx={{ fontSize: 13, fontWeight: 900, mt: 0.8 }}>
+                  {formatCLP(neto)}{" "}
+                  <span style={{ fontWeight: 700, color: "rgba(0,0,0,.55)" }}>
+                    (Desc: {formatCLP(descMonto)} / {descPct}%)
+                  </span>
+                </Typography>
 
                 <Typography sx={{ fontSize: 11, color: "text.secondary", mt: 0.5 }}>
-                  {g.manual ? "Manual" : "Auto (remanente)"}
+                  Neto = Bruto - Descuento
                 </Typography>
               </Box>
 
               <IconButton
                 onClick={() => removeGlosa(idx)}
-                sx={{ mt: 2 }}
+                sx={{ mt: 1.4, ml: "auto" }}
                 disabled={glosas.length === 1}
               >
                 <DeleteOutlineIcon />
@@ -202,11 +300,15 @@ export default function StepGlosasTotales({
         })}
       </Box>
 
+      <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+        Manual: {formatCLP(manualSum)} / Subtotal bruto ventas: {formatCLP(subtotalNeto)}
+      </Typography>
+
       {glosaErr ? (
         <Alert severity="warning">{glosaErr}</Alert>
       ) : okCuadra ? (
         <Alert icon={<VerifiedIcon />} severity="success">
-          Las glosas coinciden exactamente con el subtotal neto de las ventas seleccionadas.
+          Las glosas coinciden exactamente con el subtotal <b>BRUTO</b> de las ventas seleccionadas.
         </Alert>
       ) : null}
     </Box>
