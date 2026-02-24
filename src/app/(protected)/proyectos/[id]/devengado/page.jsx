@@ -47,12 +47,12 @@ function Badge({ children, tone = "slate" }) {
 
 function Card({ title, right, children }) {
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 md:p-5 shadow-sm">
+    <div className="bg-white  border border-slate-200  rounded-2xl p-4 md:p-5 shadow-sm">
       {(title || right) && (
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
             {title && (
-              <h3 className="text-sm md:text-base font-extrabold text-slate-900 dark:text-white">
+              <h3 className="text-sm md:text-base font-extrabold text-slate-900 ">
                 {title}
               </h3>
             )}
@@ -69,10 +69,10 @@ function ProgressBar({ value = 0 }) {
   const v = Math.max(0, Math.min(100, Number(value) || 0));
   return (
     <div className="w-full">
-      <div className="h-2.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-        <div className="h-full bg-slate-900 dark:bg-white" style={{ width: `${v}%` }} />
+      <div className="h-2.5 rounded-full bg-slate-100  overflow-hidden">
+        <div className="h-full bg-slate-900 " style={{ width: `${v}%` }} />
       </div>
-      <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{pct(v)}</div>
+      <div className="mt-1 text-xs text-slate-500 ">{pct(v)}</div>
     </div>
   );
 }
@@ -87,15 +87,15 @@ function TaskRow({ t }) {
   else if (estado === "pendiente") tone = "slate";
 
   return (
-    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 py-3 border-b border-slate-100 dark:border-slate-800 last:border-b-0">
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 py-3 border-b border-slate-100  last:border-b-0">
       <div className="min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <Badge tone={tone}>{(t?.tipo || "").toLowerCase()}</Badge>
-          <div className="font-semibold text-slate-900 dark:text-white truncate">
+          <div className="font-semibold text-slate-900  truncate">
             {t?.nombre || "Sin nombre"}
           </div>
         </div>
-        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400 flex flex-wrap gap-x-3 gap-y-1">
+        <div className="mt-1 text-xs text-slate-500  flex flex-wrap gap-x-3 gap-y-1">
           <span>Plan: {fmtDate(t?.fecha_inicio_plan)} → {fmtDate(t?.fecha_fin_plan)}</span>
           <span>Real: {fmtDate(t?.fecha_inicio_real)} → {fmtDate(t?.fecha_fin_real)}</span>
           {t?.responsable?.nombre ? <span>Resp: {t.responsable.nombre}</span> : null}
@@ -111,12 +111,12 @@ function TaskRow({ t }) {
 
 function Stat({ label, value, sub }) {
   return (
-    <div className="p-3 md:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-      <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
-      <div className="mt-1 text-lg md:text-xl font-black text-slate-900 dark:text-white">
+    <div className="p-3 md:p-4 rounded-2xl border border-slate-200  bg-white ">
+      <div className="text-xs text-slate-500 ">{label}</div>
+      <div className="mt-1 text-lg md:text-xl font-black text-slate-900 ">
         {value}
       </div>
-      {sub ? <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{sub}</div> : null}
+      {sub ? <div className="mt-1 text-xs text-slate-500 ">{sub}</div> : null}
     </div>
   );
 }
@@ -156,15 +156,15 @@ export default async function ProyectoDevengadoPage({ params }) {
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="min-w-0">
-            <div className="text-xs text-slate-500 dark:text-slate-400">
+            <div className="text-xs text-slate-500 ">
               <Link
                 href={`/proyectos/${id}`}
-                className="hover:underline text-slate-600 dark:text-slate-300"
+                className="hover:underline text-slate-600 "
               >
                 ← Volver al proyecto
               </Link>
             </div>
-            <h1 className="mt-1 text-2xl md:text-3xl font-black tracking-tight text-slate-900 dark:text-white truncate">
+            <h1 className="mt-1 text-2xl md:text-3xl font-black tracking-tight text-slate-900  truncate">
               Devengado · {proyecto?.nombre || "Proyecto"}
             </h1>
 
@@ -184,7 +184,7 @@ export default async function ProyectoDevengadoPage({ params }) {
           </div>
         </div>
 
-        <div className="text-xs text-slate-500 dark:text-slate-400">
+        <div className="text-xs text-slate-500 ">
           Semana pasada: {fmtDate(rango?.semanaPasada?.inicio)} → {fmtDate(rango?.semanaPasada?.fin)} ·
           Semana actual: {fmtDate(rango?.semanaActual?.inicio)} → {fmtDate(rango?.semanaActual?.fin)}
         </div>
@@ -231,13 +231,13 @@ export default async function ProyectoDevengadoPage({ params }) {
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           <div>
-            <div className="text-sm text-slate-700 dark:text-slate-300 font-semibold mb-2">
+            <div className="text-sm text-slate-700  font-semibold mb-2">
               Avance ponderado (por costo/horas plan)
             </div>
             <ProgressBar value={avancePct} />
             {breakevenPct != null && base?.valor > 0 && (
-              <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                Punto de equilibrio aprox: <b className="text-slate-700 dark:text-slate-200">{pct(breakevenPct)}</b>{" "}
+              <div className="mt-3 text-xs text-slate-500 ">
+                Punto de equilibrio aprox: <b className="text-slate-700 ">{pct(breakevenPct)}</b>{" "}
                 de avance (cuando devengado ≈ costo acumulado).
               </div>
             )}
@@ -273,7 +273,7 @@ export default async function ProyectoDevengadoPage({ params }) {
               ))}
             </div>
           ) : (
-            <div className="text-sm text-slate-500 dark:text-slate-400">No hay tareas terminadas en ese rango.</div>
+            <div className="text-sm text-slate-500 ">No hay tareas terminadas en ese rango.</div>
           )}
         </Card>
 
@@ -288,7 +288,7 @@ export default async function ProyectoDevengadoPage({ params }) {
               ))}
             </div>
           ) : (
-            <div className="text-sm text-slate-500 dark:text-slate-400">No hay tareas planificadas para esta semana.</div>
+            <div className="text-sm text-slate-500 ">No hay tareas planificadas para esta semana.</div>
           )}
         </Card>
       </div>
@@ -302,7 +302,7 @@ export default async function ProyectoDevengadoPage({ params }) {
               ))}
             </div>
           ) : (
-            <div className="text-sm text-slate-500 dark:text-slate-400">No hay tareas atrasadas 🎉</div>
+            <div className="text-sm text-slate-500 ">No hay tareas atrasadas 🎉</div>
           )}
         </Card>
 
@@ -317,13 +317,13 @@ export default async function ProyectoDevengadoPage({ params }) {
               ))}
             </div>
           ) : (
-            <div className="text-sm text-slate-500 dark:text-slate-400">No hay pendientes futuras registradas.</div>
+            <div className="text-sm text-slate-500 ">No hay pendientes futuras registradas.</div>
           )}
         </Card>
       </div>
 
       {/* Footer mini */}
-      <div className="text-xs text-slate-500 dark:text-slate-400">
+      <div className="text-xs text-slate-500 ">
         Nota: el devengado se calcula como <b>Base ({base?.fuente || "—"}) × Avance ponderado</b>. El avance ponderado
         usa costo plan / horas plan cuando existen, para que no todas las tareas “pesen igual”.
       </div>

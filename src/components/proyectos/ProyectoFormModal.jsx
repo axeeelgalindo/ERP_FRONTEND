@@ -56,7 +56,9 @@ export default function ProyectoFormModal({
       setNombre(initialProyecto?.nombre || "");
       setDescripcion(initialProyecto?.descripcion || "");
       setPresupuesto(
-        initialProyecto?.presupuesto == null ? "" : String(initialProyecto.presupuesto)
+        initialProyecto?.presupuesto == null
+          ? ""
+          : String(initialProyecto.presupuesto),
       );
 
       // si en el futuro guardas cliente_id en Proyecto:
@@ -82,15 +84,18 @@ export default function ProyectoFormModal({
       const res = await fetch(url, { headers, cache: "no-store" });
       const json = await res.json().catch(() => null);
 
-      if (!res.ok) throw new Error(json?.message || json?.msg || "Error al cargar clientes");
+      if (!res.ok)
+        throw new Error(
+          json?.message || json?.msg || "Error al cargar clientes",
+        );
 
       const list = Array.isArray(json?.data)
         ? json.data
         : Array.isArray(json?.items)
-        ? json.items
-        : Array.isArray(json)
-        ? json
-        : [];
+          ? json.items
+          : Array.isArray(json)
+            ? json
+            : [];
 
       setClientes(list);
     } catch (e) {
@@ -112,15 +117,18 @@ export default function ProyectoFormModal({
       const res = await fetch(url, { headers, cache: "no-store" });
       const json = await res.json().catch(() => null);
 
-      if (!res.ok) throw new Error(json?.message || json?.msg || "Error al cargar empleados");
+      if (!res.ok)
+        throw new Error(
+          json?.message || json?.msg || "Error al cargar empleados",
+        );
 
       const list = Array.isArray(json?.data)
         ? json.data
         : Array.isArray(json?.items)
-        ? json.items
-        : Array.isArray(json)
-        ? json
-        : [];
+          ? json.items
+          : Array.isArray(json)
+            ? json
+            : [];
 
       setEmpleados(list);
     } catch (e) {
@@ -141,7 +149,9 @@ export default function ProyectoFormModal({
   }
 
   function toggleMiembro(id) {
-    setMiembrosIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setMiembrosIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
   }
 
   async function handleSubmit(e) {
@@ -177,10 +187,17 @@ export default function ProyectoFormModal({
 
       const method = isEdit ? "PATCH" : "POST";
 
-      const res = await fetch(url, { method, headers, body: JSON.stringify(body) });
+      const res = await fetch(url, {
+        method,
+        headers,
+        body: JSON.stringify(body),
+      });
       const json = await res.json().catch(() => null);
 
-      if (!res.ok) throw new Error(json?.message || json?.msg || "Error al guardar proyecto");
+      if (!res.ok)
+        throw new Error(
+          json?.message || json?.msg || "Error al guardar proyecto",
+        );
 
       setLoading(false);
       onClose?.();
@@ -206,12 +223,12 @@ export default function ProyectoFormModal({
       <form onSubmit={handleSubmit} className="space-y-4 text-sm">
         {/* Nombre */}
         <div className="space-y-1">
-          <label className="block text-xs font-medium text-gray-700 dark:text-slate-200">
+          <label className="block text-xs font-medium text-gray-700 ">
             Nombre *
           </label>
           <input
             type="text"
-            className="w-full rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-full rounded-lg border border-gray-300  bg-white  px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             placeholder="Ej: Proyecto SEST"
@@ -221,11 +238,11 @@ export default function ProyectoFormModal({
 
         {/* Descripción */}
         <div className="space-y-1">
-          <label className="block text-xs font-medium text-gray-700 dark:text-slate-200">
+          <label className="block text-xs font-medium text-gray-700  ">
             Descripción
           </label>
           <textarea
-            className="w-full rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-full rounded-lg border border-gray-300  bg-white  px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             rows={3}
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
@@ -235,12 +252,12 @@ export default function ProyectoFormModal({
 
         {/* Presupuesto */}
         <div className="space-y-1">
-          <label className="block text-xs font-medium text-gray-700 dark:text-slate-200">
+          <label className="block text-xs font-medium text-gray-700 ">
             Presupuesto (CLP)
           </label>
           <input
             type="number"
-            className="w-full rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-full rounded-lg border border-gray-300  bg-white  px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             value={presupuesto}
             onChange={(e) => setPresupuesto(e.target.value)}
             placeholder="Ej: 4000000"
@@ -250,11 +267,11 @@ export default function ProyectoFormModal({
 
         {/* Cliente (opcional) */}
         <div className="space-y-1">
-          <label className="block text-xs font-medium text-gray-700 dark:text-slate-200">
+          <label className="block text-xs font-medium text-gray-700 ">
             Cliente (opcional)
           </label>
           <select
-            className="w-full rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-full rounded-lg border border-gray-300  bg-white  px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             value={clienteId}
             onChange={(e) => setClienteId(e.target.value)}
           >
@@ -271,39 +288,49 @@ export default function ProyectoFormModal({
           </select>
 
           <p className="text-[11px] text-gray-400">
-            * Ojo: tu modelo <b>Proyecto</b> no tiene <code>cliente_id</code> aún. Este select no guardará nada
-            hasta que lo agregues en DB/backend.
+            * Ojo: tu modelo <b>Proyecto</b> no tiene <code>cliente_id</code>{" "}
+            aún. Este select no guardará nada hasta que lo agregues en
+            DB/backend.
           </p>
         </div>
 
         {/* Miembros */}
         <div className="space-y-1">
-          <label className="block text-xs font-medium text-gray-700 dark:text-slate-200">
+          <label className="block text-xs font-medium text-gray-700 ">
             Miembros del proyecto (empleados)
           </label>
 
-          <div className="h-40 overflow-y-auto rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900">
+          <div className="h-40 overflow-y-auto rounded-lg border border-gray-300  bg-white ">
             {loadingEmpleados ? (
-              <p className="px-3 py-2 text-xs text-gray-500">Cargando empleados...</p>
+              <p className="px-3 py-2 text-xs text-gray-500">
+                Cargando empleados...
+              </p>
             ) : empleados.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-gray-500">No hay empleados disponibles</p>
+              <p className="px-3 py-2 text-xs text-gray-500">
+                No hay empleados disponibles
+              </p>
             ) : (
-              <ul className="text-xs divide-y divide-gray-100 dark:divide-slate-800">
+              <ul className="text-xs divide-y divide-gray-100 ">
                 {empleados.map((emp) => (
                   <li
                     key={emp.id}
-                    className="flex items-center justify-between gap-2 px-3 py-2 cursor-pointer hover:bg-emerald-50 dark:hover:bg-slate-800"
+                    className="flex items-center justify-between gap-2 px-3 py-2 cursor-pointer hover:bg-emerald-50 "
                     onClick={() => toggleMiembro(emp.id)}
                   >
                     <div>
-                      <div className="font-medium text-gray-800 dark:text-slate-100">
+                      <div className="font-medium text-gray-800 ">
                         {emp.usuario?.nombre || "Sin nombre"}
                       </div>
-                      <div className="text-[11px] text-gray-500 dark:text-slate-400">
+                      <div className="text-[11px] text-gray-500 ">
                         {emp.cargo || emp.usuario?.rol?.nombre || "Empleado"}
                       </div>
                     </div>
-                    <input type="checkbox" className="h-4 w-4" checked={miembrosIds.includes(emp.id)} readOnly />
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={miembrosIds.includes(emp.id)}
+                      readOnly
+                    />
                   </li>
                 ))}
               </ul>
@@ -332,7 +359,13 @@ export default function ProyectoFormModal({
             className="inline-flex items-center rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
             disabled={loading}
           >
-            {loading ? (isEdit ? "Guardando..." : "Creando...") : isEdit ? "Guardar cambios" : "Crear proyecto"}
+            {loading
+              ? isEdit
+                ? "Guardando..."
+                : "Creando..."
+              : isEdit
+                ? "Guardar cambios"
+                : "Crear proyecto"}
           </button>
         </div>
       </form>

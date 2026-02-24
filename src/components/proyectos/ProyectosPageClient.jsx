@@ -19,10 +19,10 @@ export default function ProyectosPageClient({
     <div className="px-6 py-6 space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 dark:text-white">
+          <h1 className="text-2xl font-black text-slate-900 ">
             Proyectos
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-sm text-slate-500  mt-1">
             Crea, edita y gestiona el avance de tus proyectos.
           </p>
         </div>
@@ -30,7 +30,7 @@ export default function ProyectosPageClient({
         <AddProyectoButton />
       </div>
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+      <div className="bg-white  border border-slate-200 rounded-2xl overflow-hidden">
         <ProjectsTable
           rows={items}
           loading={false}
