@@ -14,14 +14,12 @@ export default function ProyectosPageClient({
 }) {
   const [openEdit, setOpenEdit] = useState(false);
   const [selected, setSelected] = useState(null);
-
+  const [open, setOpen] = useState(false);
   return (
     <div className="px-6 py-6 space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 ">
-            Proyectos
-          </h1>
+          <h1 className="text-2xl font-black text-slate-900 ">Proyectos</h1>
           <p className="text-sm text-slate-500  mt-1">
             Crea, edita y gestiona el avance de tus proyectos.
           </p>

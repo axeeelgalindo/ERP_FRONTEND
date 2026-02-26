@@ -70,7 +70,8 @@ export default function CotizacionPDFButton({ cotizacion }) {
 
     const { headers, token, empresaId } = buildAuthHeaders(session);
     if (!token) throw new Error("Falta accessToken para generar PDF.");
-    if (!empresaId) throw new Error("Falta empresaId (x-empresa-id) para generar PDF.");
+    if (!empresaId)
+      throw new Error("Falta empresaId (x-empresa-id) para generar PDF.");
 
     const res = await fetch(`${API_URL}/cotizaciones/${id}`, {
       method: "GET",
@@ -81,13 +82,23 @@ export default function CotizacionPDFButton({ cotizacion }) {
     const data = await safeJson(res);
     if (!res.ok) {
       throw new Error(
-        data?.detalle || data?.error || data?.message || "No se pudo cargar la cotización"
+        data?.detalle ||
+          data?.error ||
+          data?.message ||
+          "No se pudo cargar la cotización",
       );
     }
     return data;
   };
 
   const round0 = (n) => Math.round(Number(n || 0));
+  
+  const clampPct = (v) => {
+    if (v === "" || v == null) return 0;
+    const n = Number(v);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(99.99, n));
+  };
 
   const generarPDF = async (e) => {
     e?.preventDefault?.();
@@ -98,7 +109,9 @@ export default function CotizacionPDFButton({ cotizacion }) {
       setBusy(true);
 
       let cot = cotizacion;
-      const tieneObjResponsable = !!(cot?.cliente_responsable || cot?.clienteResponsable);
+      const tieneObjResponsable = !!(
+        cot?.cliente_responsable || cot?.clienteResponsable
+      );
       if (!tieneObjResponsable && cot?.id) {
         const full = await fetchCotizacionCompleta(cot.id);
         if (full) cot = full;
@@ -135,7 +148,9 @@ export default function CotizacionPDFButton({ cotizacion }) {
           : Math.trunc(Number(vigenciaDiasRaw));
 
       const vigenciaLabel =
-        Number.isFinite(vigenciaDias) && vigenciaDias > 0 ? `${vigenciaDias} días vigencia` : "";
+        Number.isFinite(vigenciaDias) && vigenciaDias > 0
+          ? `${vigenciaDias} días vigencia`
+          : "";
 
       let logo = null;
       try {
@@ -144,8 +159,8 @@ export default function CotizacionPDFButton({ cotizacion }) {
         logo = null;
       }
 
-      const HEADER_H = 26;
-      const FOOTER_H = 16;
+      const HEADER_H = 36;
+      const FOOTER_H = 23;
 
       const doc = new jsPDF({
         orientation: "p",
@@ -163,12 +178,20 @@ export default function CotizacionPDFButton({ cotizacion }) {
           doc.path(
             [
               ["M", 0, yTop + height - 6],
-              ["C", W * 0.25, yTop + height + 8, W * 0.75, yTop + height - 18, W, yTop + height - 6],
+              [
+                "C",
+                W * 0.25,
+                yTop + height + 8,
+                W * 0.75,
+                yTop + height - 18,
+                W,
+                yTop + height - 6,
+              ],
               ["L", W, yTop],
               ["L", 0, yTop],
               ["Z"],
             ],
-            "F"
+            "F",
           );
         } else {
           doc.path(
@@ -179,7 +202,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
               ["L", 0, yTop + height],
               ["Z"],
             ],
-            "F"
+            "F",
           );
         }
       };
@@ -191,7 +214,11 @@ export default function CotizacionPDFButton({ cotizacion }) {
         doc.setFont("cambria", "normal");
         doc.setFontSize(8.2);
         doc.setTextColor(...C.muted);
-        doc.text("Tecnología que impulsa, soluciones que transforman", mx, 22.0);
+        doc.text(
+          "Tecnología que impulsa, soluciones que transforman",
+          mx,
+          22.0,
+        );
 
         const boxW = 72;
         const boxX = W - mx - boxW;
@@ -225,14 +252,20 @@ export default function CotizacionPDFButton({ cotizacion }) {
         doc.setFont("cambria", "normal");
         doc.setFontSize(8.2);
         doc.setTextColor(...C.text);
-        doc.text("administracion@blueinge.com", W / 2, H - 9.3, { align: "center" });
+        doc.text("administracion@blueinge.com", W / 2, H - 9.3, {
+          align: "center",
+        });
 
         doc.setTextColor(...C.blue);
-        doc.text("https://blue-ingenieria.com/", W / 2, H - 5.8, { align: "center" });
+        doc.text("https://blue-ingenieria.com/", W / 2, H - 5.8, {
+          align: "center",
+        });
 
         doc.setTextColor(...C.muted);
         doc.setFontSize(7.2);
-        doc.text(`Página ${page} / ${pages}`, W / 2, H - 2.4, { align: "center" });
+        doc.text(`Página ${page} / ${pages}`, W / 2, H - 2.4, {
+          align: "center",
+        });
       };
 
       drawHeader();
@@ -323,9 +356,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
       doc.text("Vendedor", mx + 128, barY + 5);
 
       const vendedorNombre =
-        safe(cot?.vendedor?.nombre) ||
-        safe(cot?.vendedor?.correo) ||
-        "-";
+        safe(cot?.vendedor?.nombre) || safe(cot?.vendedor?.correo) || "-";
 
       doc.setFont("cambria", "normal");
       doc.setFontSize(9.2);
@@ -335,26 +366,38 @@ export default function CotizacionPDFButton({ cotizacion }) {
       doc.text(vendedorNombre, mx + 128, barY + 10);
 
       // =========================
-      // TABLA: Bruto / % / Desc$ / Neto
+      // TABLA: Descripción / Cantidad / Precio Unitario / % Desc / Impuestos / Importe
       // =========================
       const glosas = Array.isArray(cot?.glosas) ? cot.glosas : [];
+
+      const ivaRate = Number(cot?.ivaRate ?? 0.19); // si no existe en cot, usamos 19%
+      const ivaRateNum = Number.isFinite(ivaRate) ? ivaRate : 0.19;
+
       const glosasBody = glosas.length
         ? glosas
             .slice()
             .sort((a, b) => Number(a?.orden ?? 0) - Number(b?.orden ?? 0))
             .map((g) => {
-              const bruto = round0(g.monto ?? 0);
-              const pct = Number(g.descuento_pct || 0);
-              const desc$ = Math.round(bruto * (pct / 100));
-              const neto = Math.max(0, bruto - desc$);
+              const descripcion = safe(g.descripcion) || "—";
+
+              const cantidad = 1;
+
+              const unitarioBruto = round0(g.monto ?? 0);
+              const pct = clampPct(g.descuento_pct || 0);
+
+              const descMonto = round0(unitarioBruto * (pct / 100));
+              const netoLinea = Math.max(0, unitarioBruto - descMonto);
+
+              const impuestos = round0(netoLinea * ivaRateNum);
+              const importe = round0(netoLinea + impuestos);
 
               return [
-                safe(g.descripcion) || "—",
-                "1",
-                clp(bruto),
-                pct ? String(pct) : "—",
-                clp(desc$),
-                clp(neto),
+                descripcion,
+                String(cantidad),
+                clp(unitarioBruto),
+                pct ? `${pct}%` : "0%",
+                clp(impuestos),
+                clp(importe),
               ];
             })
         : [["Esta cotización no tiene glosas.", "", "", "", "", ""]];
@@ -362,52 +405,70 @@ export default function CotizacionPDFButton({ cotizacion }) {
       const tableW = W - mx * 2;
       const tableStartY = barY + 18;
 
+      // ✅ 6 columnas, 6 estilos
       autoTable(doc, {
         startY: tableStartY,
         margin: { left: mx, right: mx, top: HEADER_H, bottom: FOOTER_H + 2 },
         tableWidth: tableW,
-        head: [["Descripción", "Cant.", "Bruto", "%", "Desc $", "Neto"]],
+        head: [
+          [
+            "Descripción",
+            "Cantidad",
+            "Precio Unitario",
+            "% de descuento",
+            "Impuestos",
+            "Importe",
+          ],
+        ],
         body: glosasBody,
         theme: "plain",
         styles: {
           font: "cambria",
-          fontSize: 9.2,
+          fontSize: 9.0,
           textColor: C.text,
           cellPadding: { top: 2.2, right: 2.2, bottom: 2.2, left: 2.2 },
           valign: "top",
         },
         columnStyles: {
-          0: { cellWidth: 86 },
-          1: { cellWidth: 14, halign: "right" },
-          2: { cellWidth: 28, halign: "right" },
-          3: { cellWidth: 14, halign: "right" },
-          4: { cellWidth: 28, halign: "right" },
-          5: { cellWidth: tableW - (86 + 14 + 28 + 14 + 28), halign: "right" },
+          0: { cellWidth: 78 }, // descripción
+          1: { cellWidth: 16, halign: "right" }, // cantidad
+          2: { cellWidth: 30, halign: "right" }, // unitario
+          3: { cellWidth: 20, halign: "right" }, // % desc
+          4: { cellWidth: 30, halign: "right" }, // impuestos
+          5: { cellWidth: tableW - (78 + 16 + 30 + 20 + 30), halign: "right" }, // importe
         },
         didParseCell: (data) => {
           data.cell.styles.lineWidth = data.section === "head" ? 0.25 : 0.18;
           data.cell.styles.lineColor = C.line;
+          if (data.section === "head") {
+            data.cell.styles.fontStyle = "bold";
+            data.cell.styles.textColor = C.blue;
+          }
         },
       });
 
       // =========================
       // TOTALES con descuento general
       // =========================
-      const brutoTotal = round0(glosas.reduce((a, g) => a + round0(g.monto || 0), 0));
+      const brutoTotal = round0(
+        glosas.reduce((a, g) => a + round0(g.monto || 0), 0),
+      );
       const descGlosas = round0(
         glosas.reduce((a, g) => {
           const m = round0(g.monto || 0);
           const pct = Number(g.descuento_pct || 0);
           return a + Math.round(m * (pct / 100));
-        }, 0)
+        }, 0),
       );
       const afterGlosas = Math.max(0, brutoTotal - descGlosas);
-      const descGeneral = Math.round(afterGlosas * (Number(cot?.descuento_pct || 0) / 100));
+      const descGeneral = Math.round(
+        afterGlosas * (Number(cot?.descuento_pct || 0) / 100),
+      );
       const descTotal = round0(descGlosas + descGeneral);
       const neto = round0(Math.max(0, afterGlosas - descGeneral));
 
       const iva = round0(cot?.iva ?? Math.round(neto * 0.19));
-      const total = round0(cot?.total ?? (neto + iva));
+      const total = round0(cot?.total ?? neto + iva);
 
       let y = (doc.lastAutoTable?.finalY ?? tableStartY + 40) + 5;
 
@@ -423,15 +484,15 @@ export default function CotizacionPDFButton({ cotizacion }) {
           textColor: C.text,
         },
         body: [
-          ["Subtotal Bruto", clp(brutoTotal)],
-          ["Descuento", clp(descTotal)],
-          ["Subtotal Neto", clp(neto)],
+        //  ["Precio", clp(brutoTotal)],
+        //  ["Descuento", clp(descTotal)],
+          ["Subtotal", clp(neto)],
           ["IVA 19%", clp(iva)],
           ["Total", clp(total)],
         ],
         columnStyles: {
-          0: { cellWidth: 52, halign: "left", textColor: C.muted },
-          1: { cellWidth: 40, halign: "right" },
+          0: { cellWidth: 45, halign: "left", textColor: C.muted },
+          1: { cellWidth: 35, halign: "right" },
         },
         didParseCell: (data) => {
           data.cell.styles.lineWidth = 0.18;
@@ -489,7 +550,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
       }
 
       const fileName = `Cotizacion_${numDoc}_${safeName(
-        cot?.cliente?.nombre || cot?.proyecto?.nombre || "cotizacion"
+        cot?.cliente?.nombre || cot?.proyecto?.nombre || "cotizacion",
       )}.pdf`;
 
       doc.save(fileName);

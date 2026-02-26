@@ -150,7 +150,7 @@ export default async function ProyectoDetailPage({ params }) {
         />
       )}
 
-      <ProyectoVentasSection ventas={ventas} />
+  
 
       <ProyectoTareasEquipoSection
         proyectoId={proyecto.id}

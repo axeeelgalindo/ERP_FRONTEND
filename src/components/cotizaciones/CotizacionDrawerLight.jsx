@@ -339,15 +339,13 @@ export default function CotizacionDrawerLight({
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-4 py-3 font-semibold text-slate-600">
+                    <th className="px-4 py-3 font-semibold text-slate-600" colSpan={2}>
                       Descripción
                     </th>
                     <th className="px-4 py-3 font-semibold text-slate-600 text-center">
                       Tipo
                     </th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 text-right">
-                      Bruto
-                    </th>
+                    
                     <th className="px-4 py-3 font-semibold text-slate-600 text-right">
                       Descuento
                     </th>
@@ -366,7 +364,7 @@ export default function CotizacionDrawerLight({
 
                     return (
                       <tr key={it.id ?? idx}>
-                        <td className="px-4 py-4">
+                        <td className="px-4 py-4" colSpan={2}>
                           <p className="font-medium">
                             {it.descripcion || it.Item || it?.producto?.nombre || "—"}
                           </p>
@@ -378,9 +376,7 @@ export default function CotizacionDrawerLight({
                           </span>
                         </td>
 
-                        <td className="px-4 py-4 text-right font-medium">
-                          {formatCLP(bruto)}
-                        </td>
+                        
 
                         <td className="px-4 py-4 text-right font-medium">
                           {formatCLP(desc)} {pct > 0 ? <span className="text-xs text-slate-400">({pct}%)</span> : null}

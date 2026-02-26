@@ -1,59 +1,41 @@
-// src/components/proyectos/ProyectoTareasEquipoSection.jsx
 "use client";
 
-import React, { Fragment, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
   Card,
   CardHeader,
   CardContent,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  IconButton,
   Tooltip,
-  Chip,
-  Box,
-  LinearProgress,
-  Typography,
-  Button,
-  Collapse,
   CircularProgress,
   Stack,
+  Button,
+  Typography,
+  Box,
+  Alert,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import EditIcon from "@mui/icons-material/Edit";
-import DeleteIcon from "@mui/icons-material/Delete";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ReplayIcon from "@mui/icons-material/Replay";
 import dayjs from "dayjs";
 
+import AssignEpicToTaskModal from "./tareas/AssignEpicToTaskModal";
+import WizardEpicaTareasSubtareasModal from "./tareas/WizardEpicaTareasSubtareasModal";
 import AddTareaModal from "./tareas/AddTareaButton";
-import ImportJiraCsvButton from "./tareas/ImportJiraCsvButton"; // ✅ NUEVO
+import ImportJiraCsvButton from "./tareas/ImportJiraCsvButton";
 import Modal from "@/components/ui/Modal";
 import { makeHeaders } from "@/lib/api";
 
+import EpicaFormModal from "./tareas/modals/EpicaFormModal";
+import TareaFormModal from "./tareas/modals/TareaFormModal";
+import SubtareaFormModal from "./tareas/modals/SubtareaFormModal";
+
+import TasksTreePremium from "./tareas/TasksTreePremium";
+
 const API = process.env.NEXT_PUBLIC_API_URL;
 
-function formatDate(d) {
-  if (!d) return "—";
-  const dt = typeof d === "string" ? d : d.toISOString();
-  return dt.slice(0, 10);
-}
-
-const ESTADO_LABELS = {
-  pendiente: "Pendiente",
-  en_progreso: "En progreso",
-  completada: "Completada",
-};
-
-// helper para labels del modal según acción
 const ACCION_LABELS = {
   start: {
     title: "Iniciar actividad",
@@ -75,6 +57,73 @@ const ACCION_LABELS = {
   },
 };
 
+function clampPct(n) {
+  const v = Number(n || 0);
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.min(100, v));
+}
+
+// stats por épica
+function computeEpicStats(tareas) {
+  if (!tareas?.length) {
+    return {
+      avance: 0,
+      estado: "pendiente",
+      fecha_inicio_plan: null,
+      fecha_fin_plan: null,
+      totalTareas: 0,
+      totalSubtareas: 0,
+      subtareasCompletadas: 0,
+    };
+  }
+
+  const avances = tareas.map((t) => clampPct(t.avance));
+  const avgAvance = Math.round(
+    avances.reduce((a, b) => a + b, 0) / Math.max(1, avances.length),
+  );
+
+  let estado = "pendiente";
+  if (avgAvance >= 100) estado = "completada";
+  else if (avgAvance > 0) estado = "en_progreso";
+
+  let minInicio = null;
+  let maxFin = null;
+
+  let totalSubtareas = 0;
+  let subtareasCompletadas = 0;
+
+  for (const t of tareas) {
+    if (t.fecha_inicio_plan) {
+      const d = new Date(t.fecha_inicio_plan);
+      if (!Number.isNaN(d.getTime())) {
+        if (!minInicio || d < minInicio) minInicio = d;
+      }
+    }
+    if (t.fecha_fin_plan) {
+      const d = new Date(t.fecha_fin_plan);
+      if (!Number.isNaN(d.getTime())) {
+        if (!maxFin || d > maxFin) maxFin = d;
+      }
+    }
+
+    const detalles = t.detalles || t.detalle || t.tareasDetalle || [];
+    totalSubtareas += detalles.length;
+    subtareasCompletadas += detalles.filter(
+      (d) => d.estado === "completada",
+    ).length;
+  }
+
+  return {
+    avance: avgAvance,
+    estado,
+    fecha_inicio_plan: minInicio,
+    fecha_fin_plan: maxFin,
+    totalTareas: tareas.length,
+    totalSubtareas,
+    subtareasCompletadas,
+  };
+}
+
 export default function ProyectoTareasEquipoSection({
   proyectoId,
   tareas,
@@ -84,53 +133,166 @@ export default function ProyectoTareasEquipoSection({
   const { data: session } = useSession();
 
   const [modalOpen, setModalOpen] = useState(false);
+
+  // EPICA modal
+  const [epicaModalOpen, setEpicaModalOpen] = useState(false);
+  const [editingEpica, setEditingEpica] = useState(null);
+
+  // TAREA modal
+  const [tareaModalOpen, setTareaModalOpen] = useState(false);
   const [editingTarea, setEditingTarea] = useState(null);
+  const [presetEpicaId, setPresetEpicaId] = useState(null);
+
+  // SUBTAREA modal
+  const [subModalOpen, setSubModalOpen] = useState(false);
+  const [subTareaParent, setSubTareaParent] = useState(null);
+  const [editingSub, setEditingSub] = useState(null);
+
+  const [assignEpicOpen, setAssignEpicOpen] = useState(false);
+  const [assignEpicTarea, setAssignEpicTarea] = useState(null);
+
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardEpicaPreselectId, setWizardEpicaPreselectId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
-  const [expandedIds, setExpandedIds] = useState([]);
+
+  // expand/collapse
+  const [expandedEpicaIds, setExpandedEpicaIds] = useState([]);
+  const [expandedTareaIds, setExpandedTareaIds] = useState([]);
+
+  // update subtarea action
   const [updatingDetalleId, setUpdatingDetalleId] = useState(null);
 
-  // modal de confirmación de acción (start/finish/reset)
   const [confirmState, setConfirmState] = useState({
     open: false,
     detalle: null,
     accion: null,
   });
 
+  const openNewEpica = () => {
+    setEditingEpica(null);
+    setEpicaModalOpen(true);
+  };
+
+  const openEditEpica = (ep) => {
+    setEditingEpica(ep);
+    setEpicaModalOpen(true);
+  };
+
+  const openNewTarea = () => {
+    setEditingTarea(null);
+    setPresetEpicaId(null);
+    setTareaModalOpen(true);
+  };
+
+  const openNewTareaInEpica = (ep) => {
+    setEditingTarea(null);
+    setPresetEpicaId(ep?.id || null);
+    setTareaModalOpen(true);
+  };
+
+  const openEditTarea = (t) => {
+    setEditingTarea(t);
+    setPresetEpicaId(null);
+    setTareaModalOpen(true);
+  };
+
+  const openNewSubtarea = (t) => {
+    setSubTareaParent(t);
+    setEditingSub(null);
+    setSubModalOpen(true);
+  };
+
+  const openEditSubtarea = (t, d) => {
+    setSubTareaParent(t);
+    setEditingSub(d?.__delete ? { ...d, __delete: false } : d);
+    setSubModalOpen(true);
+  };
+
+  const openAssignEpic = (t, ev) => {
+    ev?.stopPropagation?.();
+    setAssignEpicTarea(t);
+    setAssignEpicOpen(true);
+  };
+
+  const openWizard = (epicaId = null, ev) => {
+    ev?.stopPropagation?.();
+    setWizardEpicaPreselectId(epicaId);
+    setWizardOpen(true);
+  };
+
+  // ====== EPICAS (state + reload) ======
+  const [epicas, setEpicas] = useState([]);
+  const [loadingEpicas, setLoadingEpicas] = useState(false);
+
+  const reloadEpicas = async () => {
+    if (!session?.user || !proyectoId) return;
+
+    try {
+      setLoadingEpicas(true);
+      const res = await fetch(`${API}/epicas?proyectoId=${proyectoId}`, {
+        headers: makeHeaders(session),
+        cache: "no-store",
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.ok && Array.isArray(json.rows)) setEpicas(json.rows);
+      else setEpicas([]);
+    } catch (e) {
+      console.error("Error cargando épicas", e);
+      setEpicas([]);
+    } finally {
+      setLoadingEpicas(false);
+    }
+  };
+
+  useEffect(() => {
+    reloadEpicas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user, proyectoId]);
+
+  const epicasById = useMemo(() => {
+    const m = new Map();
+    for (const e of epicas || []) if (e?.id) m.set(e.id, e);
+    return m;
+  }, [epicas]);
+
   const handleAddClick = () => {
     setEditingTarea(null);
     setModalOpen(true);
   };
 
-  const handleRowClick = (t) => {
-    setEditingTarea(t);
-    setModalOpen(true);
-  };
-
-  const handleSaved = () => {
+  const handleSaved = async () => {
     setModalOpen(false);
     setEditingTarea(null);
+    await reloadEpicas();
     router.refresh();
   };
 
-  const toggleExpanded = (tId, ev) => {
-    ev.stopPropagation();
-    setExpandedIds((prev) =>
-      prev.includes(tId) ? prev.filter((id) => id !== tId) : [...prev, tId]
+  const toggleExpandedEpica = (epicaId, ev) => {
+    ev?.stopPropagation?.();
+    setExpandedEpicaIds((prev) =>
+      prev.includes(epicaId)
+        ? prev.filter((id) => id !== epicaId)
+        : [...prev, epicaId],
+    );
+  };
+
+  const toggleExpandedTarea = (tId, ev) => {
+    ev?.stopPropagation?.();
+    setExpandedTareaIds((prev) =>
+      prev.includes(tId) ? prev.filter((id) => id !== tId) : [...prev, tId],
     );
   };
 
   const handleDelete = async (t, ev) => {
-    ev.stopPropagation();
+    ev?.stopPropagation?.();
     if (
       !window.confirm("¿Eliminar esta tarea? Esta acción no se puede deshacer.")
-    ) {
+    )
       return;
-    }
 
     try {
       setDeletingId(t.id);
 
-      // DELETE sin body, sin Content-Type
       const headers = { ...makeHeaders(session) };
       delete headers["Content-Type"];
       delete headers["content-type"];
@@ -141,11 +303,10 @@ export default function ProyectoTareasEquipoSection({
       });
       const json = await res.json().catch(() => null);
 
-      if (!res.ok) {
+      if (!res.ok)
         throw new Error(
-          json?.message || json?.msg || "Error al eliminar tarea"
+          json?.message || json?.msg || "Error al eliminar tarea",
         );
-      }
 
       router.refresh();
     } catch (err) {
@@ -156,21 +317,17 @@ export default function ProyectoTareasEquipoSection({
     }
   };
 
-  // decide la acción según el estado actual de la subtarea
   const getAccionFromEstado = (estado) => {
     if (estado === "pendiente") return "start";
     if (estado === "en_progreso") return "finish";
-    return "reset"; // completada
+    return "reset";
   };
 
   const getAccionIcon = (estado) => {
-    if (estado === "pendiente") {
-      return <PlayArrowIcon fontSize="small" />;
-    }
-    if (estado === "en_progreso") {
+    if (estado === "pendiente") return <PlayArrowIcon fontSize="small" />;
+    if (estado === "en_progreso")
       return <CheckCircleOutlineIcon fontSize="small" />;
-    }
-    return <ReplayIcon fontSize="small" />; // completada
+    return <ReplayIcon fontSize="small" />;
   };
 
   const getAccionTooltip = (estado) => {
@@ -179,28 +336,17 @@ export default function ProyectoTareasEquipoSection({
     return "Reiniciar a pendiente";
   };
 
-  // cuando se hace click en el icono de acción
   const handleActionIconClick = (detalle, ev) => {
-    ev.stopPropagation();
+    ev?.stopPropagation?.();
     if (!session?.user) return;
-
     const accion = getAccionFromEstado(detalle.estado);
-    setConfirmState({
-      open: true,
-      detalle,
-      accion,
-    });
+    setConfirmState({ open: true, detalle, accion });
   };
 
   const handleCloseConfirmModal = () => {
-    setConfirmState({
-      open: false,
-      detalle: null,
-      accion: null,
-    });
+    setConfirmState({ open: false, detalle: null, accion: null });
   };
 
-  // Confirmar acción en el modal → llama al backend
   const handleConfirmAccion = async () => {
     const { detalle, accion } = confirmState;
     if (!detalle || !accion || !session?.user) return;
@@ -216,15 +362,14 @@ export default function ProyectoTareasEquipoSection({
       const res = await fetch(`${API}/tareas-detalle/update/${detalle.id}`, {
         method: "PATCH",
         headers,
-        body: JSON.stringify({ accion }), // 👈 solo mandamos la acción; el backend calcula todo
+        body: JSON.stringify({ accion }),
       });
 
       const json = await res.json().catch(() => null);
-      if (!res.ok) {
+      if (!res.ok)
         throw new Error(
-          json?.message || json?.msg || "Error al actualizar subtarea"
+          json?.message || json?.msg || "Error al actualizar subtarea",
         );
-      }
 
       handleCloseConfirmModal();
       router.refresh();
@@ -236,17 +381,63 @@ export default function ProyectoTareasEquipoSection({
     }
   };
 
-  const tareasOrdenadas = useMemo(() => {
-    return [...(tareas || [])].sort((a, b) => {
-      const oa = a.orden ?? 0;
-      const ob = b.orden ?? 0;
-      if (oa !== ob) return oa - ob;
-      return (
-        dayjs(a.fecha_inicio_plan).valueOf() -
-        dayjs(b.fecha_inicio_plan).valueOf()
-      );
+  // ========= AGRUPAR POR ÉPICA (MOSTRAR INCLUSO VACÍAS) =========
+  const epicasAgrupadas = useMemo(() => {
+    const map = new Map();
+
+    // 1) Pre-cargar todas las épicas (aunque no tengan tareas)
+    for (const e of epicas || []) {
+      if (!e?.id) continue;
+      map.set(e.id, {
+        id: e.id,
+        nombre: e.nombre?.trim() || "Épica sin nombre",
+        tareas: [],
+      });
+    }
+
+    // 2) Bucket "Sin épica" (por si hay tareas sin épica)
+    map.set("SIN_EPICA", { id: "SIN_EPICA", nombre: "Sin épica", tareas: [] });
+
+    // 3) Meter tareas dentro de su épica
+    const lista = Array.isArray(tareas) ? tareas : [];
+    for (const t of lista) {
+      const epId = t?.epica?.id || t?.epica_id || "SIN_EPICA";
+
+      if (!map.has(epId)) {
+        const epNombre =
+          epId === "SIN_EPICA"
+            ? "Sin épica"
+            : epicasById.get(epId)?.nombre?.trim() ||
+              t?.epica?.nombre?.trim() ||
+              "Épica sin nombre";
+
+        map.set(epId, { id: epId, nombre: epNombre, tareas: [] });
+      }
+
+      map.get(epId).tareas.push(t);
+    }
+
+    const rows = Array.from(map.values()).sort((a, b) => {
+      if (a.id === "SIN_EPICA") return 1;
+      if (b.id === "SIN_EPICA") return -1;
+      return String(a.nombre || "").localeCompare(String(b.nombre || ""), "es");
     });
-  }, [tareas]);
+
+    for (const ep of rows) {
+      ep.tareas = [...ep.tareas].sort((a, b) => {
+        const oa = a.orden ?? 0;
+        const ob = b.orden ?? 0;
+        if (oa !== ob) return oa - ob;
+        return (
+          dayjs(a.fecha_inicio_plan).valueOf() -
+          dayjs(b.fecha_inicio_plan).valueOf()
+        );
+      });
+      ep.stats = computeEpicStats(ep.tareas);
+    }
+
+    return rows;
+  }, [tareas, epicas, epicasById]);
 
   const currentAccionConfig =
     confirmState.accion && ACCION_LABELS[confirmState.accion]
@@ -256,336 +447,99 @@ export default function ProyectoTareasEquipoSection({
   const confirmTitle =
     currentAccionConfig?.title || "Confirmar acción en subtarea";
 
+  const renderSubtareaAccionCell = (d) => {
+    const isUpdating = updatingDetalleId === d.id;
+    if (isUpdating) return <CircularProgress size={18} />;
+
+    return (
+      <Tooltip title={getAccionTooltip(d.estado)}>
+        <button
+          type="button"
+          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all duration-200"
+          onClick={(ev) => handleActionIconClick(d, ev)}
+        >
+          {getAccionIcon(d.estado)}
+        </button>
+      </Tooltip>
+    );
+  };
+
   return (
     <>
-      <Card sx={{ mt: 4 }}>
-        <CardHeader
-          title="Tareas del proyecto"
-          subheader="Planificación, responsables y avance"
-          action={
-            // ✅ NUEVO: Importar Jira + Agregar tarea
-            <Stack direction="row" spacing={1} alignItems="center">
-              <ImportJiraCsvButton
-                proyectoId={proyectoId}
-                onDone={() => {
-                  // refresca para ver las nuevas tareas/subtareas importadas
-                  router.refresh();
-                }}
-              />
-
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<AddIcon />}
-                onClick={handleAddClick}
-              >
-                Agregar tarea
-              </Button>
-            </Stack>
-          }
-        />
-
-        <CardContent sx={{ p: 0 }}>
-          {tareasOrdenadas.length === 0 ? (
-            <Box sx={{ p: 3 }}>
+      <Card>
+        <CardContent sx={{ p: 2 }}>
+          {loadingEpicas ? (
+            <Box sx={{ p: 2 }}>
               <Typography variant="body2" color="text.secondary">
-                Aún no hay tareas para este proyecto. Usa el botón
-                <strong> “Agregar tarea”</strong> o <strong>“Importar Jira (CSV)”</strong>.
+                Cargando épicas...
               </Typography>
             </Box>
+          ) : epicasAgrupadas.length === 0 ? (
+            <Alert severity="info">
+              Aún no hay tareas para este proyecto. Usa <b>Agregar tarea</b> o{" "}
+              <b>Importar Jira (CSV)</b>.
+            </Alert>
           ) : (
-            <Box sx={{ width: "100%", overflowX: "auto" }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell width={40} />
-                    <TableCell>Nombre</TableCell>
-                    <TableCell>Responsable</TableCell>
-                    <TableCell>Estado</TableCell>
-                    <TableCell>Inicio plan</TableCell>
-                    <TableCell>Fin plan</TableCell>
-                    <TableCell width={180}>Avance</TableCell>
-                    <TableCell align="right">Acciones</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {tareasOrdenadas.map((t) => {
-                    const responsableNombre =
-                      t.responsable?.usuario?.nombre ||
-                      t.responsable?.usuario?.correo ||
-                      "—";
-
-                    const detalles =
-                      t.detalles || t.detalle || t.tareasDetalle || [];
-
-                    const expanded = expandedIds.includes(t.id);
-                    const totalSubtareas = detalles.length;
-                    const completadas = detalles.filter(
-                      (d) => d.estado === "completada"
-                    ).length;
-
-                    return (
-                      <Fragment key={t.id}>
-                        {/* FILA PRINCIPAL */}
-                        <TableRow
-                          hover
-                          sx={{ cursor: "pointer" }}
-                          onClick={() => handleRowClick(t)}
-                        >
-                          <TableCell
-                            onClick={(ev) => toggleExpanded(t.id, ev)}
-                            padding="checkbox"
-                          >
-                            <IconButton size="small">
-                              {expanded ? (
-                                <ExpandMoreIcon fontSize="small" />
-                              ) : (
-                                <ChevronRightIcon fontSize="small" />
-                              )}
-                            </IconButton>
-                          </TableCell>
-
-                          <TableCell>
-                            {t.nombre}
-                            {totalSubtareas > 0 && (
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                                sx={{ ml: 1 }}
-                              >
-                                ({completadas}/{totalSubtareas} subtareas)
-                              </Typography>
-                            )}
-                          </TableCell>
-
-                          <TableCell>{responsableNombre}</TableCell>
-
-                          <TableCell>
-                            <Chip
-                              label={
-                                ESTADO_LABELS[t.estado] || t.estado || "Pendiente"
-                              }
-                              size="small"
-                              color={
-                                t.estado === "completada"
-                                  ? "success"
-                                  : t.estado === "en_progreso"
-                                  ? "warning"
-                                  : "default"
-                              }
-                            />
-                          </TableCell>
-
-                          <TableCell>{formatDate(t.fecha_inicio_plan)}</TableCell>
-                          <TableCell>{formatDate(t.fecha_fin_plan)}</TableCell>
-
-                          <TableCell>
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                              }}
-                            >
-                              <Box sx={{ flex: 1 }}>
-                                <LinearProgress
-                                  variant="determinate"
-                                  value={Number(t.avance || 0)}
-                                />
-                              </Box>
-                              <Typography variant="caption">
-                                {Number(t.avance || 0)}%
-                              </Typography>
-                            </Box>
-                          </TableCell>
-
-                          <TableCell
-                            align="right"
-                            onClick={(ev) => ev.stopPropagation()}
-                          >
-                            <Tooltip title="Editar tarea">
-                              <IconButton
-                                size="small"
-                                onClick={(ev) => {
-                                  ev.stopPropagation();
-                                  handleRowClick(t);
-                                }}
-                              >
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-
-                            <Tooltip title="Eliminar tarea">
-                              <IconButton
-                                size="small"
-                                onClick={(ev) => handleDelete(t, ev)}
-                                disabled={deletingId === t.id}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </TableCell>
-                        </TableRow>
-
-                        {/* FILA DETALLE: SUBTAREAS */}
-                        <TableRow>
-                          <TableCell colSpan={8} sx={{ p: 0, border: 0 }}>
-                            <Collapse in={expanded} timeout="auto" unmountOnExit>
-                              <Box
-                                sx={{
-                                  pl: 7,
-                                  pr: 2,
-                                  pb: 1,
-                                  pt: 0.5,
-                                  bgcolor: "grey.50",
-                                }}
-                              >
-                                {detalles.length === 0 ? (
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                  >
-                                    Esta tarea no tiene subtareas.
-                                  </Typography>
-                                ) : (
-                                  <Table size="small">
-                                    <TableHead>
-                                      <TableRow>
-                                        <TableCell width={40}>Acción</TableCell>
-                                        <TableCell>Título</TableCell>
-                                        <TableCell>Responsable</TableCell>
-                                        <TableCell>Estado</TableCell>
-                                        <TableCell>Inicio plan</TableCell>
-                                        <TableCell>Fin plan</TableCell>
-                                        <TableCell>Días plan</TableCell>
-                                        <TableCell>Inicio real</TableCell>
-                                        <TableCell>Fin real</TableCell>
-                                        <TableCell>Dif. días</TableCell>
-                                      </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                      {detalles.map((d) => {
-                                        const respNombre =
-                                          d.responsable?.usuario?.nombre ||
-                                          d.responsable?.usuario?.correo ||
-                                          "—";
-
-                                        const desviacion = d.dias_desviacion;
-
-                                        let diffLabel = "—";
-                                        let diffColor = "text.secondary";
-
-                                        if (typeof desviacion === "number") {
-                                          if (desviacion === 0) {
-                                            diffLabel = "En plazo";
-                                            diffColor = "text.secondary";
-                                          } else if (desviacion > 0) {
-                                            const plural =
-                                              desviacion === 1 ? "" : "s";
-                                            diffLabel = `${desviacion} día${plural} de atraso`;
-                                            diffColor = "error.main";
-                                          } else {
-                                            const abs = Math.abs(desviacion);
-                                            const plural = abs === 1 ? "" : "s";
-                                            diffLabel = `${abs} día${plural} antes`;
-                                            diffColor = "success.main";
-                                          }
-                                        }
-
-                                        const isUpdating =
-                                          updatingDetalleId === d.id;
-
-                                        return (
-                                          <TableRow
-                                            key={d.id}
-                                            hover
-                                            sx={{ cursor: "default" }}
-                                          >
-                                            <TableCell padding="checkbox">
-                                              {isUpdating ? (
-                                                <CircularProgress size={18} />
-                                              ) : (
-                                                <Tooltip
-                                                  title={getAccionTooltip(
-                                                    d.estado
-                                                  )}
-                                                >
-                                                  <IconButton
-                                                    size="small"
-                                                    onClick={(ev) =>
-                                                      handleActionIconClick(
-                                                        d,
-                                                        ev
-                                                      )
-                                                    }
-                                                  >
-                                                    {getAccionIcon(d.estado)}
-                                                  </IconButton>
-                                                </Tooltip>
-                                              )}
-                                            </TableCell>
-                                            <TableCell>{d.titulo}</TableCell>
-                                            <TableCell>{respNombre}</TableCell>
-                                            <TableCell>
-                                              <Chip
-                                                label={
-                                                  ESTADO_LABELS[d.estado] ||
-                                                  d.estado ||
-                                                  "Pendiente"
-                                                }
-                                                size="small"
-                                                color={
-                                                  d.estado === "completada"
-                                                    ? "success"
-                                                    : d.estado ===
-                                                      "en_progreso"
-                                                    ? "warning"
-                                                    : "default"
-                                                }
-                                              />
-                                            </TableCell>
-                                            <TableCell>
-                                              {formatDate(d.fecha_inicio_plan)}
-                                            </TableCell>
-                                            <TableCell>
-                                              {formatDate(d.fecha_fin_plan)}
-                                            </TableCell>
-                                            <TableCell>
-                                              {d.dias_plan ?? "—"}
-                                            </TableCell>
-                                            <TableCell>
-                                              {formatDate(d.fecha_inicio_real)}
-                                            </TableCell>
-                                            <TableCell>
-                                              {formatDate(d.fecha_fin_real)}
-                                            </TableCell>
-                                            <TableCell>
-                                              <Typography
-                                                variant="caption"
-                                                sx={{ color: diffColor }}
-                                              >
-                                                {diffLabel}
-                                              </Typography>
-                                            </TableCell>
-                                          </TableRow>
-                                        );
-                                      })}
-                                    </TableBody>
-                                  </Table>
-                                )}
-                              </Box>
-                            </Collapse>
-                          </TableCell>
-                        </TableRow>
-                      </Fragment>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </Box>
+            <TasksTreePremium
+              proyectoId={proyectoId}
+              epicasAgrupadas={epicasAgrupadas}
+              expandedEpicaIds={expandedEpicaIds}
+              expandedTareaIds={expandedTareaIds}
+              deletingId={deletingId}
+              onToggleEpica={(epId, ev) => toggleExpandedEpica(epId, ev)}
+              onToggleTarea={(tId, ev) => toggleExpandedTarea(tId, ev)}
+              onOpenNewEpica={openNewEpica}
+              onOpenWizard={() => openWizard(null)}
+              onOpenNewTarea={openNewTarea}
+              onEditEpica={openEditEpica}
+              onNewTareaInEpica={openNewTareaInEpica}
+              onEditTarea={openEditTarea}
+              onDeleteTarea={handleDelete}
+              onNewSubtareaInTarea={openNewSubtarea}
+              onEditSubtarea={openEditSubtarea}
+              renderSubtareaAccionCell={renderSubtareaAccionCell}
+            />
           )}
         </CardContent>
 
+        <EpicaFormModal
+          open={epicaModalOpen}
+          onClose={() => setEpicaModalOpen(false)}
+          session={session}
+          proyectoId={proyectoId}
+          epica={editingEpica}
+          onSaved={async () => {
+            await reloadEpicas();
+            router.refresh();
+          }}
+        />
+
+        <TareaFormModal
+          open={tareaModalOpen}
+          onClose={() => setTareaModalOpen(false)}
+          session={session}
+          proyectoId={proyectoId}
+          miembros={miembros}
+          epicas={epicas}
+          tarea={editingTarea}
+          presetEpicaId={presetEpicaId}
+          onSaved={async () => {
+            await reloadEpicas();
+            router.refresh();
+          }}
+        />
+
+        <SubtareaFormModal
+          open={subModalOpen}
+          onClose={() => setSubModalOpen(false)}
+          session={session}
+          tarea={subTareaParent}
+          miembros={miembros}
+          subtarea={editingSub}
+          onSaved={() => router.refresh()}
+        />
+
+        {/* MODALES (tu legacy) */}
         <AddTareaModal
           open={modalOpen}
           onClose={() => setModalOpen(false)}
@@ -594,51 +548,45 @@ export default function ProyectoTareasEquipoSection({
           tarea={editingTarea}
           onSaved={handleSaved}
         />
+
+        <AssignEpicToTaskModal
+          open={assignEpicOpen}
+          onClose={() => setAssignEpicOpen(false)}
+          session={session}
+          epicas={epicas}
+          tarea={assignEpicTarea}
+          onSaved={async () => {
+            await reloadEpicas();
+            router.refresh();
+          }}
+        />
+
+        <WizardEpicaTareasSubtareasModal
+          open={wizardOpen}
+          onClose={() => setWizardOpen(false)}
+          session={session}
+          proyectoId={proyectoId}
+          epicas={epicas}
+          miembros={miembros}
+          epicaPreselectId={wizardEpicaPreselectId}
+          onSaved={async () => {
+            await reloadEpicas();
+            router.refresh();
+          }}
+        />
       </Card>
 
-      {/* Modal de confirmación para iniciar/finalizar/resetear subtarea */}
+      {/* CONFIRM MODAL SUBTAREA */}
       <Modal
         open={confirmState.open}
         onClose={handleCloseConfirmModal}
         title={confirmTitle}
       >
         <div className="space-y-4">
-          {confirmState.detalle && (
-            <>
-              <p className="text-sm text-gray-700">
-                {currentAccionConfig?.description ||
-                  "Confirma la acción que deseas realizar sobre esta subtarea."}
-              </p>
-
-              <div className="rounded-md bg-gray-50 px-4 py-3 text-xs text-gray-700 space-y-1">
-                <p>
-                  <span className="font-semibold">Subtarea: </span>
-                  {confirmState.detalle.titulo}
-                </p>
-                <p>
-                  <span className="font-semibold">Estado actual: </span>
-                  {ESTADO_LABELS[confirmState.detalle.estado] ||
-                    confirmState.detalle.estado}
-                </p>
-                <p>
-                  <span className="font-semibold">Inicio plan: </span>
-                  {formatDate(confirmState.detalle.fecha_inicio_plan)}
-                </p>
-                <p>
-                  <span className="font-semibold">Fin plan: </span>
-                  {formatDate(confirmState.detalle.fecha_fin_plan)}
-                </p>
-                <p>
-                  <span className="font-semibold">Inicio real: </span>
-                  {formatDate(confirmState.detalle.fecha_inicio_real)}
-                </p>
-                <p>
-                  <span className="font-semibold">Fin real: </span>
-                  {formatDate(confirmState.detalle.fecha_fin_real)}
-                </p>
-              </div>
-            </>
-          )}
+          <p className="text-sm text-gray-700">
+            {currentAccionConfig?.description ||
+              "Confirma la acción que deseas realizar sobre esta subtarea."}
+          </p>
 
           <div className="flex justify-end gap-2 pt-2">
             <button
@@ -648,6 +596,7 @@ export default function ProyectoTareasEquipoSection({
             >
               Cancelar
             </button>
+
             <button
               type="button"
               onClick={handleConfirmAccion}
