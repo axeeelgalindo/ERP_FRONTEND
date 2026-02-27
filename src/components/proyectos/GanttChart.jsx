@@ -75,7 +75,10 @@ function getStartPlan(item) {
   return parseDateSafe(item?.fecha_inicio_plan || item?.fechaInicioPlan);
 }
 function getEndPlan(item) {
-  return parseDateSafe(item?.fecha_fin_plan || item?.fechaFinPlan) || getStartPlan(item);
+  return (
+    parseDateSafe(item?.fecha_fin_plan || item?.fechaFinPlan) ||
+    getStartPlan(item)
+  );
 }
 
 function buildMonthSegments(days) {
@@ -114,7 +117,9 @@ function buildMonthSegments(days) {
 function calcTaskPct(taskAvance, subtareas) {
   const subs = Array.isArray(subtareas) ? subtareas : [];
   if (!subs.length) return clampPct(taskAvance);
-  const avg = subs.reduce((s, x) => s + clampPct(x?.__avance ?? x?.avance), 0) / subs.length;
+  const avg =
+    subs.reduce((s, x) => s + clampPct(x?.__avance ?? x?.avance), 0) /
+    subs.length;
   return Math.round(avg);
 }
 
@@ -128,7 +133,10 @@ function calcEpicPct(tasks) {
   return Math.round(avg);
 }
 
-export default function GanttChart({ tareas = [], heightPx = DEFAULT_HEIGHT_PX }) {
+export default function GanttChart({
+  tareas = [],
+  heightPx = DEFAULT_HEIGHT_PX,
+}) {
   const [cellWidth, setCellWidth] = useState(DEFAULT_CELL);
 
   // refs scroll
@@ -157,7 +165,8 @@ export default function GanttChart({ tareas = [], heightPx = DEFAULT_HEIGHT_PX }
       if (!start || !end) continue;
 
       const eid = getEpicaId(t) || noEpicKey;
-      const enombre = getEpicaNombre(t) || (eid === noEpicKey ? "Sin agrupar" : "Épica");
+      const enombre =
+        getEpicaNombre(t) || (eid === noEpicKey ? "Sin agrupar" : "Épica");
       const epic = ensureEpic(eid, enombre);
 
       const subtareasRaw = getSubtareasFromTarea(t);
@@ -227,9 +236,16 @@ export default function GanttChart({ tareas = [], heightPx = DEFAULT_HEIGHT_PX }
     });
 
     for (const e of epics) {
-      e.tareas.sort((a, b) => String(a.__nombre || "").localeCompare(String(b.__nombre || ""), "es"));
+      e.tareas.sort((a, b) =>
+        String(a.__nombre || "").localeCompare(String(b.__nombre || ""), "es"),
+      );
       for (const t of e.tareas) {
-        t.__subtareas.sort((a, b) => String(a.__nombre || "").localeCompare(String(b.__nombre || ""), "es"));
+        t.__subtareas.sort((a, b) =>
+          String(a.__nombre || "").localeCompare(
+            String(b.__nombre || ""),
+            "es",
+          ),
+        );
       }
     }
 
@@ -293,7 +309,8 @@ export default function GanttChart({ tareas = [], heightPx = DEFAULT_HEIGHT_PX }
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const todayIdx = today >= minDate && today <= maxDate ? diffDays(minDate, today) : null;
+    const todayIdx =
+      today >= minDate && today <= maxDate ? diffDays(minDate, today) : null;
 
     // ✅ rows SIEMPRE EXPANDIDO
     const rows = [];
@@ -521,7 +538,9 @@ export default function GanttChart({ tareas = [], heightPx = DEFAULT_HEIGHT_PX }
                     className="h-12 flex items-center gap-2 pl-6 pr-3 border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30"
                     title={row.__nombre}
                   >
-                    <div className="w-6 text-slate-400">{row.__subtareas?.length ? "▾" : "·"}</div>
+                    <div className="w-6 text-slate-400">
+                      {row.__subtareas?.length ? "▾" : "·"}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
                         {row.__nombre}
@@ -605,10 +624,13 @@ export default function GanttChart({ tareas = [], heightPx = DEFAULT_HEIGHT_PX }
                           title={`${row.__nombre} (${pct}%)`}
                         >
                           <div className="h-1.5 w-full bg-purple-200 rounded-full overflow-hidden">
-                            <div className="h-full bg-purple-500" style={{ width: `${pct}%` }} />
+                            <div
+                              className="h-full bg-purple-500"
+                              style={{ width: `${pct}%` }}
+                            />
                           </div>
-                          <span className="text-[10px] font-bold text-purple-800 uppercase whitespace-nowrap">
-                            ÉPICA ({pct}%)
+                          <span className="text-[10px] font-bold text-purple-800 whitespace-nowrap truncate max-w-[260px]">
+                            {row.__nombre} ({pct}%)
                           </span>
                         </div>
                       </div>
@@ -666,31 +688,52 @@ export default function GanttChart({ tareas = [], heightPx = DEFAULT_HEIGHT_PX }
         <div className="flex flex-wrap items-center gap-4 px-4 py-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
             <div className="w-6 h-4 border border-purple-400 bg-purple-100 rounded" />
-            <span className="text-xs text-slate-600 dark:text-slate-400">Épica</span>
+            <span className="text-xs text-slate-600 dark:text-slate-400">
+              Épica
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
             <div className="w-6 h-4 bg-slate-500 rounded" />
-            <span className="text-xs text-slate-600 dark:text-slate-400">Tarea</span>
+            <span className="text-xs text-slate-600 dark:text-slate-400">
+              Tarea
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
             <div className="w-6 h-2 bg-slate-400 rounded-sm" />
-            <span className="text-xs text-slate-600 dark:text-slate-400">Subtarea</span>
+            <span className="text-xs text-slate-600 dark:text-slate-400">
+              Subtarea
+            </span>
           </div>
 
           <div className="ml-auto flex items-center gap-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-1 rounded-md">
-            <button type="button" className="px-2 py-1 text-xs hover:bg-slate-200 dark:hover:bg-slate-700 rounded" onClick={zoomOut}>
+            <button
+              type="button"
+              className="px-2 py-1 text-xs hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
+              onClick={zoomOut}
+            >
               −
             </button>
 
-            <button type="button" className="px-2 py-1 text-xs hover:bg-slate-200 dark:hover:bg-slate-700 rounded" onClick={fitToScreen} title="Ajustar todo a pantalla">
+            <button
+              type="button"
+              className="px-2 py-1 text-xs hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
+              onClick={fitToScreen}
+              title="Ajustar todo a pantalla"
+            >
               Fit
             </button>
 
-            <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">Zoom</span>
+            <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+              Zoom
+            </span>
 
-            <button type="button" className="px-2 py-1 text-xs hover:bg-slate-200 dark:hover:bg-slate-700 rounded" onClick={zoomIn}>
+            <button
+              type="button"
+              className="px-2 py-1 text-xs hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
+              onClick={zoomIn}
+            >
               +
             </button>
           </div>

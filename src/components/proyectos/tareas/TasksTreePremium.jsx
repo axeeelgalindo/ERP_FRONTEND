@@ -17,6 +17,7 @@ import { Avatar, Tooltip, CircularProgress } from "@mui/material";
 
 import ImportJiraCsvButton from "./ImportJiraCsvButton"; // ✅ AJUSTA RUTA si corresponde
 
+
 function clampPct(n) {
   const v = Number(n || 0);
   if (!Number.isFinite(v)) return 0;

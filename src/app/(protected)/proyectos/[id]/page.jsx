@@ -28,10 +28,10 @@ function buildGanttRows(tareas) {
     const detalles = Array.isArray(t.detalles)
       ? t.detalles
       : Array.isArray(t.detalle)
-      ? t.detalle
-      : Array.isArray(t.tareasDetalle)
-      ? t.tareasDetalle
-      : [];
+        ? t.detalle
+        : Array.isArray(t.tareasDetalle)
+          ? t.tareasDetalle
+          : [];
 
     // === rango de la tarea padre ===
     let tareaStart = t.fecha_inicio_plan ?? null;
@@ -75,10 +75,10 @@ function buildGanttRows(tareas) {
         typeof d.avance === "number"
           ? d.avance
           : estado === "completa"
-          ? 100
-          : estado === "en_progreso"
-          ? 50
-          : 0;
+            ? 100
+            : estado === "en_progreso"
+              ? 50
+              : 0;
 
       rows.push({
         id: d.id,
@@ -138,10 +138,10 @@ export default async function ProyectoDetailPage({ params }) {
 
       <ProyectoKpis
         fin={fin}
-        tareas={tareasMetrics}
+        tareas={tareasMetrics ?? {}} // ✅ existe (metrics.tareas)
         clientePrincipal={clientePrincipal}
+        items={tareasList} // ✅ existe (proyecto.tareas)
       />
-
       {tareasGantt.length > 0 && (
         <ProyectoGanttSection
           tareas={tareasGantt}
@@ -149,8 +149,6 @@ export default async function ProyectoDetailPage({ params }) {
           miembros={miembros}
         />
       )}
-
-  
 
       <ProyectoTareasEquipoSection
         proyectoId={proyecto.id}
