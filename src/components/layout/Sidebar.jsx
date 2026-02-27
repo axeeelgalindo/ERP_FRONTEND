@@ -66,76 +66,83 @@ export default function Sidebar() {
         href: "/",
         label: "Inicio",
         Icon: Home,
-        roles: ["master", "admin", "user"],
+        roles: ["superadmin", "admin", "user"],
       },
       {
         href: "/clientes",
         label: "Clientes",
         Icon: Users,
-        roles: ["master", "admin", "user", "empleado" ],
+        roles: ["superadmin", "admin", "user", "empleado" ],
       },
       {
         href: "/proveedores",
         label: "Proveedores",
         Icon: Building2,
-        roles: ["master", "admin"],
+        roles: ["superadmin", "admin"],
       },
       {
         href: "/productos",
         label: "Productos",
         Icon: ShoppingCart,
-        roles: ["master", "admin"],
+        roles: ["superadmin", "admin"],
       },
       {
         href: "/proyectos",
         label: "Proyectos",
         Icon: FolderKanban,
-        roles: ["master", "admin"],
+        roles: ["superadmin", "admin"],
       },
       {
         href: "/empleados",
         label: "Empleados",
         Icon: IdCardIcon,
-        roles: ["master", "admin"],
+        roles: ["superadmin", "admin"],
       },
       {
         href: "/hh",
         label: "HH",
         Icon: CircleDollarSignIcon,
-        roles: ["master", "admin"],
+        roles: ["superadmin", "admin"],
       },
       {
         href: "/costeos",
         label: "Costeos",
         Icon: FileText,
-        roles: ["master", "admin", "user", "empleado"],
+        roles: ["superadmin", "admin", "user", "empleado"],
       },
       {
         href: "/compras",
         label: "Compras",
         Icon: FileSpreadsheet,
-        roles: ["master", "admin"],
+        roles: ["superadmin", "admin"],
       },
       {
         href: "/cotizaciones",
         label: "Cotizaciones",
         Icon: FileText,
-        roles: ["master", "admin", "user", "empleado"],
+        roles: ["superadmin", "admin", "user", "empleado"],
       },
       {
         href: "/empresas",
         label: "Empresas",
         Icon: Building2,
-        roles: ["master"],
-      }, // solo master crea/gestiona empresas
+        roles: ["superadmin"],
+      }, // solo superadmin crea/gestiona empresas
       {
         href: "/usuarios",
         label: "Usuarios",
         Icon: Users,
-        roles: ["master", "admin"],
+        roles: ["superadmin"],
+      },
+      , // solo superadmin crea/gestiona empresas
+      {
+        href: "/admin/folio-cotizaciones",
+        label: "Folio Cotizaciones",
+        Icon: FileText,
+        roles: ["superadmin"],
       },
     ];
-    if (rol === "master") return all;
+    if (rol === "superadmin") return all;
     if (rol === "admin") return all.filter((i) => i.roles.includes("admin"));
     if (rol === "empleado")
       return all.filter((i) => i.roles.includes("empleado"));
@@ -144,7 +151,7 @@ export default function Sidebar() {
     // por defecto, deja lo básico
     return all.filter(
       (i) =>
-        ["master", "admin", "empleado", "cliente"].includes("empleado") &&
+        ["superadmin", "admin", "empleado", "cliente"].includes("empleado") &&
         i.roles.includes("empleado")
     );
   }, [rol]);

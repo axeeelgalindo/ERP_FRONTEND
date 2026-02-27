@@ -443,37 +443,37 @@ export default function GanttChart({
     const a = clampPct(avance);
     if (a >= 100 || estado === "completada") return "bg-emerald-500";
     if (estado === "en_progreso" || (a > 0 && a < 100)) return "bg-blue-500";
-    return "bg-slate-300 dark:bg-slate-600";
+    return "bg-slate-300 ";
   };
 
   return (
     <div className="w-full">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-white  border border-slate-200  rounded-xl overflow-hidden shadow-sm">
         {/* Top bar */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200  bg-white ">
           <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+            <h3 className="text-base font-bold text-slate-900 ">
               Cronograma del proyecto
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-slate-500 ">
               Jerarquía 3 niveles: Épica → Tarea → Subtarea (siempre expandido)
             </p>
           </div>
         </div>
 
         {/* Header */}
-        <div className="flex overflow-hidden border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-          <div className="w-[320px] min-w-[320px] px-4 py-3 text-sm font-semibold border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
+        <div className="flex overflow-hidden border-b border-slate-200  bg-slate-50 ">
+          <div className="w-[320px] min-w-[320px] px-4 py-3 text-sm font-semibold border-r border-slate-200  bg-slate-50 ">
             Épica / Tarea / Subtarea
           </div>
 
           <div ref={headerXRef} className="flex-1 overflow-x-auto">
             <div className="min-w-max" style={{ width: totalWidth }}>
-              <div className="flex border-b border-slate-200 dark:border-slate-700">
+              <div className="flex border-b border-slate-200 ">
                 {model.monthSegments.map((m) => (
                   <div
                     key={m.key}
-                    className="px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
+                    className="px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500  border-r border-slate-200 bg-slate-50 "
                     style={{ width: m.len * cellWidth }}
                   >
                     {m.label}
@@ -481,11 +481,11 @@ export default function GanttChart({
                 ))}
               </div>
 
-              <div className="flex bg-slate-50 dark:bg-slate-800">
+              <div className="flex bg-slate-50 ">
                 {model.days.map((d, idx) => (
                   <div
                     key={idx}
-                    className="text-center py-1 text-[10px] font-medium text-slate-400 border-r border-slate-200/50 dark:border-slate-700/50"
+                    className="text-center py-1 text-[10px] font-medium text-slate-400 border-r border-slate-200/50 "
                     style={{ width: cellWidth }}
                   >
                     {fmtDay(d)}
@@ -501,7 +501,7 @@ export default function GanttChart({
           {/* Left list */}
           <div
             ref={leftBodyRef}
-            className="w-[320px] min-w-[320px] border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto"
+            className="w-[320px] min-w-[320px] border-r border-slate-200  bg-white  overflow-y-auto"
             style={{ maxHeight: heightPx }}
           >
             {model.rows.map((row) => {
@@ -512,19 +512,19 @@ export default function GanttChart({
                 return (
                   <div
                     key={key}
-                    className="h-12 flex items-center gap-2 px-3 border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30"
+                    className="h-12 flex items-center gap-2 px-3 border-b border-slate-100  hover:bg-slate-50 "
                     title={row.__nombre}
                   >
                     <div className="w-6 text-slate-400">▾</div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">
+                      <div className="text-sm font-bold text-slate-800  truncate">
                         Épica: {row.__nombre}
                       </div>
-                      <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                      <div className="text-[10px] text-slate-500 ">
                         {row.__tareasCount} Tareas • {row.__subtCount} Subtareas
                       </div>
                     </div>
-                    <div className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                    <div className="text-[11px] font-bold text-slate-600 ">
                       {pct}%
                     </div>
                   </div>
@@ -535,14 +535,14 @@ export default function GanttChart({
                 return (
                   <div
                     key={key}
-                    className="h-12 flex items-center gap-2 pl-6 pr-3 border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30"
+                    className="h-12 flex items-center gap-2 pl-6 pr-3 border-b border-slate-100  hover:bg-slate-50 "
                     title={row.__nombre}
                   >
                     <div className="w-6 text-slate-400">
                       {row.__subtareas?.length ? "▾" : "·"}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
+                      <div className="text-sm font-medium text-slate-700  truncate">
                         {row.__nombre}
                       </div>
                       <div className="text-[10px] text-slate-400 truncate">
@@ -556,12 +556,12 @@ export default function GanttChart({
               return (
                 <div
                   key={key}
-                  className="h-10 flex items-center gap-2 pl-12 pr-3 border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30"
+                  className="h-10 flex items-center gap-2 pl-12 pr-3 border-b border-slate-100  hover:bg-slate-50 "
                   title={row.__nombre}
                 >
                   <div className="w-6 text-slate-300">•</div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs text-slate-600 dark:text-slate-400 truncate">
+                    <div className="text-xs text-slate-600  truncate">
                       {row.__nombre}
                     </div>
                     <div className="text-[10px] text-slate-400 truncate">
@@ -576,7 +576,7 @@ export default function GanttChart({
           {/* Timeline */}
           <div
             ref={rightBodyYRef}
-            className="flex-1 overflow-y-auto bg-white dark:bg-slate-900"
+            className="flex-1 overflow-y-auto bg-white "
             style={{ maxHeight: heightPx }}
           >
             <div ref={bodyXRef} className="overflow-x-auto">
@@ -603,7 +603,7 @@ export default function GanttChart({
                       {model.days.map((_, i) => (
                         <div
                           key={i}
-                          className="absolute top-0 bottom-0 border-r border-slate-200/40 dark:border-slate-700/40"
+                          className="absolute top-0 bottom-0 border-r border-slate-200/40 "
                           style={{ left: i * cellWidth }}
                         />
                       ))}
@@ -614,7 +614,7 @@ export default function GanttChart({
                     return (
                       <div
                         key={key}
-                        className="relative border-b border-slate-100 dark:border-slate-800/50"
+                        className="relative border-b border-slate-100 "
                         style={{ height: h }}
                       >
                         {gridLines}
@@ -642,7 +642,7 @@ export default function GanttChart({
                     return (
                       <div
                         key={key}
-                        className="relative border-b border-slate-100 dark:border-slate-800/50"
+                        className="relative border-b border-slate-100 "
                         style={{ height: h }}
                       >
                         {gridLines}
@@ -663,7 +663,7 @@ export default function GanttChart({
                   return (
                     <div
                       key={key}
-                      className="relative border-b border-slate-100 dark:border-slate-800/50"
+                      className="relative border-b border-slate-100 "
                       style={{ height: h }}
                     >
                       {gridLines}
@@ -685,32 +685,26 @@ export default function GanttChart({
         </div>
 
         {/* Footer */}
-        <div className="flex flex-wrap items-center gap-4 px-4 py-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
+        <div className="flex flex-wrap items-center gap-4 px-4 py-3 bg-white  border-t border-slate-200 ">
           <div className="flex items-center gap-2">
             <div className="w-6 h-4 border border-purple-400 bg-purple-100 rounded" />
-            <span className="text-xs text-slate-600 dark:text-slate-400">
-              Épica
-            </span>
+            <span className="text-xs text-slate-600 ">Épica</span>
           </div>
 
           <div className="flex items-center gap-2">
             <div className="w-6 h-4 bg-slate-500 rounded" />
-            <span className="text-xs text-slate-600 dark:text-slate-400">
-              Tarea
-            </span>
+            <span className="text-xs text-slate-600 ">Tarea</span>
           </div>
 
           <div className="flex items-center gap-2">
             <div className="w-6 h-2 bg-slate-400 rounded-sm" />
-            <span className="text-xs text-slate-600 dark:text-slate-400">
-              Subtarea
-            </span>
+            <span className="text-xs text-slate-600 ">Subtarea</span>
           </div>
 
-          <div className="ml-auto flex items-center gap-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-1 rounded-md">
+          <div className="ml-auto flex items-center gap-2 bg-slate-50  border border-slate-200  px-2 py-1 rounded-md">
             <button
               type="button"
-              className="px-2 py-1 text-xs hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
+              className="px-2 py-1 text-xs hover:bg-slate-200  rounded"
               onClick={zoomOut}
             >
               −
@@ -718,20 +712,16 @@ export default function GanttChart({
 
             <button
               type="button"
-              className="px-2 py-1 text-xs hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
+              className="px-2 py-1 text-xs hover:bg-slate-200  rounded"
               onClick={fitToScreen}
               title="Ajustar todo a pantalla"
             >
               Fit
             </button>
-
-            <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
-              Zoom
-            </span>
-
+            <span className="text-[11px] font-bold text-slate-600 ">Zoom</span>
             <button
               type="button"
-              className="px-2 py-1 text-xs hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
+              className="px-2 py-1 text-xs hover:bg-slate-200  rounded"
               onClick={zoomIn}
             >
               +
