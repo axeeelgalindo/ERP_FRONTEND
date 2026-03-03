@@ -9,9 +9,25 @@ const API = process.env.NEXT_PUBLIC_API_URL;
 /* =========================
    Helpers
 ========================= */
+function pickEmpresaId(session) {
+  const u = session?.user || session || {};
+  return (
+    u.empresaId ??
+    u.empresa_id ??
+    u.empresa?.id ?? // 👈 ESTA ES LA CLAVE SI TE VIENE COMO OBJETO
+    u.empresa ?? // por si viene string directo
+    null
+  );
+}
+
+function pickToken(session) {
+  const u = session?.user || session || {};
+  return u.accessToken || session?.accessToken || "";
+}
+
 function makeHeadersJson(session) {
-  const token = session?.user?.accessToken || "";
-  const empresaId = session?.user?.empresaId ?? null;
+  const token = pickToken(session);
+  const empresaId = pickEmpresaId(session);
 
   return {
     "Content-Type": "application/json",
@@ -21,8 +37,8 @@ function makeHeadersJson(session) {
 }
 
 function makeHeadersMultipart(session) {
-  const token = session?.user?.accessToken || "";
-  const empresaId = session?.user?.empresaId ?? null;
+  const token = pickToken(session);
+  const empresaId = pickEmpresaId(session);
 
   return {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -258,9 +274,12 @@ export default function ComprasPage() {
       setLoading(true);
       setErr("");
 
-      const res = await fetch(`${API}/compras?page=${p}&pageSize=${clampPageSize(s)}`, {
-        headers: makeHeadersJson(session),
-      });
+      const res = await fetch(
+        `${API}/compras?page=${p}&pageSize=${clampPageSize(s)}`,
+        {
+          headers: makeHeadersJson(session),
+        },
+      );
 
       const payload = await jsonOrNull(res);
       if (!res.ok) {
@@ -297,19 +316,26 @@ export default function ComprasPage() {
         }),
       ]);
 
-      const [pProv, pProy] = await Promise.all([jsonOrNull(rProv), jsonOrNull(rProy)]);
+      const [pProv, pProy] = await Promise.all([
+        jsonOrNull(rProv),
+        jsonOrNull(rProy),
+      ]);
 
       if (!rProv.ok)
         throw new Error(
-          pProv?.message || pProv?.msg || pProv?.error || "Error proveedores"
+          pProv?.message || pProv?.msg || pProv?.error || "Error proveedores",
         );
       if (!rProy.ok)
         throw new Error(
-          pProy?.message || pProy?.msg || pProy?.error || "Error proyectos"
+          pProy?.message || pProy?.msg || pProy?.error || "Error proyectos",
         );
 
-      const provArr = Array.isArray(pProv) ? pProv : pProv?.data || [];
-      const proyArr = Array.isArray(pProy) ? pProy : pProy?.data || [];
+      const provArr = Array.isArray(pProv)
+        ? pProv
+        : pProv?.rows || pProv?.items || pProv?.data || [];
+      const proyArr = Array.isArray(pProy)
+        ? pProy
+        : pProy?.items || pProy?.rows || pProy?.data || [];
 
       setProveedores(provArr);
       setProyectos(proyArr);
@@ -337,10 +363,13 @@ export default function ComprasPage() {
   ========================= */
   const rows = useMemo(() => {
     const arr = bundle?.data || [];
-    const term = String(q || "").trim().toLowerCase();
+    const term = String(q || "")
+      .trim()
+      .toLowerCase();
 
     return arr.filter((c) => {
-      if (estadoFilter !== "ALL" && String(c.estado) !== estadoFilter) return false;
+      if (estadoFilter !== "ALL" && String(c.estado) !== estadoFilter)
+        return false;
 
       if (periodo) {
         const d = getCompraDate(c);
@@ -363,7 +392,15 @@ export default function ComprasPage() {
       const tipoDoc = c?.tipo_doc ?? "";
       const proyecto = c?.proyecto?.nombre ?? "";
 
-      const hay = [proveedorNombre, rut, razon, folio, tipoDoc, proyecto, c?.numero ?? ""]
+      const hay = [
+        proveedorNombre,
+        rut,
+        razon,
+        folio,
+        tipoDoc,
+        proyecto,
+        c?.numero ?? "",
+      ]
         .join(" ")
         .toLowerCase();
 
@@ -444,7 +481,9 @@ export default function ComprasPage() {
 
       const payload = await jsonOrNull(res);
       if (!res.ok) {
-        throw new Error(payload?.message || payload?.error || "Error subiendo factura");
+        throw new Error(
+          payload?.message || payload?.error || "Error subiendo factura",
+        );
       }
 
       await loadCompras({ page, pageSize });
@@ -480,7 +519,8 @@ export default function ComprasPage() {
     if (!c_tipoDoc) return setCreateErr("Selecciona tipo doc.");
     if (!c_folio) return setCreateErr("Ingresa folio.");
     if (!c_fechaDocto) return setCreateErr("Ingresa fecha del documento.");
-    if (!c_total || Number(c_total) <= 0) return setCreateErr("Ingresa total > 0.");
+    if (!c_total || Number(c_total) <= 0)
+      return setCreateErr("Ingresa total > 0.");
 
     try {
       setCreating(true);
@@ -502,7 +542,9 @@ export default function ComprasPage() {
 
       const payload = await jsonOrNull(res);
       if (!res.ok) {
-        throw new Error(payload?.message || payload?.error || "Error creando compra");
+        throw new Error(
+          payload?.message || payload?.error || "Error creando compra",
+        );
       }
 
       setOpenCreate(false);
@@ -536,7 +578,12 @@ export default function ComprasPage() {
       const payload = await jsonOrNull(res);
 
       if (!res.ok) {
-        throw new Error(payload?.message || payload?.msg || payload?.error || "Error cargando ventas");
+        throw new Error(
+          payload?.message ||
+            payload?.msg ||
+            payload?.error ||
+            "Error cargando ventas",
+        );
       }
 
       // soporta: { data: [...] } o array directo (por si tu endpoint cambia)
@@ -561,12 +608,14 @@ export default function ComprasPage() {
       // ✅ tu backend devuelve: { data: rows }
       const rows = payload?.data || [];
 
-      return rows.map((r) => ({
-        ventaId: String(r?.venta_id ?? r?.ventaId ?? r?.venta?.id ?? ""),
-        monto: Number(r?.monto || 0),
-        locked: true,
-        meta: r?.venta || null,
-      })).filter((x) => x.ventaId);
+      return rows
+        .map((r) => ({
+          ventaId: String(r?.venta_id ?? r?.ventaId ?? r?.venta?.id ?? ""),
+          monto: Number(r?.monto || 0),
+          locked: true,
+          meta: r?.venta || null,
+        }))
+        .filter((x) => x.ventaId);
     } catch {
       return [];
     }
@@ -623,7 +672,8 @@ export default function ComprasPage() {
       const base = Math.floor(total / next.length);
       const copy = next.map((a, idx) => ({
         ...a,
-        monto: idx === next.length - 1 ? total - base * (next.length - 1) : base,
+        monto:
+          idx === next.length - 1 ? total - base * (next.length - 1) : base,
         locked: false,
       }));
       return copy;
@@ -636,7 +686,7 @@ export default function ComprasPage() {
 
     setAsignaciones((prev) => {
       const next = prev.map((a) =>
-        a.ventaId === ventaId ? { ...a, monto, locked: true } : a
+        a.ventaId === ventaId ? { ...a, monto, locked: true } : a,
       );
 
       const unlocked = next.filter((a) => !a.locked);
@@ -712,7 +762,10 @@ export default function ComprasPage() {
       const payload = await jsonOrNull(res);
       if (!res.ok) {
         throw new Error(
-          payload?.message || payload?.msg || payload?.error || "Error guardando vinculación"
+          payload?.message ||
+            payload?.msg ||
+            payload?.error ||
+            "Error guardando vinculación",
         );
       }
 
@@ -747,7 +800,8 @@ export default function ComprasPage() {
             <div>
               <h1 className="text-lg md:text-xl font-semibold">Compras</h1>
               <p className="mt-1 text-sm text-slate-500">
-                Importa el CSV RCV del SII, vincula a costeos y sube facturas en PDF.
+                Importa el CSV RCV del SII, vincula a costeos y sube facturas en
+                PDF.
               </p>
               {lookupsErr && (
                 <div className="mt-2 text-xs text-amber-700">{lookupsErr}</div>
@@ -761,7 +815,10 @@ export default function ComprasPage() {
               <StatBox label="Total registros" value={bundle?.total ?? 0} />
               <StatBox label="Total página" value={toCLP(stats.pageTotal)} />
               <StatBox label="Página" value={bundle?.page ?? page} />
-              <StatBox label="Tamaño pág." value={bundle?.pageSize ?? pageSize} />
+              <StatBox
+                label="Tamaño pág."
+                value={bundle?.pageSize ?? pageSize}
+              />
             </div>
           </div>
 
@@ -812,8 +869,9 @@ export default function ComprasPage() {
         <div className="px-4 md:px-5 py-4 space-y-3">
           {periodo && pendientesPeriodo > 0 && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              Hay <b>{pendientesPeriodo}</b> compra(s) del periodo <b>{periodo}</b>{" "}
-              que aún no están <b>100%</b> vinculadas a un costeo.
+              Hay <b>{pendientesPeriodo}</b> compra(s) del periodo{" "}
+              <b>{periodo}</b> que aún no están <b>100%</b> vinculadas a un
+              costeo.
             </div>
           )}
 
@@ -882,10 +940,12 @@ export default function ComprasPage() {
           >
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <div>
-                <div className="font-medium">Arrastra un CSV aquí o selecciónalo</div>
+                <div className="font-medium">
+                  Arrastra un CSV aquí o selecciónalo
+                </div>
                 <div className="text-xs text-slate-500 mt-1">
-                  Tip: si importas el mismo documento (mismo proveedor + tipo doc + folio),
-                  debería marcarlo como <b>saltado</b>.
+                  Tip: si importas el mismo documento (mismo proveedor + tipo
+                  doc + folio), debería marcarlo como <b>saltado</b>.
                 </div>
               </div>
 
@@ -1081,14 +1141,18 @@ export default function ComprasPage() {
                         <td className="px-3 py-3">{rut}</td>
                         <td className="px-3 py-3">{c?.tipo_doc ?? "-"}</td>
                         <td className="px-3 py-3">{c?.folio ?? "-"}</td>
-                        <td className="px-3 py-3">{fmtDateDMY(c?.fecha_docto)}</td>
-                        <td className="px-3 py-3">{fmtDateDMY(c?.fecha_recepcion)}</td>
+                        <td className="px-3 py-3">
+                          {fmtDateDMY(c?.fecha_docto)}
+                        </td>
+                        <td className="px-3 py-3">
+                          {fmtDateDMY(c?.fecha_recepcion)}
+                        </td>
                         <td className="px-3 py-3">{proyecto}</td>
 
                         <td className="px-3 py-3">
                           <span
                             className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${pctBadge(
-                              pct
+                              pct,
                             )}`}
                             title="Porcentaje de vinculación al costeo"
                           >
@@ -1187,8 +1251,8 @@ export default function ComprasPage() {
                 className="h-9 rounded-lg border px-3 text-sm hover:bg-slate-50 disabled:opacity-60"
                 disabled={
                   loading ||
-                  ((bundle?.page ?? page) * (bundle?.pageSize ?? pageSize) >=
-                    (bundle?.total ?? 0))
+                  (bundle?.page ?? page) * (bundle?.pageSize ?? pageSize) >=
+                    (bundle?.total ?? 0)
                 }
                 onClick={() => {
                   const p = (bundle?.page ?? page) + 1;
@@ -1334,7 +1398,7 @@ export default function ComprasPage() {
         title={
           compraSel
             ? `Vincular compra #${compraSel?.numero ?? "-"} · Total ${toCLP(
-                compraSel?.total
+                compraSel?.total,
               )}`
             : "Vincular compra"
         }
@@ -1397,10 +1461,12 @@ export default function ComprasPage() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Lista ventas */} 
+          {/* Lista ventas */}
           <div className="rounded-xl border">
             <div className="p-3 border-b flex items-center justify-between">
-              <div className="font-semibold text-sm">Costeos disponibles (ventas)</div>
+              <div className="font-semibold text-sm">
+                Costeos disponibles (ventas)
+              </div>
               <button
                 className="h-8 rounded-lg border px-2 text-xs hover:bg-slate-50 disabled:opacity-60"
                 onClick={loadCosteosDisponibles}
@@ -1442,12 +1508,13 @@ export default function ComprasPage() {
             </div>
           </div>
 
-          {/* Asignación */} 
+          {/* Asignación */}
           <div className="rounded-xl border">
             <div className="p-3 border-b">
               <div className="font-semibold text-sm">Asignación</div>
               <div className="text-xs text-slate-500 mt-1">
-                Selecciona 1+ ventas. La suma debe ser igual al total de la compra.
+                Selecciona 1+ ventas. La suma debe ser igual al total de la
+                compra.
               </div>
             </div>
 
@@ -1461,7 +1528,9 @@ export default function ComprasPage() {
                   {asignaciones.map((a) => {
                     const meta =
                       a.meta ||
-                      costeosDisponibles.find((x) => String(x.id) === String(a.ventaId)) ||
+                      costeosDisponibles.find(
+                        (x) => String(x.id) === String(a.ventaId),
+                      ) ||
                       null;
 
                     return (
@@ -1471,7 +1540,8 @@ export default function ComprasPage() {
                       >
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-medium truncate">
-                            #{meta?.numero ?? "-"} {meta?.descripcion ?? a.ventaId}
+                            #{meta?.numero ?? "-"}{" "}
+                            {meta?.descripcion ?? a.ventaId}
                           </div>
                           <div className="text-xs text-slate-500">
                             {a.locked ? "Fijo" : "Auto"}
@@ -1482,7 +1552,9 @@ export default function ComprasPage() {
                           type="number"
                           className="h-9 w-40 rounded-lg border px-2 text-sm"
                           value={Number(a.monto || 0)}
-                          onChange={(e) => updateMonto(a.ventaId, e.target.value)}
+                          onChange={(e) =>
+                            updateMonto(a.ventaId, e.target.value)
+                          }
                           min={0}
                         />
                       </div>
