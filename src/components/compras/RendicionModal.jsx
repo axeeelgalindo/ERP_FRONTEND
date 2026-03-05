@@ -502,23 +502,23 @@ export default function RendicionModal({
       {/* =========================
           MODAL SELECCIÓN RENDICIÓN (nuevo look)
       ========================= */}
-      <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+      <div className="w-full max-w-2xl bg-white  rounded-xl shadow-2xl border border-slate-200  overflow-hidden">
         {/* Header sticky */}
-        <div className="border-b border-slate-100 dark:border-slate-800 p-5 flex justify-between items-start bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-10">
+        <div className="border-b border-slate-100  p-5 flex justify-between items-start bg-white/80  backdrop-blur-md sticky top-0 z-10">
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <span className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+              <span className="bg-blue-100 text-blue-700   text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                 Rendición
               </span>
 
-              <h1 className="text-xl font-bold text-slate-900 dark:text-white truncate">
+              <h1 className="text-xl font-bold text-slate-900  truncate">
                 Compra #{compra?.numero ?? "-"}{" "}
-                <span className="text-slate-400 dark:text-slate-500 font-normal">·</span>{" "}
+                <span className="text-slate-400  font-normal">·</span>{" "}
                 {toCLP(compra?.total)}
               </h1>
             </div>
 
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-slate-500 ">
               Seleccione una rendición compatible con el destino y proyecto.
             </p>
 
@@ -530,7 +530,7 @@ export default function RendicionModal({
           </div>
 
           <button
-            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
+            className="p-2 hover:bg-slate-100   rounded-full transition-colors"
             onClick={onClose}
             type="button"
             title="Cerrar"
@@ -540,12 +540,12 @@ export default function RendicionModal({
         </div>
 
         {/* Info bar */}
-        <div className="px-6 py-3 bg-slate-50 dark:bg-slate-800/50 flex flex-wrap gap-x-6 gap-y-2 border-b border-slate-100 dark:border-slate-800">
+        <div className="px-6 py-3 bg-slate-50  flex flex-wrap gap-x-6 gap-y-2 border-b border-slate-100 ">
           <div className="flex items-center gap-2">
             <span className="text-slate-400 text-sm">🏢</span>
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-medium text-slate-500 ">
               Destino:{" "}
-              <span className="text-slate-800 dark:text-slate-200 uppercase">
+              <span className="text-slate-800  uppercase">
                 {safeStr(compraInfo.destino)}
               </span>
             </span>
@@ -553,9 +553,9 @@ export default function RendicionModal({
 
           <div className="flex items-center gap-2">
             <span className="text-slate-400 text-sm">📌</span>
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-medium text-slate-500 ">
               Proyecto:{" "}
-              <span className="text-slate-800 dark:text-slate-200 uppercase tracking-tighter">
+              <span className="text-slate-800  uppercase tracking-tighter">
                 {safeStr(compraInfo.proyecto)}
               </span>
             </span>
@@ -563,9 +563,9 @@ export default function RendicionModal({
 
           <div className="flex items-center gap-2 ml-auto">
             <span className="text-slate-400 text-sm">📅</span>
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            <span className="text-xs font-medium text-slate-500 ">
               Fecha:{" "}
-              <span className="text-slate-800 dark:text-slate-200">
+              <span className="text-slate-800 ">
                 {fmtDateDMY(compra?.fecha_docto)}
               </span>
             </span>
@@ -575,7 +575,7 @@ export default function RendicionModal({
         {/* Body */}
         <div className="p-6 space-y-6">
           {loading ? (
-            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/30 p-4 text-sm text-slate-500">
+            <div className="rounded-xl border border-slate-200  bg-slate-50  p-4 text-sm text-slate-500">
               Cargando rendiciones…
             </div>
           ) : null}
@@ -583,13 +583,13 @@ export default function RendicionModal({
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
             <div className="md:col-span-12 space-y-4">
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                <label className="text-xs font-bold text-slate-500  uppercase tracking-widest">
                   Vincular a Rendición
                 </label>
 
                 <div className="relative">
                   <select
-                    className="w-full pl-4 pr-10 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg appearance-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900 dark:text-white transition-all"
+                    className="w-full pl-4 pr-10 py-3 bg-white  border border-slate-200  rounded-lg appearance-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900  transition-all"
                     value={rendicionId}
                     onChange={(e) => setRendicionId(e.target.value)}
                     disabled={loading}
@@ -614,7 +614,7 @@ export default function RendicionModal({
                     type="button"
                     onClick={loadRendiciones}
                     disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 text-slate-700 dark:text-slate-300 rounded-lg font-medium transition-all text-sm group shadow-sm disabled:opacity-60"
+                    className="flex items-center gap-2 px-4 py-2 bg-white  border border-slate-200  hover:border-slate-400  text-slate-700  rounded-lg font-medium transition-all text-sm group shadow-sm disabled:opacity-60"
                   >
                     <span className="text-slate-400 group-hover:text-blue-500 transition-colors text-lg">
                       ⟳
@@ -625,7 +625,7 @@ export default function RendicionModal({
                   <button
                     type="button"
                     onClick={openCreateModal}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-medium transition-all text-sm shadow-md shadow-slate-200 dark:shadow-none"
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-medium transition-all text-sm shadow-md shadow-slate-200 "
                   >
                     <span className="text-lg">＋</span>
                     Nueva rendición
@@ -633,9 +633,9 @@ export default function RendicionModal({
                 </div>
               </div>
 
-              <div className="md:col-span-12 flex gap-3 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-900/30">
+              <div className="md:col-span-12 flex gap-3 p-4 bg-blue-50  rounded-lg border border-blue-100 ">
                 <span className="text-blue-500">ℹ️</span>
-                <p className="text-sm text-blue-800 dark:text-blue-300 leading-relaxed">
+                <p className="text-sm text-blue-800  leading-relaxed">
                   Solo se muestran rendiciones que coincidan con el destino{" "}
                   <strong>"{safeStr(compraInfo.destino)}"</strong>{" "}
                   {compraInfo.destino === "PROYECTO" ? (
@@ -657,11 +657,11 @@ export default function RendicionModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-5 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+        <div className="px-6 py-5 border-t border-slate-100  flex justify-between items-center bg-slate-50/50 ">
           <button
             type="button"
             onClick={() => setRendicionId("")}
-            className="px-5 py-2 text-sm font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-transparent hover:border-red-200 dark:hover:border-red-900/50"
+            className="px-5 py-2 text-sm font-semibold text-red-600  hover:bg-red-50  rounded-lg transition-colors border border-transparent hover:border-red-200 "
             title="Desvincular compra de cualquier rendición"
           >
             Desvincular
@@ -671,7 +671,7 @@ export default function RendicionModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              className="px-5 py-2 text-sm font-semibold text-slate-600  hover:bg-slate-100  rounded-lg transition-colors"
             >
               Cancelar
             </button>
@@ -679,7 +679,7 @@ export default function RendicionModal({
             <button
               type="button"
               onClick={guardarAsignacion}
-              className="px-8 py-2 text-sm font-bold bg-slate-900 text-white rounded-lg hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-slate-200 dark:shadow-none"
+              className="px-8 py-2 text-sm font-bold bg-slate-900 text-white rounded-lg hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-slate-200 "
             >
               Guardar Cambios
             </button>
@@ -697,14 +697,14 @@ export default function RendicionModal({
             if (e.target === e.currentTarget) closeCreateModal();
           }}
         >
-          <div className="bg-white dark:bg-[#020617] w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
+          <div className="bg-white  w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 ">
             {/* Header */}
-            <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-start">
+            <div className="px-8 py-6 border-b border-slate-100  flex justify-between items-start">
               <div>
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+                <h1 className="text-2xl font-bold text-slate-900 ">
                   Nueva rendición
                 </h1>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                <p className="text-sm text-slate-500  mt-1">
                   Se creará con <span className="font-semibold">destino/centro</span>{" "}
                   de la compra. Si destino es{" "}
                   <span className="font-semibold">PROYECTO</span>, requiere proyecto.
@@ -712,7 +712,7 @@ export default function RendicionModal({
               </div>
 
               <button
-                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
+                className="p-2 hover:bg-slate-100  rounded-full transition-colors"
                 onClick={closeCreateModal}
                 type="button"
                 title="Cerrar"
@@ -722,7 +722,7 @@ export default function RendicionModal({
             </div>
 
             {/* Stepper (clickable 1/2) */}
-            <div className="px-8 py-6 bg-slate-50 dark:bg-slate-900/50 flex justify-center border-b border-slate-100 dark:border-slate-800">
+            <div className="px-8 py-6 bg-slate-50  flex justify-center border-b border-slate-100 ">
               <div className="flex items-center space-x-4 w-full max-w-md">
                 {/* Step 1 */}
                 <button
@@ -732,11 +732,11 @@ export default function RendicionModal({
                   title="Ir a Datos Generales"
                 >
                   <div
-                    className={`w-10 h-10 rounded-full border-2 flex items-center justify-center bg-white dark:bg-slate-800 font-bold z-10 transition-all duration-300
+                    className={`w-10 h-10 rounded-full border-2 flex items-center justify-center bg-white  font-bold z-10 transition-all duration-300
                       ${
                         step === 1
-                          ? "border-slate-900 text-slate-900 dark:border-white dark:text-white"
-                          : "border-slate-200 text-slate-400 dark:border-slate-700 dark:text-slate-500"
+                          ? "border-slate-900 text-slate-900"
+                          : "border-slate-200 text-slate-400"
                       }
                     `}
                   >
@@ -745,15 +745,15 @@ export default function RendicionModal({
                   <span
                     className={`text-xs font-semibold mt-2 ${
                       step === 1
-                        ? "text-slate-700 dark:text-slate-200"
-                        : "text-slate-400 dark:text-slate-500"
+                        ? "text-slate-700 "
+                        : "text-slate-400 "
                     }`}
                   >
                     Datos Generales
                   </span>
                 </button>
 
-                <div className="h-0.5 bg-slate-200 dark:bg-slate-700 flex-1 -mt-6" />
+                <div className="h-0.5 bg-slate-200  flex-1 -mt-6" />
 
                 {/* Step 2 */}
                 <button
@@ -767,11 +767,11 @@ export default function RendicionModal({
                   title="Ir a Detalle de Ítems"
                 >
                   <div
-                    className={`w-10 h-10 rounded-full border-2 flex items-center justify-center bg-white dark:bg-slate-800 font-bold z-10 transition-all duration-300
+                    className={`w-10 h-10 rounded-full border-2 flex items-center justify-center bg-white  font-bold z-10 transition-all duration-300
                       ${
                         step === 2
-                          ? "border-slate-900 text-slate-900 dark:border-white dark:text-white"
-                          : "border-slate-200 text-slate-400 dark:border-slate-700 dark:text-slate-500"
+                          ? "border-slate-900 text-slate-900"
+                          : "border-slate-200 text-slate-400"
                       }
                     `}
                   >
@@ -780,8 +780,8 @@ export default function RendicionModal({
                   <span
                     className={`text-xs font-semibold mt-2 ${
                       step === 2
-                        ? "text-slate-700 dark:text-slate-200"
-                        : "text-slate-400 dark:text-slate-500"
+                        ? "text-slate-700 "
+                        : "text-slate-400 "
                     }`}
                   >
                     Detalle de Ítems
@@ -804,11 +804,11 @@ export default function RendicionModal({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        <label className="block text-sm font-semibold text-slate-700  mb-1">
                           Empleado *
                         </label>
                         <select
-                          className="w-full rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:ring-slate-900 focus:border-slate-900"
+                          className="w-full rounded-lg border-slate-200   focus:ring-slate-900 focus:border-slate-900"
                           value={r_empleadoId}
                           onChange={(e) => setR_empleadoId(e.target.value)}
                           disabled={empLoading}
@@ -828,11 +828,11 @@ export default function RendicionModal({
                       </div>
 
                       <div>
-                        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        <label className="block text-sm font-semibold text-slate-700  mb-1">
                           Descripción *
                         </label>
                         <textarea
-                          className="w-full rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:ring-slate-900 focus:border-slate-900"
+                          className="w-full rounded-lg border-slate-200   focus:ring-slate-900 focus:border-slate-900"
                           placeholder="Ej: Rendición compra de materiales..."
                           rows={3}
                           value={r_desc}
@@ -841,12 +841,12 @@ export default function RendicionModal({
                       </div>
                     </div>
 
-                    <div className="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col justify-center">
-                      <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 dark:text-slate-500 mb-2">
+                    <div className="bg-slate-50  p-5 rounded-xl border border-slate-200  flex flex-col justify-center">
+                      <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400  mb-2">
                         Destino / Centro
                       </span>
 
-                      <div className="flex items-center space-x-2 text-slate-900 dark:text-white font-bold text-lg">
+                      <div className="flex items-center space-x-2 text-slate-900  font-bold text-lg">
                         <span className="text-slate-400">🏢</span>
                         <span>
                           {safeStr(compraInfo.destino)} · {safeStr(compraInfo.centro ?? "-")}
@@ -856,12 +856,12 @@ export default function RendicionModal({
                       <div className="mt-4 space-y-2">
                         <div className="flex justify-between items-center text-sm">
                           <span className="text-slate-500">Proyecto:</span>
-                          <span className="font-medium dark:text-slate-300">
+                          <span className="font-medium ">
                             {safeStr(compraInfo.proyecto)}
                           </span>
                         </div>
 
-                        <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                        <div className="pt-2 border-t border-slate-200 ">
                           <p className="text-xs italic text-slate-400">
                             {compraInfo.destino === "PROYECTO"
                               ? "Requiere proyecto_id (se toma desde la compra)."
@@ -878,14 +878,14 @@ export default function RendicionModal({
               {step === 2 ? (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <h3 className="font-bold text-slate-800 dark:text-white flex items-center">
+                    <h3 className="font-bold text-slate-800  flex items-center">
                       <span className="text-slate-400 mr-2">📋</span>
                       Ítems de la Rendición
                     </h3>
 
                     <button
                       type="button"
-                      className="flex items-center space-x-1 text-sm font-semibold text-slate-900 dark:text-slate-100 hover:opacity-80 transition-opacity"
+                      className="flex items-center space-x-1 text-sm font-semibold text-slate-900  hover:opacity-80 transition-opacity"
                       onClick={addItem}
                     >
                       <span className="text-sm">＋</span>
@@ -897,7 +897,7 @@ export default function RendicionModal({
                     {r_items.map((it, idx) => (
                       <div
                         key={idx}
-                        className="p-5 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 relative"
+                        className="p-5 border border-slate-200  rounded-xl bg-white  relative"
                       >
                         <div className="absolute top-4 right-4 flex space-x-2">
                           {r_items.length > 1 ? (
@@ -912,7 +912,7 @@ export default function RendicionModal({
                           ) : null}
                         </div>
 
-                        <span className="inline-block px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-4 uppercase">
+                        <span className="inline-block px-2 py-0.5 bg-slate-100  rounded text-[10px] font-bold text-slate-500  mb-4 uppercase">
                           Ítem #{idx + 1}
                         </span>
 
@@ -922,7 +922,7 @@ export default function RendicionModal({
                               Fecha
                             </label>
                             <input
-                              className="w-full text-sm rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white focus:ring-slate-900"
+                              className="w-full text-sm rounded-lg border-slate-200  focus:ring-slate-900"
                               type="date"
                               value={it.fecha}
                               onChange={(e) => updateItem(idx, "fecha", e.target.value)}
@@ -938,7 +938,7 @@ export default function RendicionModal({
                                 $
                               </span>
                               <input
-                                className="w-full pl-7 text-sm rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white focus:ring-slate-900"
+                                className="w-full pl-7 text-sm rounded-lg border-slate-200  focus:ring-slate-900"
                                 placeholder="0"
                                 type="number"
                                 min={0}
@@ -953,7 +953,7 @@ export default function RendicionModal({
                               Categoría
                             </label>
                             <select
-                              className="w-full text-sm rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white focus:ring-slate-900"
+                              className="w-full text-sm rounded-lg border-slate-200  focus:ring-slate-900"
                               value={it.categoria || ""}
                               onChange={(e) => updateItem(idx, "categoria", e.target.value)}
                             >
@@ -970,7 +970,7 @@ export default function RendicionModal({
                               Descripción
                             </label>
                             <input
-                              className="w-full text-sm rounded-lg border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-white focus:ring-slate-900"
+                              className="w-full text-sm rounded-lg border-slate-200  focus:ring-slate-900"
                               placeholder="Ej: Taxi / materiales / colación..."
                               type="text"
                               value={it.descripcion}
@@ -985,7 +985,7 @@ export default function RendicionModal({
                               Comprobante
                             </label>
 
-                            <label className="flex items-center justify-center px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                            <label className="flex items-center justify-center px-4 py-2 bg-slate-50  border border-dashed border-slate-300  rounded-lg cursor-pointer hover:bg-slate-100  transition-colors">
                               <span className="text-sm text-slate-400 mr-2">⬆️</span>
                               <span className="text-xs text-slate-500">
                                 {it.comprobante_name ? "Cambiar archivo" : "Subir archivo"}
@@ -1015,10 +1015,10 @@ export default function RendicionModal({
                     ))}
                   </div>
 
-                  <div className="flex justify-between items-center pt-4 border-t border-slate-100 dark:border-slate-800">
-                    <span className="text-slate-500 dark:text-slate-400 text-sm">
+                  <div className="flex justify-between items-center pt-4 border-t border-slate-100 ">
+                    <span className="text-slate-500  text-sm">
                       Total estimado:{" "}
-                      <span className="font-bold text-slate-900 dark:text-white text-base">
+                      <span className="font-bold text-slate-900  text-base">
                         {toCLP(totalItems)}
                       </span>
                     </span>
@@ -1028,12 +1028,12 @@ export default function RendicionModal({
             </div>
 
             {/* Footer stepper */}
-            <div className="px-8 py-6 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800">
+            <div className="px-8 py-6 bg-slate-50  border-t border-slate-100 ">
               {step === 1 ? (
                 <div className="flex justify-end space-x-3">
                   <button
                     type="button"
-                    className="px-6 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                    className="px-6 py-2.5 rounded-xl border border-slate-200  text-slate-600  font-semibold hover:bg-slate-100  transition-all"
                     onClick={closeCreateModal}
                     disabled={creating}
                   >
@@ -1061,7 +1061,7 @@ export default function RendicionModal({
                 <div className="flex justify-between items-center">
                   <button
                     type="button"
-                    className="px-6 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center"
+                    className="px-6 py-2.5 rounded-xl border border-slate-200  text-slate-600  font-semibold hover:bg-slate-100  transition-all flex items-center"
                     onClick={() => setStep(1)}
                     disabled={creating}
                   >
@@ -1073,7 +1073,7 @@ export default function RendicionModal({
                     {/* Si no tienes endpoint de borrador, lo dejamos como UI (no hace nada) */}
                     <button
                       type="button"
-                      className="px-6 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                      className="px-6 py-2.5 rounded-xl border border-slate-200  text-slate-600  font-semibold hover:bg-slate-100  transition-all"
                       onClick={() => {
                         setCreateErr("Borrador no implementado (solo UI).");
                       }}

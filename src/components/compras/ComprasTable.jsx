@@ -29,8 +29,8 @@ function RendicionCell({ compra }) {
         "inline-flex items-center justify-center",
         "h-6 w-6 rounded-full text-xs font-bold",
         has
-          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-          : "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
+          ? "bg-emerald-100 text-emerald-700  "
+          : "bg-rose-100 text-rose-700  ",
       ].join(" ")}
       title={has ? "Con rendición" : "Sin rendición"}
     >

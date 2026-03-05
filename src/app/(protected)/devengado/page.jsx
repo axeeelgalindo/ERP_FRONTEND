@@ -5,14 +5,16 @@ import React, { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 /**
- * ✅ DEVENGADO DETALLADO (1 PROYECTO) — UI “real” con gráficos (sin libs)
- * - Avance ponderado por subtareas (costo_plan || horas_plan || 1)
- * - Devengado $ = Venta base (neto) * Avance
- * - Costos reales = HH (desde costeo) + Compras (facturadas/total)
- * - Panel semanal: deltas de avance + devengado semanal (mock)
+ * ✅ DEVENGADO / GANANCIA (SOLO POSITIVOS) — UI real con forecast semanal
  *
- * Nota: aquí todo es mock dentro del archivo para que funcione “copiar/pegar”.
- * Cuando tengas endpoint real, reemplazas makeProjectDevengadoMock() por fetch.
+ * Cambios clave:
+ * - Ya NO mostramos “utilidad devengada” negativa.
+ * - Mostramos “GANANCIA (solo positivos)” = max(0, ingresoDevengadoPeriodo - costoPeriodo)
+ * - Ingreso devengado semanal se calcula con el DELTA de avance de la semana:
+ *      ingresoSemana = ventaBaseNeto * deltaAvanceSemana
+ * - Además breakdown por épicas / tareas / subtareas:
+ *      asignamos el ingreso semanal según ponderación por subtarea (costo_plan || horas_plan || 1)
+ * - Forecast: “esta semana” y “próxima semana” usando promedio diario de la semana pasada.
  */
 
 /* ----------------------- helpers base ----------------------- */
@@ -59,8 +61,47 @@ function endOfMonthUTC(y, m1to12) {
 function daysInMonth(y, m1to12) {
   return new Date(y, m1to12, 0).getDate();
 }
+function dateKey(d) {
+  const x = new Date(d);
+  const y = x.getFullYear();
+  const m = String(x.getMonth() + 1).padStart(2, "0");
+  const dd = String(x.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
 
-/* ----------------------- mock “realista” ----------------------- */
+/* ----------------------- ventanas semanales (7 días) -----------------------
+   - Semana pasada: [-13 .. -7]
+   - Esta semana:   [-6  ..  0]   (incluye hoy)
+   - Próx semana:   [+1  .. +7]
+--------------------------------------------------------------------------- */
+function makeWeekWindows(today = new Date()) {
+  const startLast = addDays(today, -13);
+  const endLast = addDays(today, -7);
+  const startThis = addDays(today, -6);
+  const endThis = addDays(today, 0);
+  const startNext = addDays(today, 1);
+  const endNext = addDays(today, 7);
+  return {
+    last: { key: "last", label: "Semana pasada", start: startLast, end: endLast },
+    this: { key: "this", label: "Esta semana", start: startThis, end: endThis },
+    next: { key: "next", label: "Próxima semana", start: startNext, end: endNext },
+  };
+}
+
+function daysBetweenInclusive(start, end) {
+  const out = [];
+  const s = new Date(start);
+  const e = new Date(end);
+  s.setHours(12, 0, 0, 0);
+  e.setHours(12, 0, 0, 0);
+  for (let d = new Date(s); d <= e; d = addDays(d, 1)) out.push(new Date(d));
+  return out;
+}
+
+/* ----------------------- MOCK con “historial” de avance por subtarea -----------------------
+   Cada subtarea tendrá progress_events: [{date, avance}] en últimos 21 días.
+   Así podemos calcular delta de avance en semana pasada / esta / próxima.
+------------------------------------------------------------------------------------------- */
 function makeProjectDevengadoMock({
   seed = 20260302,
   anio = 2026,
@@ -71,6 +112,9 @@ function makeProjectDevengadoMock({
   const monthStart = startOfMonthUTC(anio, mes);
   const monthEnd = endOfMonthUTC(anio, mes);
   const dim = daysInMonth(anio, mes);
+
+  const hoy = new Date();
+  const windows = makeWeekWindows(hoy);
 
   const proyecto = {
     id: proyectoId || cuidLike(rng),
@@ -86,7 +130,7 @@ function makeProjectDevengadoMock({
     presupuesto: int(rng, 8_000_000, 42_000_000),
   };
 
-  // Cotización + Venta (costeo)
+  // Cotización + Venta base
   const ventaBaseNeto = int(rng, 8_000_000, 28_000_000);
   const iva = round0(ventaBaseNeto * 0.19);
   const totalConIva = ventaBaseNeto + iva;
@@ -101,7 +145,7 @@ function makeProjectDevengadoMock({
     fecha: addDays(monthStart, int(rng, 0, 10)),
   };
 
-  const empleados = Array.from({ length: 6 }).map((_, i) => ({
+  const empleados = Array.from({ length: 6 }).map(() => ({
     id: cuidLike(rng),
     nombre: pick(rng, [
       "Axel",
@@ -117,12 +161,7 @@ function makeProjectDevengadoMock({
     costoHH: int(rng, 12_000, 28_000),
   }));
 
-  // CIF (para que se sienta “ERP”)
-  const cif = {
-    valor: int(rng, 120_000, 420_000),
-    anio,
-    mes,
-  };
+  const cif = { valor: int(rng, 120_000, 420_000), anio, mes };
 
   // Estructura: épicas -> tareas -> subtareas
   const epicasN = int(rng, 2, 4);
@@ -143,7 +182,7 @@ function makeProjectDevengadoMock({
     const tN = int(rng, 2, 5);
     for (let t = 0; t < tN; t++) {
       const tId = cuidLike(rng);
-      const avance = int(rng, 10, 95);
+      const avanceTarea = int(rng, 10, 95);
       const tPlanDias = int(rng, 6, 18);
       const inicioPlan = addDays(monthStart, int(rng, 0, Math.max(1, dim - 10)));
       const finPlan = addDays(inicioPlan, tPlanDias);
@@ -159,8 +198,9 @@ function makeProjectDevengadoMock({
           "Devengado dashboard",
           "Rendiciones + flujo",
         ]),
-        estado: avance >= 100 ? "terminada" : avance >= 45 ? "en_progreso" : "pendiente",
-        avance,
+        estado:
+          avanceTarea >= 100 ? "terminada" : avanceTarea >= 45 ? "en_progreso" : "pendiente",
+        avance: avanceTarea,
         fecha_inicio_plan: inicioPlan,
         fecha_fin_plan: finPlan,
         responsable_id: pick(rng, empleados).id,
@@ -171,16 +211,31 @@ function makeProjectDevengadoMock({
       for (let s = 0; s < sN; s++) {
         const sId = cuidLike(rng);
         const horasPlan = int(rng, 6, 28);
-        const detAv = clamp(avance + int(rng, -25, 25), 0, 100);
+        const detAvFinal = clamp(avanceTarea + int(rng, -25, 25), 0, 100);
 
         const resp = rng() < 0.8 ? pick(rng, empleados) : null;
         const valorHora = resp ? resp.costoHH : null;
 
         const costoPlan = valorHora != null ? valorHora * horasPlan : null;
+
+        // Historial de avance en últimos 21 días: 2 a 5 “eventos”
+        const eventsN = int(rng, 2, 5);
+        const baseStart = clamp(detAvFinal - int(rng, 15, 55), 0, 95);
+
+        const allDays = daysBetweenInclusive(addDays(hoy, -21), hoy);
+        const picks = new Set();
+        while (picks.size < eventsN) picks.add(int(rng, 0, allDays.length - 1));
+        const idxs = Array.from(picks).sort((a, b) => a - b);
+
+        const progress_events = idxs.map((idx, k) => {
+          const t = k / Math.max(1, idxs.length - 1);
+          const av = clamp(baseStart + (detAvFinal - baseStart) * t + int(rng, -3, 3), 0, detAvFinal);
+          return { date: allDays[idx], avance: round0(av) };
+        });
+
+        // horas/costo real (info): aproximación a final
         const horasReal =
-          detAv > 0
-            ? Math.max(0, round0(horasPlan * (detAv / 100) + int(rng, -3, 6)))
-            : null;
+          detAvFinal > 0 ? Math.max(0, round0(horasPlan * (detAvFinal / 100) + int(rng, -3, 6))) : null;
         const costoReal =
           valorHora != null && horasReal != null ? valorHora * horasReal : null;
 
@@ -188,8 +243,9 @@ function makeProjectDevengadoMock({
           id: sId,
           tarea_id: tId,
           titulo: pick(rng, ["DTO/Schema", "Tabla UI", "Validaciones", "Seeds", "Fix UX", "Tests"]),
-          estado: detAv >= 100 ? "terminada" : detAv >= 45 ? "en_progreso" : "pendiente",
-          avance: detAv,
+          estado:
+            detAvFinal >= 100 ? "terminada" : detAvFinal >= 45 ? "en_progreso" : "pendiente",
+          avance: detAvFinal,
           horas_plan: horasPlan,
           horas_real: horasReal,
           valor_hora: valorHora,
@@ -197,13 +253,13 @@ function makeProjectDevengadoMock({
           costo_real: costoReal,
           responsable_id: resp?.id ?? null,
           fecha: addDays(monthStart, int(rng, 0, dim - 1)),
+          progress_events,
         });
       }
     }
   }
 
-  // Venta (costeo) con líneas HH y COMPRA
-  // (para que el costo real pueda salir de “detalleVenta”)
+  // Venta (costeo) con líneas HH y COMPRA (mock)
   const venta = {
     id: cuidLike(rng),
     numero: int(rng, 100, 999),
@@ -212,7 +268,7 @@ function makeProjectDevengadoMock({
     detalles: [],
   };
 
-  // HH: derivar desde subtareas (más horas -> más peso)
+  // HH
   const hhLines = int(rng, 3, 6);
   for (let i = 0; i < hhLines; i++) {
     const emp = pick(rng, empleados);
@@ -223,7 +279,6 @@ function makeProjectDevengadoMock({
     const costoSinAlpha = emp.costoHH * cantHoras + (cif.valor || 0) / hhLines;
     const costoTotal = costoSinAlpha * alphaMult;
 
-    // venta = costo (tu lógica típica en costeo) menos descuentos
     const ventaTotalBruto = costoTotal;
     const descItem = rng() < 0.25 ? int(rng, 3, 12) : 0;
     const ventaTotal = ventaTotalBruto * (1 - descItem / 100);
@@ -243,11 +298,10 @@ function makeProjectDevengadoMock({
     });
   }
 
-  // Compras: OC/Facturas + asignación a costeo (CompraCosteo)
+  // Compras
   const comprasN = int(rng, 3, 7);
   const compras = [];
   const compraCosteos = [];
-
   for (let i = 0; i < comprasN; i++) {
     const estado = pick(rng, ["ORDEN_COMPRA", "FACTURADA", "PAGADA"]);
     const total = int(rng, 120_000, 2_200_000);
@@ -265,7 +319,6 @@ function makeProjectDevengadoMock({
     };
     compras.push(compra);
 
-    // asignación a costeo (monto asignado <= total)
     if (rng() < 0.65) {
       compraCosteos.push({
         id: cuidLike(rng),
@@ -276,7 +329,6 @@ function makeProjectDevengadoMock({
       });
     }
 
-    // si quieres que COMPRA aparezca también en venta.detalles (modo COMPRA)
     if (rng() < 0.55) {
       const alpha = int(rng, 5, 18);
       const alphaMult = 1 + alpha / 100;
@@ -300,18 +352,16 @@ function makeProjectDevengadoMock({
     }
   }
 
-  // aplicar descuento general a venta
+  // descuento general
   const multGeneral = 1 - Number(venta.descuentoPct || 0) / 100;
   for (const d of venta.detalles) {
     const bruto = Number(d.ventaTotalBruto || d.ventaTotal || 0);
     const neto = bruto * (1 - Number(d.descuentoPct || 0) / 100) * multGeneral;
     d.ventaTotal = neto;
   }
-
-  // recalcular total neto desde líneas (más realista)
   venta.totalNeto = round0(venta.detalles.reduce((s, x) => s + Number(x.ventaTotal || 0), 0));
 
-  // ---------- avance ponderado por subtareas ----------
+  // ---------- avance ponderado (estado actual) ----------
   let wSum = 0;
   let wProg = 0;
   for (const st of subtareas) {
@@ -322,52 +372,19 @@ function makeProjectDevengadoMock({
   }
   const avance = wSum > 0 ? wProg / wSum : 0;
 
-  // venta base (neto): usa venta.totalNeto (tu costeo real)
   const ventaBase = Number(venta.totalNeto || 0);
   const devengadoMonto = ventaBase * avance;
 
-  // costos reales
-  const hhCostoReal = venta.detalles
-    .filter((x) => x.modo === "HH")
-    .reduce((s, x) => s + Number(x.costoTotal || 0), 0);
-
-  const comprasFacturadas = compras
-    .filter((c) => c.factura_url)
-    .reduce((s, c) => s + Number(c.factura_monto || c.total || 0), 0);
-
+  // costos reales globales
+  const hhCostoReal = venta.detalles.filter((x) => x.modo === "HH").reduce((s, x) => s + Number(x.costoTotal || 0), 0);
+  const comprasFacturadas = compras.filter((c) => c.factura_url).reduce((s, c) => s + Number(c.factura_monto || c.total || 0), 0);
   const comprasTotal = compras.reduce((s, c) => s + Number(c.total || 0), 0);
-
   const comprasAsignadas = compraCosteos.reduce((s, x) => s + Number(x.monto || 0), 0);
 
-  const costoReal = hhCostoReal + comprasFacturadas;
-  const utilidadDevengada = devengadoMonto - costoReal;
+  const costoRealGlobal = hhCostoReal + comprasFacturadas;
 
-  // ---------- Semana pasada (mock) ----------
-  // generamos 7 días con “delta avance” + costo + devengado día
-  const hoy = new Date();
-  const days = Array.from({ length: 7 }).map((_, i) => addDays(hoy, -6 + i));
-
-  // “avance semanal” como delta total (pequeño)
-  const deltaSemana = (2 + rng() * 10) / 100; // 2%..12%
-  const avanceInicioSemana = clamp(avance - deltaSemana, 0, 1);
-
-  const serieSemana = [];
-  for (let i = 0; i < 7; i++) {
-    const t = i / 6;
-    const avanceDia = avanceInicioSemana + (avance - avanceInicioSemana) * t;
-    const devDia = ventaBase * (avanceDia - (i > 0 ? serieSemana[i - 1].avance : avanceInicioSemana));
-    // costos del día (HH + compras puntuales)
-    const costoHHdia = int(rng, 80_000, 320_000);
-    const costoCompraDia = rng() < 0.25 ? int(rng, 50_000, 600_000) : 0;
-    serieSemana.push({
-      date: days[i],
-      avance: avanceDia,
-      delta_avance: i === 0 ? avanceDia - avanceInicioSemana : avanceDia - serieSemana[i - 1].avance,
-      devengado: round0(Math.max(0, devDia)),
-      costo_hh: costoHHdia,
-      costo_compra: costoCompraDia,
-    });
-  }
+  // (para “solo positivos”)
+  const gananciaGlobalPos = Math.max(0, devengadoMonto - costoRealGlobal);
 
   // ---------- agrupar subtareas por tarea y épica ----------
   const subtareasByTarea = new Map();
@@ -375,32 +392,28 @@ function makeProjectDevengadoMock({
     if (!subtareasByTarea.has(st.tarea_id)) subtareasByTarea.set(st.tarea_id, []);
     subtareasByTarea.get(st.tarea_id).push(st);
   }
-
   const tareasByEpica = new Map();
   for (const t of tareas) {
     if (!tareasByEpica.has(t.epica_id)) tareasByEpica.set(t.epica_id, []);
     tareasByEpica.get(t.epica_id).push({
       ...t,
-      subtareas: (subtareasByTarea.get(t.id) || []).sort(
-        (a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime(),
-      ),
+      subtareas: (subtareasByTarea.get(t.id) || []).sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime()),
     });
   }
-
   const epicasUI = epicas.map((e) => ({
     ...e,
     tareas: (tareasByEpica.get(e.id) || []).sort((a, b) => a.nombre.localeCompare(b.nombre)),
   }));
 
-  // ---------- riesgo / alertas ----------
-  const burnPct = ventaBase > 0 ? (costoReal / ventaBase) * 100 : 0;
+  // ---------- riesgo ----------
+  const burnPct = ventaBase > 0 ? (costoRealGlobal / ventaBase) * 100 : 0;
   const riesgo =
     burnPct > 105
-      ? { level: "critico", msg: "Costo real (facturado) supera la venta base. Riesgo alto de pérdida." }
+      ? { level: "critico", msg: "Costo real (facturado) supera la venta base. En esta vista verás solo ganancias positivas." }
       : burnPct > 85
-        ? { level: "alto", msg: "Costo real está muy cerca de la venta base. Controla compras y HH." }
+        ? { level: "alto", msg: "Costo real está muy cerca de la venta base." }
         : burnPct > 65
-          ? { level: "medio", msg: "Costo real en zona media. Mantén control de compras asignadas." }
+          ? { level: "medio", msg: "Costo real en zona media." }
           : { level: "ok", msg: "Costo real controlado vs venta base." };
 
   return {
@@ -413,20 +426,169 @@ function makeProjectDevengadoMock({
     epicas: epicasUI,
     compras,
     compraCosteos,
+    windows,
     resumen: {
       ventaBase,
       avancePct: avance * 100,
       devengadoMonto,
-      costoReal,
-      utilidadDevengada,
+      costoReal: costoRealGlobal,
+      // IMPORTANTES:
+      gananciaPos: gananciaGlobalPos, // <- solo positivos
       hhCostoReal,
       comprasFacturadas,
       comprasTotal,
       comprasAsignadas,
       burnPct,
       riesgo,
+      wSum,
     },
-    semana: serieSemana,
+  };
+}
+
+/* ----------------------- cálculo: avance en una fecha desde progress_events ----------------------- */
+function progressAtDate(subtarea, atDate) {
+  const events = subtarea.progress_events || [];
+  if (!events.length) return clamp(Number(subtarea.avance || 0), 0, 100) / 100;
+  const t = new Date(atDate).getTime();
+  let last = null;
+  for (const e of events) {
+    const te = new Date(e.date).getTime();
+    if (te <= t) last = e;
+    else break;
+  }
+  if (!last) return clamp(Number(events[0].avance || 0), 0, 100) / 100;
+  return clamp(Number(last.avance || 0), 0, 100) / 100;
+}
+
+/* ----------------------- calcular “ganancia” semanal por jerarquía -----------------------
+   - ingresoDevengadoSemana: ventaBase * deltaAvanceSemana (ponderado)
+   - costoSemana: estimación (para esta vista): usamos % del costo global basado en avance
+     y para FUTURO: usamos promedio diario de semana pasada.
+   - gananciaPos: max(0, ingreso - costo)
+------------------------------------------------------------------------------------------ */
+function computeWeekReport({ data, weekKey }) {
+  const { windows, resumen, epicas } = data;
+  const week = windows[weekKey];
+  const days = daysBetweenInclusive(week.start, week.end);
+
+  // construir lista plana de subtareas con referencias
+  const flat = [];
+  for (const ep of epicas) {
+    for (const t of ep.tareas) {
+      for (const st of t.subtareas || []) {
+        flat.push({
+          epicaId: ep.id,
+          epicaNombre: ep.nombre,
+          tareaId: t.id,
+          tareaNombre: t.nombre,
+          subtareaId: st.id,
+          subtareaTitulo: st.titulo,
+          subtarea: st,
+        });
+      }
+    }
+  }
+
+  // ponderación
+  const weights = new Map();
+  let wSum = 0;
+  for (const x of flat) {
+    const st = x.subtarea;
+    const w = Number(st.costo_plan ?? 0) || Number(st.horas_plan ?? 0) || 1;
+    weights.set(st.id, w);
+    wSum += w;
+  }
+  if (wSum <= 0) wSum = resumen.wSum || 1;
+
+  // delta avance ponderado de la semana (start -> end)
+  const p0 = new Map();
+  const p1 = new Map();
+  for (const x of flat) {
+    const st = x.subtarea;
+    p0.set(st.id, progressAtDate(st, week.start));
+    p1.set(st.id, progressAtDate(st, week.end));
+  }
+
+  let deltaWeek = 0;
+  for (const x of flat) {
+    const st = x.subtarea;
+    const w = weights.get(st.id) || 1;
+    const d = Math.max(0, (p1.get(st.id) || 0) - (p0.get(st.id) || 0)); // SOLO delta positivo
+    deltaWeek += (w / wSum) * d;
+  }
+
+  const ingresoSemana = resumen.ventaBase * deltaWeek;
+
+  // costo semana:
+  // - semana pasada: aproximamos como “costo global * deltaWeek” (siempre proporcional a avance)
+  // - esta/próxima: forecast usando promedio diario semana pasada (calculado abajo)
+  let costoSemana = resumen.costoReal * deltaWeek;
+
+  // Breakdown por jerarquía: asignar ingreso según contribución de cada subtarea
+  const epMap = new Map();
+  const tareaMap = new Map();
+  const subtMap = new Map();
+
+  for (const x of flat) {
+    const st = x.subtarea;
+    const w = weights.get(st.id) || 1;
+    const d = Math.max(0, (p1.get(st.id) || 0) - (p0.get(st.id) || 0));
+    const share = (w / wSum) * d; // contribución al delta ponderado
+    const ingreso = resumen.ventaBase * share;
+
+    // costeamos igual: proporcional a ingreso (misma share)
+    const costo = resumen.costoReal * share;
+
+    const gPos = Math.max(0, ingreso - costo);
+
+    // épica
+    const eKey = x.epicaId;
+    if (!epMap.has(eKey)) epMap.set(eKey, { id: x.epicaId, nombre: x.epicaNombre, ingreso: 0, costo: 0, ganancia: 0 });
+    const e = epMap.get(eKey);
+    e.ingreso += ingreso; e.costo += costo; e.ganancia += gPos;
+
+    // tarea
+    const tKey = x.tareaId;
+    if (!tareaMap.has(tKey)) tareaMap.set(tKey, { id: x.tareaId, nombre: x.tareaNombre, epicaNombre: x.epicaNombre, ingreso: 0, costo: 0, ganancia: 0 });
+    const tt = tareaMap.get(tKey);
+    tt.ingreso += ingreso; tt.costo += costo; tt.ganancia += gPos;
+
+    // subtarea
+    const sKey = x.subtareaId;
+    if (!subtMap.has(sKey)) subtMap.set(sKey, { id: x.subtareaId, nombre: x.subtareaTitulo, tareaNombre: x.tareaNombre, ingreso: 0, costo: 0, ganancia: 0 });
+    const ss = subtMap.get(sKey);
+    ss.ingreso += ingreso; ss.costo += costo; ss.ganancia += gPos;
+  }
+
+  // ordenar
+  const epicasRows = Array.from(epMap.values()).sort((a, b) => b.ganancia - a.ganancia);
+  const tareasRows = Array.from(tareaMap.values()).sort((a, b) => b.ganancia - a.ganancia);
+  const subtRows = Array.from(subtMap.values()).sort((a, b) => b.ganancia - a.ganancia);
+
+  // KPIs semana (solo positivos)
+  const gananciaSemanaPos = Math.max(0, ingresoSemana - costoSemana);
+
+  // tabla diaria (para “sensación real”)
+  // ingreso diario = ingresoSemana / 7 (simple)
+  // costo diario = costoSemana / 7 (simple)
+  const ingresoDia = ingresoSemana / days.length;
+  const costoDia = costoSemana / days.length;
+
+  const daily = days.map((d) => {
+    const g = Math.max(0, ingresoDia - costoDia);
+    return { date: d, ingreso: ingresoDia, costo: costoDia, ganancia: g };
+  });
+
+  return {
+    week,
+    deltaWeekPct: deltaWeek * 100,
+    ingresoSemana,
+    costoSemana,
+    gananciaSemanaPos,
+    epicasRows,
+    tareasRows,
+    subtRows,
+    daily,
   };
 }
 
@@ -468,7 +630,7 @@ function Donut({ valuePct = 0, subtitle, big }) {
   );
 }
 
-function Sparkline({ data = [], valueKey = "devengado" }) {
+function Sparkline({ data = [], valueKey = "ganancia" }) {
   const w = 280;
   const h = 64;
   const pad = 6;
@@ -496,7 +658,6 @@ function Sparkline({ data = [], valueKey = "devengado" }) {
 }
 
 function Bars({ items }) {
-  // items: [{label, value}]
   const max = Math.max(...items.map((x) => Number(x.value || 0)), 1);
   return (
     <div className="space-y-3">
@@ -605,7 +766,7 @@ export default function DevengadoProyectoPage() {
   const sp = useSearchParams();
   const proyectoId = sp.get("proyectoId");
 
-  const [semanaMode, setSemanaMode] = useState("devengado"); // devengado | costo
+  const [weekTab, setWeekTab] = useState("last"); // last | this | next
 
   const data = useMemo(() => {
     return makeProjectDevengadoMock({
@@ -616,15 +777,59 @@ export default function DevengadoProyectoPage() {
     });
   }, [proyectoId]);
 
-  const { proyecto, periodo, cotizacion, venta, empleados, cif, epicas, compras, compraCosteos, resumen, semana } = data;
+  const { proyecto, periodo, cotizacion, venta, empleados, cif, epicas, compras, compraCosteos, resumen } = data;
 
   const riesgoTone =
-    resumen.riesgo.level === "critico" ? "danger" : resumen.riesgo.level === "alto" ? "warn" : resumen.riesgo.level === "medio" ? "warn" : "ok";
+    resumen.riesgo.level === "critico"
+      ? "danger"
+      : resumen.riesgo.level === "alto"
+        ? "warn"
+        : resumen.riesgo.level === "medio"
+          ? "warn"
+          : "ok";
 
   const estadoTone =
     proyecto.estado === "activo" ? "ok" : proyecto.estado === "en_riesgo" ? "warn" : "neutral";
 
-  // Top insights “gerente”
+  // Reportes semanales (real+forecast)
+  const repLast = useMemo(() => computeWeekReport({ data, weekKey: "last" }), [data]);
+  const repThis = useMemo(() => {
+    // forecast con promedio diario semana pasada
+    const base = computeWeekReport({ data, weekKey: "this" });
+    const avgIngreso = repLast.ingresoSemana / 7;
+    const avgCosto = repLast.costoSemana / 7;
+    base.ingresoSemana = avgIngreso * 7;
+    base.costoSemana = avgCosto * 7;
+    base.gananciaSemanaPos = Math.max(0, base.ingresoSemana - base.costoSemana);
+    base.daily = base.daily.map((d) => ({
+      ...d,
+      ingreso: avgIngreso,
+      costo: avgCosto,
+      ganancia: Math.max(0, avgIngreso - avgCosto),
+    }));
+    return base;
+  }, [data, repLast]);
+
+  const repNext = useMemo(() => {
+    // forecast similar (puedes hacer “tendencia” si quieres)
+    const base = computeWeekReport({ data, weekKey: "next" });
+    const avgIngreso = repLast.ingresoSemana / 7;
+    const avgCosto = repLast.costoSemana / 7;
+    base.ingresoSemana = avgIngreso * 7;
+    base.costoSemana = avgCosto * 7;
+    base.gananciaSemanaPos = Math.max(0, base.ingresoSemana - base.costoSemana);
+    base.daily = base.daily.map((d) => ({
+      ...d,
+      ingreso: avgIngreso,
+      costo: avgCosto,
+      ganancia: Math.max(0, avgIngreso - avgCosto),
+    }));
+    return base;
+  }, [data, repLast]);
+
+  const active = weekTab === "last" ? repLast : weekTab === "this" ? repThis : repNext;
+
+  // Insights
   const comprasSinFactura = compras.filter((c) => !c.factura_url).length;
   const comprasFact = compras.filter((c) => !!c.factura_url).length;
 
@@ -675,16 +880,21 @@ export default function DevengadoProyectoPage() {
         </div>
       </div>
 
-      {/* KPIs */}
+      {/* KPIs (sin negativos) */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
         <Kpi title="Venta base (neto)" value={money(round0(resumen.ventaBase))} hint="Desde costeo (Venta.detalles neto)" />
         <Kpi title="Avance ponderado" value={pct1(resumen.avancePct)} hint="Subtareas ponderadas por costo/horas" />
-        <Kpi title="Devengado $" value={money(round0(resumen.devengadoMonto))} hint="Venta base × avance" tone={resumen.devengadoMonto < 0 ? "danger" : "default"} />
-        <Kpi title="Costo real (facturado)" value={money(round0(resumen.costoReal))} hint="HH + compras facturadas" tone={resumen.costoReal > resumen.ventaBase ? "danger" : "default"} />
-        <Kpi title="Utilidad devengada" value={money(round0(resumen.utilidadDevengada))} hint={`Burn: ${pct1(resumen.burnPct)} (costo/venta)`} tone={resumen.utilidadDevengada < 0 ? "danger" : "ok"} />
+        <Kpi title="Devengado $" value={money(round0(resumen.devengadoMonto))} hint="Venta base × avance" />
+        <Kpi title="Costo real (facturado)" value={money(round0(resumen.costoReal))} hint="HH + compras facturadas" />
+        <Kpi
+          title="Ganancia (solo positivos)"
+          value={money(round0(resumen.gananciaPos))}
+          hint={`Si era negativo, aquí se muestra 0`}
+          tone={resumen.gananciaPos > 0 ? "ok" : "warn"}
+        />
       </div>
 
-      {/* Top row: donut + breakdown */}
+      {/* Top row: donut + breakdown + Ganancia semanal */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <Section
           title="Progreso"
@@ -710,59 +920,112 @@ export default function DevengadoProyectoPage() {
         </Section>
 
         <Section
-          title="Semana pasada"
+          title="Ganancia por semana"
           right={
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setSemanaMode("devengado")}
+                onClick={() => setWeekTab("last")}
                 className={`rounded-lg px-2 py-1 text-xs font-semibold border ${
-                  semanaMode === "devengado" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-200"
+                  weekTab === "last" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-200"
                 }`}
               >
-                Devengado
+                Semana pasada
               </button>
               <button
-                onClick={() => setSemanaMode("costo")}
+                onClick={() => setWeekTab("this")}
                 className={`rounded-lg px-2 py-1 text-xs font-semibold border ${
-                  semanaMode === "costo" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-200"
+                  weekTab === "this" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-200"
                 }`}
               >
-                Costos
+                Esta semana
+              </button>
+              <button
+                onClick={() => setWeekTab("next")}
+                className={`rounded-lg px-2 py-1 text-xs font-semibold border ${
+                  weekTab === "next" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-200"
+                }`}
+              >
+                Próxima
               </button>
             </div>
           }
         >
           <div className="flex flex-col gap-3">
-            <Sparkline data={semana} valueKey={semanaMode === "devengado" ? "devengado" : "costo_hh"} />
+            <Sparkline data={active.daily} valueKey="ganancia" />
             <div className="grid grid-cols-2 gap-2">
-              <Kpi
-                title="Devengado semana"
-                value={money(semana.reduce((s, x) => s + Number(x.devengado || 0), 0))}
-                hint="Suma últimos 7 días"
-              />
-              <Kpi
-                title="Delta avance semana"
-                value={pct1(
-                  (semana[semana.length - 1].avance - (semana[0].avance - semana[0].delta_avance)) * 100,
-                )}
-                hint="Crecimiento de avance"
-              />
+              <Kpi title="Ingreso devengado" value={money(round0(active.ingresoSemana))} hint={`${active.week.label}`} />
+              <Kpi title="Ganancia (solo positivos)" value={money(round0(active.gananciaSemanaPos))} hint={`Δ avance: ${pct1(active.deltaWeekPct)}`} tone={active.gananciaSemanaPos > 0 ? "ok" : "warn"} />
             </div>
-            <div className="mt-1">
-              <Table
-                cols={["Día", "Δ avance", "Devengado", "Costo HH", "Costo compras"]}
-                rows={semana.map((d) => [
-                  <span key="d" className="text-slate-700">{fmtDate(d.date)}</span>,
-                  <span key="a" className="font-semibold text-slate-900">{pct1(d.delta_avance * 100)}</span>,
-                  <span key="v" className="font-semibold text-slate-900">{money(d.devengado)}</span>,
-                  <span key="h" className="text-slate-700">{money(d.costo_hh)}</span>,
-                  <span key="c" className="text-slate-700">{money(d.costo_compra)}</span>,
-                ])}
-              />
-            </div>
+            <Table
+              cols={["Día", "Ingreso", "Costo", "Ganancia"]}
+              rows={active.daily.map((d) => [
+                <span key="d" className="text-slate-700">{fmtDate(d.date)}</span>,
+                <span key="i" className="font-semibold text-slate-900">{money(round0(d.ingreso))}</span>,
+                <span key="c" className="text-slate-700">{money(round0(d.costo))}</span>,
+                <span key="g" className="font-semibold text-slate-900">{money(round0(d.ganancia))}</span>,
+              ])}
+            />
           </div>
         </Section>
       </div>
+
+      {/* NUEVO: Breakdown por jerarquía (épicas/tareas/subtareas) */}
+      <Section
+        title={`Detalle de ganancias · ${active.week.label}`}
+        right={<Pill tone="neutral">Todo se muestra en positivo (si era negativo → 0)</Pill>}
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div className="rounded-2xl border border-slate-200 p-3">
+            <div className="text-sm font-semibold text-slate-900 mb-2">Épicas</div>
+            <Table
+              cols={["Épica", "Ingreso", "Ganancia"]}
+              rows={active.epicasRows.slice(0, 12).map((x) => [
+                <span key="n" className="text-slate-700">{x.nombre}</span>,
+                <span key="i" className="text-slate-700">{money(round0(x.ingreso))}</span>,
+                <span key="g" className="font-semibold text-slate-900">{money(round0(x.ganancia))}</span>,
+              ])}
+              empty="Sin movimiento esta semana"
+            />
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 p-3">
+            <div className="text-sm font-semibold text-slate-900 mb-2">Tareas</div>
+            <Table
+              cols={["Tarea", "Ingreso", "Ganancia"]}
+              rows={active.tareasRows.slice(0, 12).map((x) => [
+                <div key="n" className="text-slate-700">
+                  <div className="font-medium text-slate-900">{x.nombre}</div>
+                  <div className="text-xs text-slate-500">{x.epicaNombre}</div>
+                </div>,
+                <span key="i" className="text-slate-700">{money(round0(x.ingreso))}</span>,
+                <span key="g" className="font-semibold text-slate-900">{money(round0(x.ganancia))}</span>,
+              ])}
+              empty="Sin movimiento esta semana"
+            />
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 p-3">
+            <div className="text-sm font-semibold text-slate-900 mb-2">Subtareas</div>
+            <Table
+              cols={["Subtarea", "Ingreso", "Ganancia"]}
+              rows={active.subtRows.slice(0, 12).map((x) => [
+                <div key="n" className="text-slate-700">
+                  <div className="font-medium text-slate-900">{x.nombre}</div>
+                  <div className="text-xs text-slate-500">{x.tareaNombre}</div>
+                </div>,
+                <span key="i" className="text-slate-700">{money(round0(x.ingreso))}</span>,
+                <span key="g" className="font-semibold text-slate-900">{money(round0(x.ganancia))}</span>,
+              ])}
+              empty="Sin movimiento esta semana"
+            />
+          </div>
+        </div>
+
+        <div className="mt-3 text-xs text-slate-500">
+          * “Ingreso” viene del delta de avance (semana) × venta base. “Ganancia” = max(0, ingreso − costo estimado del periodo).
+          Cuando conectes a tu backend, aquí reemplazamos el costo estimado por costo real por fecha (HH y compras por día).
+        </div>
+      </Section>
 
       {/* Comercial: cotización + venta */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -789,46 +1052,8 @@ export default function DevengadoProyectoPage() {
             <Kpi title="HH (costo)" value={money(resumen.hhCostoReal)} />
             <Kpi title="Compras asignadas" value={money(resumen.comprasAsignadas)} hint="CompraCosteo hacia esta venta" />
           </div>
-
-          <div className="mt-4">
-            <div className="text-sm font-semibold text-slate-900 mb-2">Líneas del costeo</div>
-            <Table
-              cols={["Modo", "Descripción", "Venta neto", "Costo", "Alpha", "Desc."]}
-              rows={venta.detalles
-                .slice()
-                .sort((a, b) => String(a.modo).localeCompare(String(b.modo)))
-                .map((x) => [
-                  <Pill key="m" tone={x.modo === "HH" ? "neutral" : "warn"}>{x.modo}</Pill>,
-                  <div key="d" className="text-slate-700">
-                    <div className="font-medium text-slate-900">{x.descripcion}</div>
-                    {x.modo === "HH" ? (
-                      <div className="text-xs text-slate-500">Empleado: {empleados.find((e) => e.id === x.empleadoId)?.nombre || "-"}</div>
-                    ) : (
-                      <div className="text-xs text-slate-500">Compra: {String(x.compraId || "").slice(0, 6)}…</div>
-                    )}
-                  </div>,
-                  <span key="v" className="font-semibold text-slate-900">{money(x.ventaTotal)}</span>,
-                  <span key="c" className="text-slate-700">{money(x.costoTotal)}</span>,
-                  <span key="a" className="text-slate-700">{x.alpha != null ? `${x.alpha}%` : "-"}</span>,
-                  <span key="p" className="text-slate-700">{x.descuentoPct ? `${x.descuentoPct}%` : "-"}</span>,
-                ])}
-              empty="Sin líneas"
-            />
-          </div>
         </Section>
       </div>
-
-      {/* Ejecución: épicas/tareas/subtareas (detalle) */}
-      <Section
-        title="Ejecución · Épicas / Tareas / Subtareas"
-        right={<Pill tone="neutral">Ponderación: costo_plan → horas_plan → 1</Pill>}
-      >
-        <div className="space-y-4">
-          {epicas.map((ep) => (
-            <EpicaCard key={ep.id} epica={ep} empleados={empleados} />
-          ))}
-        </div>
-      </Section>
 
       {/* Compras + facturas + asignación */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -875,21 +1100,10 @@ export default function DevengadoProyectoPage() {
               ])}
             empty="Aún no hay asignaciones"
           />
-
-          <div className="mt-4">
-            <div className="text-sm font-semibold text-slate-900 mb-2">Control rápido</div>
-            <Bars
-              items={[
-                { label: "Compras totales (OC)", value: resumen.comprasTotal },
-                { label: "Compras asignadas a costeo", value: resumen.comprasAsignadas },
-                { label: "Compras facturadas", value: resumen.comprasFacturadas },
-              ]}
-            />
-          </div>
         </Section>
       </div>
 
-      {/* RRHH: costoHH + CIF */}
+      {/* RRHH */}
       <Section
         title="RRHH · Empleados / Costo HH / CIF"
         right={<Pill tone="neutral">CIF {periodo.mes}/{periodo.anio}: {money(cif.valor)}</Pill>}
@@ -907,154 +1121,11 @@ export default function DevengadoProyectoPage() {
             ])}
         />
         <div className="mt-3 text-xs text-slate-500">
-          Esta tabla es para “sensación real”: cuando lo conectes, saldrá desde HHEmpleado (Excel) y sus cálculos.
+          En real: aquí saldrá desde HH (periodos) + CIF mensual real. Este mock es “sensación”.
         </div>
       </Section>
 
       <div className="pb-10" />
-    </div>
-  );
-}
-
-/* ----------------------- epica card ----------------------- */
-function EpicaCard({ epica, empleados }) {
-  const [open, setOpen] = useState(true);
-
-  // métricas epica (desde subtareas)
-  const subt = epica.tareas.flatMap((t) => t.subtareas || []);
-  const done = subt.filter((s) => s.avance >= 100).length;
-  const total = subt.length || 1;
-  const pct = (done / total) * 100;
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white">
-      <button
-        onClick={() => setOpen((s) => !s)}
-        className="w-full flex items-start justify-between gap-3 p-4 text-left"
-      >
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="text-sm font-semibold text-slate-900">{epica.nombre}</div>
-            <Pill tone={epica.estado === "bloqueada" ? "danger" : epica.estado === "en_progreso" ? "warn" : epica.estado === "terminada" ? "ok" : "neutral"}>
-              {epica.estado}
-            </Pill>
-          </div>
-          <div className="mt-1 text-xs text-slate-500">
-            Subtareas: {done}/{total} · Progreso: {pct1(pct)}
-          </div>
-        </div>
-
-        <div className="shrink-0">
-          <div className="text-xs text-slate-500 mb-1">{open ? "Ocultar" : "Ver"}</div>
-          <div className="h-2 w-24 rounded-full bg-slate-200">
-            <div className="h-2 rounded-full bg-slate-900" style={{ width: `${clamp(pct, 0, 100)}%` }} />
-          </div>
-        </div>
-      </button>
-
-      {open ? (
-        <div className="border-t border-slate-100 p-4 space-y-3">
-          {epica.tareas.map((t) => (
-            <div key={t.id} className="rounded-xl border border-slate-200 p-3">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                <div>
-                  <div className="font-semibold text-slate-900">{t.nombre}</div>
-                  <div className="text-xs text-slate-500">
-                    Estado: {t.estado} · Avance: {t.avance}% · Responsable:{" "}
-                    <span className="font-semibold text-slate-700">
-                      {empleados.find((e) => e.id === t.responsable_id)?.nombre || "—"}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Pill tone={t.avance >= 100 ? "ok" : t.avance >= 45 ? "warn" : "neutral"}>{t.avance}%</Pill>
-                  <div className="h-2 w-28 rounded-full bg-slate-200">
-                    <div className="h-2 rounded-full bg-slate-900" style={{ width: `${clamp(t.avance, 0, 100)}%` }} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3">
-                <div className="text-xs font-semibold text-slate-600 mb-2">Subtareas</div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead className="text-left text-slate-500">
-                      <tr>
-                        <th className="py-2 pr-3 font-medium">Subtarea</th>
-                        <th className="py-2 pr-3 font-medium">Estado</th>
-                        <th className="py-2 pr-3 font-medium">Avance</th>
-                        <th className="py-2 pr-3 font-medium">Horas plan</th>
-                        <th className="py-2 pr-3 font-medium">Costo plan</th>
-                        <th className="py-2 pr-3 font-medium">Horas real</th>
-                        <th className="py-2 pr-3 font-medium">Costo real</th>
-                        <th className="py-2 pr-3 font-medium">Resp.</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(t.subtareas || []).length ? (
-                        t.subtareas.map((s) => (
-                          <tr key={s.id} className="border-t border-slate-100">
-                            <td className="py-2 pr-3">
-                              <div className="font-medium text-slate-900">{s.titulo}</div>
-                              <div className="text-xs text-slate-500">{fmtDate(s.fecha)}</div>
-                            </td>
-                            <td className="py-2 pr-3">
-                              <Pill tone={s.estado === "en_progreso" ? "warn" : s.estado === "terminada" ? "ok" : "neutral"}>
-                                {s.estado}
-                              </Pill>
-                            </td>
-                            <td className="py-2 pr-3">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-slate-900">{s.avance}%</span>
-                                <div className="h-2 w-20 rounded-full bg-slate-200">
-                                  <div className="h-2 rounded-full bg-slate-900" style={{ width: `${clamp(s.avance, 0, 100)}%` }} />
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-2 pr-3 text-slate-700">{s.horas_plan ?? "—"}</td>
-                            <td className="py-2 pr-3 text-slate-700">{s.costo_plan != null ? money(s.costo_plan) : "—"}</td>
-                            <td className="py-2 pr-3 text-slate-700">{s.horas_real ?? "—"}</td>
-                            <td className="py-2 pr-3 text-slate-700">{s.costo_real != null ? money(s.costo_real) : "—"}</td>
-                            <td className="py-2 pr-3 text-slate-700">
-                              {s.responsable_id ? empleados.find((e) => e.id === s.responsable_id)?.nombre || "—" : "—"}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr className="border-t border-slate-100">
-                          <td className="py-3 text-slate-500" colSpan={8}>
-                            Sin subtareas
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <MiniStat label="Subtareas listas" value={`${(t.subtareas || []).filter((x) => x.avance >= 100).length}`} />
-                  <MiniStat label="Subtareas pendientes" value={`${(t.subtareas || []).filter((x) => x.avance < 100).length}`} />
-                  <MiniStat
-                    label="Costo real subtareas (info)"
-                    value={money(
-                      (t.subtareas || []).reduce((s, x) => s + Number(x.costo_real || 0), 0),
-                    )}
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function MiniStat({ label, value }) {
-  return (
-    <div className="rounded-xl border border-slate-200 p-3 bg-white">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="text-sm font-semibold text-slate-900 mt-1">{value}</div>
     </div>
   );
 }
