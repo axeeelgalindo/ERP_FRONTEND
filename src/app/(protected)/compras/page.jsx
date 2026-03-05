@@ -1,23 +1,25 @@
-// src/app/(protected)/compras/page.jsx
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 
+import RendicionModal from "@/components/compras/RendicionModal";
+
+import ComprasKpis from "@/components/compras/ComprasKpis";
+import ImportRcvPanel from "@/components/compras/ImportRcvPanel";
+import ComprasTable from "@/components/compras/ComprasTable";
+import ComprasPagination from "@/components/compras/ComprasPagination";
+import CompraManualModal from "@/components/compras/CompraManualModal";
+import VincularCosteoModal from "@/components/compras/VincularCosteoModal";
+
 const API = process.env.NEXT_PUBLIC_API_URL;
 
 /* =========================
-   Helpers
+   Helpers (tuyos)
 ========================= */
 function pickEmpresaId(session) {
   const u = session?.user || session || {};
-  return (
-    u.empresaId ??
-    u.empresa_id ??
-    u.empresa?.id ?? // 👈 ESTA ES LA CLAVE SI TE VIENE COMO OBJETO
-    u.empresa ?? // por si viene string directo
-    null
-  );
+  return u.empresaId ?? u.empresa_id ?? u.empresa?.id ?? u.empresa ?? null;
 }
 
 function pickToken(session) {
@@ -91,7 +93,7 @@ function getCompraDate(c) {
 
 function getVincPct(c) {
   if (c?.vinculadoPct != null && Number.isFinite(Number(c.vinculadoPct))) {
-    const x = Number(c.vinculadoPct) * 100; // si viene 0..1
+    const x = Number(c.vinculadoPct) * 100;
     return Math.max(0, Math.min(100, x));
   }
 
@@ -121,71 +123,11 @@ function getVincPct(c) {
   return 0;
 }
 
-function pctBadge(p) {
-  const v = Number(p || 0);
-  if (v >= 100) return "bg-emerald-50 text-emerald-700 border-emerald-200";
-  if (v > 0) return "bg-amber-50 text-amber-700 border-amber-200";
-  return "bg-rose-50 text-rose-700 border-rose-200";
-}
-
 /** ✅ pageSize seguro para no romper validación backend (<=100) */
 function clampPageSize(n) {
   const x = Number(n || 20);
   if (!Number.isFinite(x)) return 20;
   return Math.min(100, Math.max(1, x));
-}
-
-/* =========================
-   Mini UI helpers (inline)
-========================= */
-function Modal({ open, title, onClose, children, footer }) {
-  useEffect(() => {
-    function onKey(e) {
-      if (e.key === "Escape") onClose?.();
-    }
-    if (open) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose?.();
-      }}
-    >
-      <div className="w-full max-w-3xl rounded-2xl bg-white shadow-xl border">
-        <div className="p-4 border-b flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-lg font-semibold truncate">{title}</div>
-          </div>
-          <button
-            className="h-9 w-9 rounded-lg border hover:bg-slate-50"
-            onClick={onClose}
-            type="button"
-            title="Cerrar"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="p-4">{children}</div>
-
-        {footer ? <div className="p-4 border-t">{footer}</div> : null}
-      </div>
-    </div>
-  );
-}
-
-function StatBox({ label, value }) {
-  return (
-    <div className="rounded-xl border bg-white px-3 py-2">
-      <div className="text-[11px] text-slate-500">{label}</div>
-      <div className="text-sm font-semibold">{value}</div>
-    </div>
-  );
 }
 
 /* =========================
@@ -195,7 +137,7 @@ export default function ComprasPage() {
   const { data: session, status } = useSession();
 
   // ===== Listado =====
-  const [bundle, setBundle] = useState(null); // {data, total, page, pageSize}
+  const [bundle, setBundle] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
@@ -217,8 +159,6 @@ export default function ComprasPage() {
   const [importing, setImporting] = useState(false);
   const [importErr, setImportErr] = useState("");
   const [importResult, setImportResult] = useState(null);
-  const importFileRef = useRef(null);
-  const [dragOver, setDragOver] = useState(false);
 
   // ===== Upload PDF =====
   const [uploadingId, setUploadingId] = useState(null);
@@ -232,19 +172,21 @@ export default function ComprasPage() {
 
   // Campos create
   const [c_proveedorId, setC_proveedorId] = useState("");
+  const [c_destino, setC_destino] = useState("PROYECTO");
+  const [c_centro, setC_centro] = useState("");
   const [c_proyectoId, setC_proyectoId] = useState("");
   const [c_tipoDoc, setC_tipoDoc] = useState("33");
   const [c_folio, setC_folio] = useState("");
   const [c_fechaDocto, setC_fechaDocto] = useState("");
   const [c_total, setC_total] = useState("");
 
-  // lookups para selects
+  // lookups
   const [proveedores, setProveedores] = useState([]);
   const [proyectos, setProyectos] = useState([]);
   const [lookupsLoading, setLookupsLoading] = useState(false);
   const [lookupsErr, setLookupsErr] = useState("");
 
-  // ===== Vincular (modal) =====
+  // ===== Vincular costeos =====
   const [openVincular, setOpenVincular] = useState(false);
   const [compraSel, setCompraSel] = useState(null);
 
@@ -252,10 +194,18 @@ export default function ComprasPage() {
   const [costeosLoading, setCosteosLoading] = useState(false);
   const [costeosErr, setCosteosErr] = useState("");
 
-  // asignaciones: [{ ventaId, monto, locked, meta }]
   const [asignaciones, setAsignaciones] = useState([]);
   const [savingVinc, setSavingVinc] = useState(false);
   const [savingErr, setSavingErr] = useState("");
+
+  // ===== Rendición =====
+  const [openRendicion, setOpenRendicion] = useState(false);
+  const [compraR, setCompraR] = useState(null);
+
+  function openRendicionModal(compra) {
+    setCompraR(compra);
+    setOpenRendicion(true);
+  }
 
   /* =========================
      Loaders
@@ -276,9 +226,7 @@ export default function ComprasPage() {
 
       const res = await fetch(
         `${API}/compras?page=${p}&pageSize=${clampPageSize(s)}`,
-        {
-          headers: makeHeadersJson(session),
-        },
+        { headers: makeHeadersJson(session) },
       );
 
       const payload = await jsonOrNull(res);
@@ -363,9 +311,7 @@ export default function ComprasPage() {
   ========================= */
   const rows = useMemo(() => {
     const arr = bundle?.data || [];
-    const term = String(q || "")
-      .trim()
-      .toLowerCase();
+    const term = String(q || "").trim().toLowerCase();
 
     return arr.filter((c) => {
       if (estadoFilter !== "ALL" && String(c.estado) !== estadoFilter)
@@ -391,6 +337,8 @@ export default function ComprasPage() {
       const folio = c?.folio ?? "";
       const tipoDoc = c?.tipo_doc ?? "";
       const proyecto = c?.proyecto?.nombre ?? "";
+      const destino = c?.destino ?? "";
+      const centro = c?.centro_costo ?? "";
 
       const hay = [
         proveedorNombre,
@@ -399,6 +347,8 @@ export default function ComprasPage() {
         folio,
         tipoDoc,
         proyecto,
+        destino,
+        centro,
         c?.numero ?? "",
       ]
         .join(" ")
@@ -408,14 +358,24 @@ export default function ComprasPage() {
     });
   }, [bundle, q, estadoFilter, periodo]);
 
-  const stats = useMemo(() => {
-    const pageTotal = rows.reduce((acc, r) => acc + Number(r?.total ?? 0), 0);
-    return { pageTotal };
-  }, [rows]);
+  /* =========================
+     KPIs (en base a lo que tienes disponible)
+  ========================= */
+  const kpis = useMemo(() => {
+    const pageRows = rows || [];
+    const totalMes = bundle?.total ?? 0;
 
-  const pendientesPeriodo = useMemo(() => {
-    return rows.filter((c) => getVincPct(c) < 100).length;
-  }, [rows]);
+    const pendientesRendicion = pageRows.filter((c) => {
+      const rid = c?.rendicion_id ?? c?.rendicionId ?? c?.rendicion?.id ?? null;
+      return !rid;
+    }).length;
+
+    const sinPdf = pageRows.filter((c) => !c?.factura_url).length;
+
+    const sinVincularCosteo = pageRows.filter((c) => getVincPct(c) < 100).length;
+
+    return { totalMes, pendientesRendicion, sinPdf, sinVincularCosteo };
+  }, [bundle, rows]);
 
   /* =========================
      Import CSV
@@ -494,7 +454,13 @@ export default function ComprasPage() {
     }
   }
 
+  function ensureFileInput(compraId) {
+    if (fileRefs.current[compraId]) return;
+    // se crea cuando renderiza la tabla (ver abajo)
+  }
+
   function openFilePicker(compraId) {
+    ensureFileInput(compraId);
     const ref = fileRefs.current[compraId];
     if (ref) ref.click();
   }
@@ -504,6 +470,8 @@ export default function ComprasPage() {
   ========================= */
   function resetCreateForm() {
     setC_proveedorId("");
+    setC_destino("PROYECTO");
+    setC_centro("");
     setC_proyectoId("");
     setC_tipoDoc("33");
     setC_folio("");
@@ -516,6 +484,16 @@ export default function ComprasPage() {
     setCreateErr("");
 
     if (!c_proveedorId) return setCreateErr("Selecciona un proveedor.");
+    if (!c_destino) return setCreateErr("Selecciona destino.");
+
+    if (c_destino === "PROYECTO" && !c_proyectoId) {
+      return setCreateErr("Selecciona un proyecto (destino = PROYECTO).");
+    }
+
+    if (c_destino !== "PROYECTO" && !c_centro) {
+      return setCreateErr("Selecciona centro (PMC/PUQ) para Administración/Taller.");
+    }
+
     if (!c_tipoDoc) return setCreateErr("Selecciona tipo doc.");
     if (!c_folio) return setCreateErr("Ingresa folio.");
     if (!c_fechaDocto) return setCreateErr("Ingresa fecha del documento.");
@@ -527,8 +505,10 @@ export default function ComprasPage() {
 
       const body = {
         proveedorId: c_proveedorId,
-        proyectoId: c_proyectoId || null,
-        tipo_doc: String(c_tipoDoc),
+        destino: c_destino,
+        centro_costo: c_destino === "PROYECTO" ? null : c_centro,
+        proyecto_id: c_destino === "PROYECTO" ? c_proyectoId || null : null,
+        tipo_doc: Number(c_tipoDoc),
         folio: String(c_folio),
         fecha_docto: new Date(c_fechaDocto).toISOString(),
         total: Number(c_total),
@@ -542,9 +522,7 @@ export default function ComprasPage() {
 
       const payload = await jsonOrNull(res);
       if (!res.ok) {
-        throw new Error(
-          payload?.message || payload?.error || "Error creando compra",
-        );
+        throw new Error(payload?.message || payload?.error || "Error creando compra");
       }
 
       setOpenCreate(false);
@@ -560,18 +538,13 @@ export default function ComprasPage() {
 
   /* =========================
      Vinculación costeos (ventas)
-     ✅ FIXES:
-     - pageSize <= 100
-     - GET /compras/:id/costeos lee payload.data (tu backend devuelve { data: rows })
-     - PUT /compras/:id/costeos envía { items: [{ venta_id, monto }] }
-========================= */
+  ========================= */
   async function loadCosteosDisponibles() {
     if (!session) return;
     setCosteosLoading(true);
     setCosteosErr("");
 
     try {
-      // ✅ no pases 300 (tu backend valida max 100)
       const res = await fetch(`${API}/ventas?page=1&pageSize=100`, {
         headers: makeHeadersJson(session),
       });
@@ -579,14 +552,10 @@ export default function ComprasPage() {
 
       if (!res.ok) {
         throw new Error(
-          payload?.message ||
-            payload?.msg ||
-            payload?.error ||
-            "Error cargando ventas",
+          payload?.message || payload?.msg || payload?.error || "Error cargando ventas",
         );
       }
 
-      // soporta: { data: [...] } o array directo (por si tu endpoint cambia)
       const arr = Array.isArray(payload) ? payload : payload?.data || [];
       setCosteosDisponibles(arr);
     } catch (e) {
@@ -605,7 +574,6 @@ export default function ComprasPage() {
       const payload = await jsonOrNull(res);
       if (!res.ok) return [];
 
-      // ✅ tu backend devuelve: { data: rows }
       const rows = payload?.data || [];
 
       return rows
@@ -652,7 +620,6 @@ export default function ComprasPage() {
     setAsignaciones((prev) => {
       const exists = prev.find((x) => x.ventaId === ventaId);
 
-      // quitar
       if (exists) {
         const next = prev.filter((x) => x.ventaId !== ventaId);
         if (next.length === 1) {
@@ -661,19 +628,16 @@ export default function ComprasPage() {
         return next;
       }
 
-      // agregar
       const next = [...prev, { ventaId, monto: 0, locked: false, meta: venta }];
 
       if (next.length === 1) {
         return [{ ...next[0], monto: total, locked: false }];
       }
 
-      // divide simple
       const base = Math.floor(total / next.length);
       const copy = next.map((a, idx) => ({
         ...a,
-        monto:
-          idx === next.length - 1 ? total - base * (next.length - 1) : base,
+        monto: idx === next.length - 1 ? total - base * (next.length - 1) : base,
         locked: false,
       }));
       return copy;
@@ -717,10 +681,7 @@ export default function ComprasPage() {
     setAsignaciones((prev) => {
       if (prev.length <= 1) return prev.map((a) => ({ ...a, locked: false }));
       const lastId = prev[prev.length - 1].ventaId;
-      return prev.map((a) => ({
-        ...a,
-        locked: a.ventaId !== lastId,
-      }));
+      return prev.map((a) => ({ ...a, locked: a.ventaId !== lastId }));
     });
   }
 
@@ -745,7 +706,6 @@ export default function ComprasPage() {
     setSavingVinc(true);
 
     try {
-      // ✅ BACKEND ESPERA: { items: [{ venta_id, monto }] }
       const body = {
         items: asignaciones.map((a) => ({
           venta_id: a.ventaId,
@@ -762,10 +722,7 @@ export default function ComprasPage() {
       const payload = await jsonOrNull(res);
       if (!res.ok) {
         throw new Error(
-          payload?.message ||
-            payload?.msg ||
-            payload?.error ||
-            "Error guardando vinculación",
+          payload?.message || payload?.msg || payload?.error || "Error guardando vinculación",
         );
       }
 
@@ -781,59 +738,60 @@ export default function ComprasPage() {
     }
   }
 
-  /* =========================
-     Effects
-  ========================= */
   async function handleRefresh() {
     await Promise.all([loadCompras({ page, pageSize }), loadLookups()]);
+  }
+
+  function handleClearFilters() {
+    setQ("");
+    setEstadoFilter("ALL");
+    setPeriodo(defaultPeriodo);
+    setPage(1);
   }
 
   /* =========================
      Render
   ========================= */
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      {/* ===== Header ===== */}
-      <div className="rounded-2xl border bg-white shadow-sm">
-        <div className="p-4 md:p-5">
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div>
-              <h1 className="text-lg md:text-xl font-semibold">Compras</h1>
-              <p className="mt-1 text-sm text-slate-500">
-                Importa el CSV RCV del SII, vincula a costeos y sube facturas en
-                PDF.
-              </p>
-              {lookupsErr && (
-                <div className="mt-2 text-xs text-amber-700">{lookupsErr}</div>
-              )}
-              {uploadErr && (
-                <div className="mt-2 text-xs text-red-700">{uploadErr}</div>
-              )}
-            </div>
+    <div className="bg-background-light  text-slate-900  min-h-screen transition-colors duration-200">
+      <header className=" mx-auto px-6 py-8">
+        {/* header top */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 ">
+              Compras
+            </h1>
+            <p className="text-slate-500  mt-1">
+              Gestión avanzada de facturas, vinculación a proyectos y rendiciones.
+            </p>
 
-            <div className="grid grid-cols-2 gap-2">
-              <StatBox label="Total registros" value={bundle?.total ?? 0} />
-              <StatBox label="Total página" value={toCLP(stats.pageTotal)} />
-              <StatBox label="Página" value={bundle?.page ?? page} />
-              <StatBox
-                label="Tamaño pág."
-                value={bundle?.pageSize ?? pageSize}
-              />
-            </div>
+            {lookupsErr ? (
+              <div className="mt-2 text-xs text-amber-700">{lookupsErr}</div>
+            ) : null}
+
+            {uploadErr ? (
+              <div className="mt-2 text-xs text-red-700">{uploadErr}</div>
+            ) : null}
+
+            {err ? (
+              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {err}
+              </div>
+            ) : null}
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="flex items-center gap-3">
             <button
-              className="h-9 rounded-lg border px-3 text-sm hover:bg-slate-50 disabled:opacity-60"
               onClick={handleRefresh}
               disabled={loading || lookupsLoading}
+              className="flex items-center gap-2 px-4 py-2 border border-slate-200  rounded-lg hover:bg-white  transition-all font-medium text-slate-700  disabled:opacity-60"
               type="button"
             >
-              {loading || lookupsLoading ? "Cargando…" : "Recargar"}
+              ⟳ Recargar
             </button>
 
             <button
-              className="h-9 rounded-lg bg-slate-900 px-3 text-sm text-white hover:opacity-90"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-all font-medium shadow-sm"
               onClick={() => {
                 setCreateErr("");
                 if (proveedores.length === 0 || proyectos.length === 0) {
@@ -843,565 +801,146 @@ export default function ComprasPage() {
               }}
               type="button"
             >
-              + Crear manual
+              ＋ Crear manual
             </button>
           </div>
-
-          {err && (
-            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              {err}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ===== Import RCV ===== */}
-      <div className="rounded-2xl border bg-white shadow-sm">
-        <div className="px-4 md:px-5 py-4 border-b">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-base font-semibold">Importar RCV</h2>
-            <p className="text-sm text-slate-500">
-              Sube el CSV exportado desde el SII (RCV Compras).
-            </p>
-          </div>
         </div>
 
-        <div className="px-4 md:px-5 py-4 space-y-3">
-          {periodo && pendientesPeriodo > 0 && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              Hay <b>{pendientesPeriodo}</b> compra(s) del periodo{" "}
-              <b>{periodo}</b> que aún no están <b>100%</b> vinculadas a un
-              costeo.
-            </div>
-          )}
+        {/* KPIs */}
+        <ComprasKpis
+          totalMes={kpis.totalMes}
+          pendientesRendicion={kpis.pendientesRendicion}
+          sinPdf={kpis.sinPdf}
+          sinVincularCosteo={kpis.sinVincularCosteo}
+        />
 
-          {importErr && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              {importErr}
-            </div>
-          )}
+        {/* Import */}
+        <ImportRcvPanel
+          importing={importing}
+          importErr={importErr}
+          importResult={importResult}
+          onPickFile={() => {}}
+          onImportFile={handleImportCSV}
+          onClear={() => {
+            setImportErr("");
+            setImportResult(null);
+          }}
+        />
 
-          {importResult && (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-              Importación OK:{" "}
-              <b>
-                {importResult?.insertados ??
-                  importResult?.created ??
-                  importResult?.ok ??
-                  "OK"}
-              </b>
-              {importResult?.skipped != null ? (
-                <>
-                  {" "}
-                  · Saltados: <b>{importResult.skipped}</b>
-                </>
-              ) : null}
-            </div>
-          )}
+        {/* Tabla + filtros */}
+        <div className="rounded-xl overflow-hidden">
+          {/* inputs hidden para PDF por fila */}
+          {rows.map((c) => (
+            <input
+              key={`pdf-${c.id}`}
+              type="file"
+              accept="application/pdf"
+              className="hidden"
+              ref={(el) => {
+                if (el) fileRefs.current[c.id] = el;
+              }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) uploadFactura(c.id, file);
+              }}
+            />
+          ))}
 
-          <input
-            ref={importFileRef}
-            type="file"
-            accept=".csv,text/csv"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              e.target.value = "";
-              if (f) handleImportCSV(f);
+          <ComprasTable
+            API={API}
+            loading={loading}
+            rows={rows}
+            q={q}
+            onChangeQ={(v) => {
+              setQ(v);
+              setPage(1);
             }}
+            estadoFilter={estadoFilter}
+            onChangeEstado={(v) => {
+              setEstadoFilter(v);
+              setPage(1);
+            }}
+            periodo={periodo}
+            onChangePeriodo={(v) => {
+              setPeriodo(v);
+              setPage(1);
+            }}
+            onClear={handleClearFilters}
+            pageSize={pageSize}
+            onChangePageSize={(v) => {
+              const s = clampPageSize(v);
+              setPageSize(s);
+              setPage(1);
+              loadCompras({ page: 1, pageSize: s });
+            }}
+            uploadingId={uploadingId}
+            onOpenVincular={openVincularModal}
+            onOpenRendicion={openRendicionModal}
+            onUploadPdfClick={(c) => openFilePicker(c.id)}
+            fmtDateDMY={fmtDateDMY}
+            toCLP={toCLP}
+            getVincPct={getVincPct}
           />
 
-          <div
-            className={`rounded-xl border-2 border-dashed p-4 md:p-5 ${
-              dragOver ? "border-slate-500 bg-slate-50" : "border-slate-200"
-            }`}
-            onDragEnter={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setDragOver(true);
+          <ComprasPagination
+            loading={loading}
+            page={bundle?.page ?? page}
+            pageSize={bundle?.pageSize ?? pageSize}
+            total={bundle?.total ?? 0}
+            onPrev={() => {
+              const p = Math.max(1, (bundle?.page ?? page) - 1);
+              setPage(p);
+              loadCompras({ page: p });
             }}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setDragOver(true);
+            onNext={() => {
+              const p = (bundle?.page ?? page) + 1;
+              setPage(p);
+              loadCompras({ page: p });
             }}
-            onDragLeave={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setDragOver(false);
+            onGo={(p) => {
+              setPage(p);
+              loadCompras({ page: p });
             }}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setDragOver(false);
-              const f = e.dataTransfer.files?.[0];
-              if (f) handleImportCSV(f);
-            }}
-          >
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <div>
-                <div className="font-medium">
-                  Arrastra un CSV aquí o selecciónalo
-                </div>
-                <div className="text-xs text-slate-500 mt-1">
-                  Tip: si importas el mismo documento (mismo proveedor + tipo
-                  doc + folio), debería marcarlo como <b>saltado</b>.
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  className="h-9 rounded-lg border px-3 text-sm hover:bg-slate-50 disabled:opacity-60"
-                  onClick={() => importFileRef.current?.click()}
-                  disabled={importing}
-                  type="button"
-                >
-                  Seleccionar
-                </button>
-
-                <button
-                  className="h-9 rounded-lg bg-slate-900 px-3 text-sm text-white hover:opacity-90 disabled:opacity-60"
-                  onClick={() => importFileRef.current?.click()}
-                  disabled={importing}
-                  type="button"
-                >
-                  {importing ? "Importando…" : "Importar"}
-                </button>
-
-                <button
-                  className="h-9 rounded-lg border px-3 text-sm hover:bg-slate-50"
-                  onClick={() => {
-                    setImportErr("");
-                    setImportResult(null);
-                  }}
-                  type="button"
-                >
-                  Limpiar
-                </button>
-              </div>
-            </div>
-          </div>
+          />
         </div>
-      </div>
+      </header>
 
-      {/* ===== Listado ===== */}
-      <div className="rounded-2xl border bg-white shadow-sm">
-        <div className="p-4 md:p-5 border-b">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-base font-semibold">Listado de compras</h2>
-              <p className="text-sm text-slate-500">
-                Documentos importados desde RCV (SII) + compras manuales.
-              </p>
-            </div>
+      <footer className="max-w-[1600px] mx-auto px-6 pb-12 text-center text-slate-400 text-xs">
+        <p>© 2026 Blue Ingeniería ERP - Módulo de Gestión de Compras Avanzado.</p>
+      </footer>
 
-            <div className="flex flex-col gap-2 md:flex-row md:items-center">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500">Estado</span>
-                <select
-                  className="h-9 rounded-lg border px-2 text-sm bg-white"
-                  value={estadoFilter}
-                  onChange={(e) => {
-                    setEstadoFilter(e.target.value);
-                    setPage(1);
-                  }}
-                >
-                  <option value="ALL">Todos</option>
-                  <option value="ORDEN_COMPRA">ORDEN_COMPRA</option>
-                  <option value="FACTURADA">FACTURADA</option>
-                  <option value="PAGADA">PAGADA</option>
-                </select>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500">Periodo</span>
-
-                <input
-                  type="month"
-                  className="h-9 rounded-lg border px-2 text-sm bg-white"
-                  value={periodo}
-                  onChange={(e) => {
-                    setPeriodo(e.target.value);
-                    setPage(1);
-                  }}
-                />
-
-                <button
-                  type="button"
-                  className="h-9 rounded-lg border px-3 text-sm hover:bg-slate-50 disabled:opacity-60"
-                  onClick={() => {
-                    setPeriodo("");
-                    setPage(1);
-                  }}
-                  disabled={!periodo}
-                >
-                  Limpiar
-                </button>
-              </div>
-
-              <input
-                className="h-9 w-full md:w-96 rounded-lg border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-200"
-                placeholder="Buscar por proveedor, RUT, folio, tipo doc, proyecto…"
-                value={q}
-                onChange={(e) => {
-                  setQ(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="p-4 md:p-5">
-          <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
-            <div>
-              Mostrando <b>{rows.length}</b> en esta página · Total registros:{" "}
-              <b>{bundle?.total ?? 0}</b>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span>Tamaño pág:</span>
-              <select
-                className="h-8 rounded-lg border px-2 bg-white text-xs"
-                value={pageSize}
-                onChange={(e) => {
-                  const s = clampPageSize(e.target.value);
-                  setPageSize(s);
-                  setPage(1);
-                  loadCompras({ page: 1, pageSize: s });
-                }}
-              >
-                {[10, 20, 50, 100].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="overflow-auto rounded-xl border">
-            <table className="min-w-[1400px] w-full text-sm">
-              <thead className="bg-slate-50 text-slate-600">
-                <tr className="text-left">
-                  <th className="px-3 py-2">N°</th>
-                  <th className="px-3 py-2">Estado</th>
-                  <th className="px-3 py-2">Proveedor</th>
-                  <th className="px-3 py-2">RUT</th>
-                  <th className="px-3 py-2">Tipo doc</th>
-                  <th className="px-3 py-2">Folio</th>
-                  <th className="px-3 py-2">Fecha docto</th>
-                  <th className="px-3 py-2">Recepción</th>
-                  <th className="px-3 py-2">Proyecto</th>
-                  <th className="px-3 py-2">Vinculado</th>
-                  <th className="px-3 py-2">PDF</th>
-                  <th className="px-3 py-2">Acciones</th>
-                  <th className="px-3 py-2 text-right">Total</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {loading ? (
-                  Array.from({ length: 8 }).map((_, i) => (
-                    <tr key={i} className="border-t">
-                      <td className="px-3 py-3 text-slate-400" colSpan={14}>
-                        Cargando…
-                      </td>
-                    </tr>
-                  ))
-                ) : rows.length === 0 ? (
-                  <tr className="border-t">
-                    <td className="px-3 py-3 text-slate-500" colSpan={14}>
-                      No hay compras para mostrar.
-                    </td>
-                  </tr>
-                ) : (
-                  rows.map((c) => {
-                    const proveedor = c?.proveedor?.nombre ?? "-";
-                    const rut = c?.rut_proveedor ?? c?.proveedor?.rut ?? "-";
-                    const proyecto = c?.proyecto?.nombre ?? "-";
-                    const pct = getVincPct(c);
-                    const hasPdf = Boolean(c?.factura_url);
-
-                    return (
-                      <tr key={c.id} className="border-t hover:bg-slate-50/60">
-                        <td className="px-3 py-3">{c?.numero ?? "-"}</td>
-
-                        <td className="px-3 py-3">
-                          <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs bg-white">
-                            {String(c?.estado ?? "-")}
-                          </span>
-                        </td>
-
-                        <td className="px-3 py-3">
-                          <div className="font-medium">{proveedor}</div>
-                          <div className="text-xs text-slate-500">{rut}</div>
-                        </td>
-
-                        <td className="px-3 py-3">{rut}</td>
-                        <td className="px-3 py-3">{c?.tipo_doc ?? "-"}</td>
-                        <td className="px-3 py-3">{c?.folio ?? "-"}</td>
-                        <td className="px-3 py-3">
-                          {fmtDateDMY(c?.fecha_docto)}
-                        </td>
-                        <td className="px-3 py-3">
-                          {fmtDateDMY(c?.fecha_recepcion)}
-                        </td>
-                        <td className="px-3 py-3">{proyecto}</td>
-
-                        <td className="px-3 py-3">
-                          <span
-                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${pctBadge(
-                              pct,
-                            )}`}
-                            title="Porcentaje de vinculación al costeo"
-                          >
-                            {Math.round(pct)}%
-                          </span>
-                        </td>
-
-                        <td className="px-3 py-3">
-                          {hasPdf ? (
-                            <a
-                              href={`${API.replace(/\/$/, "")}${c.factura_url}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              title="Ver factura PDF"
-                              className="inline-flex items-center justify-center h-8 w-8 rounded-lg border hover:bg-slate-50"
-                            >
-                              📄
-                            </a>
-                          ) : (
-                            <span
-                              title="Sin factura"
-                              className="inline-flex items-center justify-center h-8 w-8 rounded-lg border bg-white text-slate-400"
-                            >
-                              ✕
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="px-3 py-3">
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              className="h-8 rounded-lg border px-2 text-xs hover:bg-slate-50"
-                              onClick={() => openVincularModal(c)}
-                            >
-                              Vincular
-                            </button>
-
-                            <input
-                              type="file"
-                              accept="application/pdf"
-                              className="hidden"
-                              ref={(el) => {
-                                if (el) fileRefs.current[c.id] = el;
-                              }}
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                e.target.value = "";
-                                if (file) uploadFactura(c.id, file);
-                              }}
-                            />
-
-                            <button
-                              type="button"
-                              className="h-8 rounded-lg border px-2 text-xs hover:bg-slate-50 disabled:opacity-60"
-                              onClick={() => openFilePicker(c.id)}
-                              disabled={uploadingId === c.id}
-                              title="Subir factura PDF"
-                            >
-                              {uploadingId === c.id ? "Subiendo…" : "Subir PDF"}
-                            </button>
-                          </div>
-                        </td>
-
-                        <td className="px-3 py-3 text-right font-semibold">
-                          {toCLP(c?.total)}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* ===== Paginación ===== */}
-          <div className="mt-3 flex items-center justify-between">
-            <div className="text-xs text-slate-500">
-              Página <b>{bundle?.page ?? page}</b>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                className="h-9 rounded-lg border px-3 text-sm hover:bg-slate-50 disabled:opacity-60"
-                disabled={loading || (bundle?.page ?? page) <= 1}
-                onClick={() => {
-                  const p = Math.max(1, (bundle?.page ?? page) - 1);
-                  setPage(p);
-                  loadCompras({ page: p });
-                }}
-              >
-                ← Anterior
-              </button>
-
-              <button
-                className="h-9 rounded-lg border px-3 text-sm hover:bg-slate-50 disabled:opacity-60"
-                disabled={
-                  loading ||
-                  (bundle?.page ?? page) * (bundle?.pageSize ?? pageSize) >=
-                    (bundle?.total ?? 0)
-                }
-                onClick={() => {
-                  const p = (bundle?.page ?? page) + 1;
-                  setPage(p);
-                  loadCompras({ page: p });
-                }}
-              >
-                Siguiente →
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* =========================
-          MODAL CREAR MANUAL
-      ========================= */}
-      <Modal
+      {/* MODAL CREAR MANUAL */}
+      <CompraManualModal
         open={openCreate}
-        title="Crear compra manual"
-        onClose={() => {
-          if (!creating) setOpenCreate(false);
-        }}
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <button
-              className="h-9 rounded-lg border px-3 text-sm hover:bg-slate-50"
-              onClick={() => setOpenCreate(false)}
-              disabled={creating}
-              type="button"
-            >
-              Cancelar
-            </button>
-            <button
-              className="h-9 rounded-lg bg-slate-900 px-3 text-sm text-white hover:opacity-90 disabled:opacity-60"
-              onClick={createCompraManual}
-              disabled={creating}
-              type="button"
-            >
-              {creating ? "Creando…" : "Crear"}
-            </button>
-          </div>
-        }
-      >
-        {createErr && (
-          <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            {createErr}
-          </div>
-        )}
+        creating={creating}
+        createErr={createErr}
+        onClose={() => setOpenCreate(false)}
+        onSubmit={createCompraManual}
+        proveedores={proveedores}
+        proyectos={proyectos}
+        lookupsLoading={lookupsLoading}
+        c_proveedorId={c_proveedorId}
+        setC_proveedorId={setC_proveedorId}
+        c_destino={c_destino}
+        setC_destino={setC_destino}
+        c_centro={c_centro}
+        setC_centro={setC_centro}
+        c_proyectoId={c_proyectoId}
+        setC_proyectoId={setC_proyectoId}
+        c_tipoDoc={c_tipoDoc}
+        setC_tipoDoc={setC_tipoDoc}
+        c_folio={c_folio}
+        setC_folio={setC_folio}
+        c_fechaDocto={c_fechaDocto}
+        setC_fechaDocto={setC_fechaDocto}
+        c_total={c_total}
+        setC_total={setC_total}
+      />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <label className="block">
-            <div className="text-xs text-slate-500 mb-1">Proveedor *</div>
-            <select
-              className="h-10 w-full rounded-lg border px-2 text-sm bg-white"
-              value={c_proveedorId}
-              onChange={(e) => setC_proveedorId(e.target.value)}
-              disabled={lookupsLoading}
-            >
-              <option value="">Seleccionar…</option>
-              {proveedores.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nombre ?? p.razon_social ?? p.rut ?? p.id}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <div className="text-xs text-slate-500 mb-1">Proyecto</div>
-            <select
-              className="h-10 w-full rounded-lg border px-2 text-sm bg-white"
-              value={c_proyectoId}
-              onChange={(e) => setC_proyectoId(e.target.value)}
-              disabled={lookupsLoading}
-            >
-              <option value="">(Sin proyecto)</option>
-              {proyectos.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nombre ?? p.codigo ?? p.id}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <div className="text-xs text-slate-500 mb-1">Tipo doc *</div>
-            <select
-              className="h-10 w-full rounded-lg border px-2 text-sm bg-white"
-              value={c_tipoDoc}
-              onChange={(e) => setC_tipoDoc(e.target.value)}
-            >
-              <option value="33">33 - Factura</option>
-              <option value="61">61 - Nota crédito</option>
-              <option value="34">34 - Factura exenta</option>
-              <option value="56">56 - Nota débito</option>
-            </select>
-          </label>
-
-          <label className="block">
-            <div className="text-xs text-slate-500 mb-1">Folio *</div>
-            <input
-              className="h-10 w-full rounded-lg border px-3 text-sm"
-              value={c_folio}
-              onChange={(e) => setC_folio(e.target.value)}
-              placeholder="Ej: 1541"
-            />
-          </label>
-
-          <label className="block">
-            <div className="text-xs text-slate-500 mb-1">Fecha docto *</div>
-            <input
-              type="date"
-              className="h-10 w-full rounded-lg border px-3 text-sm"
-              value={c_fechaDocto}
-              onChange={(e) => setC_fechaDocto(e.target.value)}
-            />
-          </label>
-
-          <label className="block">
-            <div className="text-xs text-slate-500 mb-1">Total (CLP) *</div>
-            <input
-              type="number"
-              className="h-10 w-full rounded-lg border px-3 text-sm"
-              value={c_total}
-              onChange={(e) => setC_total(e.target.value)}
-              placeholder="Ej: 250000"
-              min={0}
-            />
-          </label>
-        </div>
-
-        {lookupsLoading && (
-          <div className="mt-3 text-xs text-slate-500">Cargando listas…</div>
-        )}
-      </Modal>
-
-      {/* =========================
-          MODAL VINCULAR
-      ========================= */}
-      <Modal
+      {/* MODAL VINCULAR COSTEO */}
+      <VincularCosteoModal
         open={openVincular}
-        title={
-          compraSel
-            ? `Vincular compra #${compraSel?.numero ?? "-"} · Total ${toCLP(
-                compraSel?.total,
-              )}`
-            : "Vincular compra"
-        }
         onClose={() => {
           if (savingVinc) return;
           setOpenVincular(false);
@@ -1410,183 +949,39 @@ export default function ComprasPage() {
           setSavingErr("");
           setCosteosErr("");
         }}
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <button
-              className="h-9 rounded-lg border px-3 text-sm hover:bg-slate-50"
-              onClick={() => {
-                setOpenVincular(false);
-                setCompraSel(null);
-                setAsignaciones([]);
-                setSavingErr("");
-                setCosteosErr("");
-              }}
-              disabled={savingVinc}
-              type="button"
-            >
-              Cancelar
-            </button>
+        compraSel={compraSel}
+        costeosDisponibles={costeosDisponibles}
+        costeosLoading={costeosLoading}
+        costeosErr={costeosErr}
+        asignaciones={asignaciones}
+        savingVinc={savingVinc}
+        savingErr={savingErr}
+        canSaveVinc={canSaveVinc}
+        diffAsignacion={diffAsignacion}
+        onReloadCosteos={loadCosteosDisponibles}
+        onToggleCosteo={toggleCosteo}
+        isSelected={isSelected}
+        onUpdateMonto={updateMonto}
+        onResetLocks={resetLocks}
+        onSave={saveVinculacion}
+        fmtDateDMY={fmtDateDMY}
+        toCLP={toCLP}
+        sumAsignado={sumAsignado}
+      />
 
-            <button
-              className="h-9 rounded-lg border px-3 text-sm hover:bg-slate-50 disabled:opacity-60"
-              onClick={resetLocks}
-              disabled={asignaciones.length === 0 || savingVinc}
-              type="button"
-              title="Dejar último como autoajustable"
-            >
-              Autoajustar
-            </button>
-
-            <button
-              className="h-9 rounded-lg bg-slate-900 px-3 text-sm text-white hover:opacity-90 disabled:opacity-60"
-              onClick={saveVinculacion}
-              disabled={!canSaveVinc || savingVinc}
-              type="button"
-            >
-              {savingVinc ? "Guardando…" : "Guardar"}
-            </button>
-          </div>
-        }
-      >
-        {costeosErr && (
-          <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            {costeosErr}
-          </div>
-        )}
-
-        {savingErr && (
-          <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            {savingErr}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Lista ventas */}
-          <div className="rounded-xl border">
-            <div className="p-3 border-b flex items-center justify-between">
-              <div className="font-semibold text-sm">
-                Costeos disponibles (ventas)
-              </div>
-              <button
-                className="h-8 rounded-lg border px-2 text-xs hover:bg-slate-50 disabled:opacity-60"
-                onClick={loadCosteosDisponibles}
-                disabled={costeosLoading}
-                type="button"
-              >
-                {costeosLoading ? "Cargando…" : "Recargar"}
-              </button>
-            </div>
-
-            <div className="max-h-[360px] overflow-auto p-2">
-              {costeosLoading ? (
-                <div className="p-3 text-sm text-slate-500">Cargando…</div>
-              ) : costeosDisponibles.length === 0 ? (
-                <div className="p-3 text-sm text-slate-500">No hay ventas.</div>
-              ) : (
-                costeosDisponibles.map((v) => (
-                  <label
-                    key={v.id}
-                    className="flex items-start gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected(String(v.id))}
-                      onChange={() => toggleCosteo(v)}
-                      className="mt-1"
-                    />
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">
-                        #{v.numero ?? "-"} {v.descripcion ?? "Sin descripción"}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {v.fecha ? fmtDateDMY(v.fecha) : "-"}
-                      </div>
-                    </div>
-                  </label>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Asignación */}
-          <div className="rounded-xl border">
-            <div className="p-3 border-b">
-              <div className="font-semibold text-sm">Asignación</div>
-              <div className="text-xs text-slate-500 mt-1">
-                Selecciona 1+ ventas. La suma debe ser igual al total de la
-                compra.
-              </div>
-            </div>
-
-            <div className="p-3 space-y-2">
-              {asignaciones.length === 0 ? (
-                <div className="text-sm text-slate-500">
-                  Selecciona 1 o más ventas para asignar el total.
-                </div>
-              ) : (
-                <>
-                  {asignaciones.map((a) => {
-                    const meta =
-                      a.meta ||
-                      costeosDisponibles.find(
-                        (x) => String(x.id) === String(a.ventaId),
-                      ) ||
-                      null;
-
-                    return (
-                      <div
-                        key={a.ventaId}
-                        className="flex items-center gap-2 rounded-xl border p-2"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium truncate">
-                            #{meta?.numero ?? "-"}{" "}
-                            {meta?.descripcion ?? a.ventaId}
-                          </div>
-                          <div className="text-xs text-slate-500">
-                            {a.locked ? "Fijo" : "Auto"}
-                          </div>
-                        </div>
-
-                        <input
-                          type="number"
-                          className="h-9 w-40 rounded-lg border px-2 text-sm"
-                          value={Number(a.monto || 0)}
-                          onChange={(e) =>
-                            updateMonto(a.ventaId, e.target.value)
-                          }
-                          min={0}
-                        />
-                      </div>
-                    );
-                  })}
-
-                  <div className="pt-2 border-t text-sm flex items-center justify-between">
-                    <div className="text-slate-600">
-                      Suma: <b>{toCLP(sumAsignado())}</b>
-                    </div>
-                    <div
-                      className={
-                        Math.abs(diffAsignacion) <= 0.01
-                          ? "text-emerald-700"
-                          : "text-amber-700"
-                      }
-                    >
-                      Diferencia: <b>{toCLP(diffAsignacion)}</b>
-                    </div>
-                  </div>
-
-                  {!canSaveVinc && (
-                    <div className="text-xs text-amber-700">
-                      La suma debe ser exactamente igual al total de la compra.
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </Modal>
+      {/* MODAL RENDICIÓN (TU COMPONENTE EXISTENTE) */}
+      <RendicionModal
+        open={openRendicion}
+        onClose={() => {
+          setOpenRendicion(false);
+          setCompraR(null);
+        }}
+        session={session}
+        apiBase={API}
+        compra={compraR}
+        makeHeadersJson={makeHeadersJson}
+        onSaved={() => loadCompras({ page, pageSize })}
+      />
     </div>
   );
 }

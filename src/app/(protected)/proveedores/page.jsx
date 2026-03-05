@@ -22,7 +22,7 @@ function classNames(...xs) {
 
 function EmptyState({ text }) {
   return (
-    <div className="border border-slate-200 dark:border-slate-800 rounded-xl p-10 text-center text-slate-500 dark:text-slate-400">
+    <div className="border border-slate-200  rounded-xl p-10 text-center text-slate-500 ">
       {text}
     </div>
   );
@@ -39,14 +39,14 @@ function Modal({ open, title, children, onClose }) {
         aria-label="Cerrar"
       />
       <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-xl">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+        <div className="w-full max-w-2xl rounded-2xl bg-white  border border-slate-200  shadow-xl">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 ">
+            <h3 className="text-lg font-semibold text-slate-900 ">
               {title}
             </h3>
             <button
               onClick={onClose}
-              className="px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900"
+              className="px-3 py-1 rounded-lg border border-slate-200  text-slate-700  hover:bg-slate-50 "
             >
               Cerrar
             </button>
@@ -204,10 +204,10 @@ export default function ProveedoresPage() {
     <div className="p-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 ">
             Proveedores
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-slate-500  mt-1">
             Gestión de proveedores (listado alfabético).
           </p>
         </div>
@@ -218,17 +218,17 @@ export default function ProveedoresPage() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar por nombre, rut o correo..."
-              className="w-full md:w-80 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
+              className="w-full md:w-80 px-3 py-2 rounded-xl border border-slate-200  bg-white  text-slate-900 "
             />
             <button
               onClick={load}
               disabled={loading}
               className={classNames(
                 "px-4 py-2 rounded-xl border",
-                "border-slate-200 dark:border-slate-800",
-                "bg-white dark:bg-slate-950",
-                "text-slate-900 dark:text-white",
-                "hover:bg-slate-50 dark:hover:bg-slate-900",
+                "border-slate-200 ",
+                "bg-white ",
+                "text-slate-900 ",
+                "hover:bg-slate-50 ",
                 loading && "opacity-60 cursor-not-allowed"
               )}
             >
@@ -238,7 +238,7 @@ export default function ProveedoresPage() {
 
           <button
             onClick={openCreate}
-            className="px-4 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+            className="px-4 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 "
           >
             Nuevo proveedor
           </button>
@@ -256,10 +256,10 @@ export default function ProveedoresPage() {
       ) : sortedRows.length === 0 ? (
         <EmptyState text="No hay proveedores para mostrar." />
       ) : (
-        <div className="overflow-auto rounded-2xl border border-slate-200 dark:border-slate-800">
-          <table className="min-w-full bg-white dark:bg-slate-950">
-            <thead className="bg-slate-50 dark:bg-slate-900/40">
-              <tr className="text-left text-sm text-slate-600 dark:text-slate-300">
+        <div className="overflow-auto rounded-2xl border border-slate-200 ">
+          <table className="min-w-full bg-white ">
+            <thead className="bg-slate-50 ">
+              <tr className="text-left text-sm text-slate-600 ">
                 <th className="px-4 py-3">Nombre</th>
                 <th className="px-4 py-3">RUT</th>
                 <th className="px-4 py-3">Correo</th>
@@ -267,30 +267,30 @@ export default function ProveedoresPage() {
                 <th className="px-4 py-3 w-[160px]">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-200 ">
               {sortedRows.map((r) => (
-                <tr key={r.id} className="text-sm text-slate-900 dark:text-white">
+                <tr key={r.id} className="text-sm text-slate-900 ">
                   <td className="px-4 py-3 font-medium">{r.nombre}</td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                  <td className="px-4 py-3 text-slate-600 ">
                     {r.rut || "—"}
                   </td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                  <td className="px-4 py-3 text-slate-600 ">
                     {r.correo || "—"}
                   </td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                  <td className="px-4 py-3 text-slate-600 ">
                     {r.telefono || "—"}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => openEdit(r)}
-                        className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900"
+                        className="px-3 py-1.5 rounded-lg border border-slate-200  hover:bg-slate-50 "
                       >
                         Editar
                       </button>
                       <button
                         onClick={() => remove(r)}
-                        className="px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 hover:bg-red-50/60 dark:hover:bg-red-950/30"
+                        className="px-3 py-1.5 rounded-lg border border-red-200  text-red-700  hover:bg-red-50/60"
                       >
                         Eliminar
                       </button>
@@ -310,41 +310,41 @@ export default function ProveedoresPage() {
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
-            <label className="text-sm text-slate-600 dark:text-slate-300">
+            <label className="text-sm text-slate-600 ">
               Nombre *
             </label>
             <input
               value={form.nombre}
               onChange={(e) => setForm((s) => ({ ...s, nombre: e.target.value }))}
-              className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950"
+              className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200  bg-white "
               placeholder="Ej: Proveedor ABC"
             />
           </div>
 
           <div>
-            <label className="text-sm text-slate-600 dark:text-slate-300">RUT</label>
+            <label className="text-sm text-slate-600 ">RUT</label>
             <input
               value={form.rut}
               onChange={(e) => setForm((s) => ({ ...s, rut: e.target.value }))}
-              className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950"
+              className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200  bg-white "
               placeholder="Ej: 76.123.456-7"
             />
           </div>
 
           <div>
-            <label className="text-sm text-slate-600 dark:text-slate-300">
+            <label className="text-sm text-slate-600 ">
               Correo
             </label>
             <input
               value={form.correo}
               onChange={(e) => setForm((s) => ({ ...s, correo: e.target.value }))}
-              className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950"
+              className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200  bg-white "
               placeholder="Ej: contacto@proveedor.cl"
             />
           </div>
 
           <div>
-            <label className="text-sm text-slate-600 dark:text-slate-300">
+            <label className="text-sm text-slate-600 ">
               Teléfono
             </label>
             <input
@@ -352,17 +352,17 @@ export default function ProveedoresPage() {
               onChange={(e) =>
                 setForm((s) => ({ ...s, telefono: e.target.value }))
               }
-              className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950"
+              className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200  bg-white "
               placeholder="Ej: +56 9 1234 5678"
             />
           </div>
 
           <div className="md:col-span-2">
-            <label className="text-sm text-slate-600 dark:text-slate-300">Notas</label>
+            <label className="text-sm text-slate-600 ">Notas</label>
             <textarea
               value={form.notas}
               onChange={(e) => setForm((s) => ({ ...s, notas: e.target.value }))}
-              className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 min-h-[90px]"
+              className="mt-1 w-full px-3 py-2 rounded-xl border border-slate-200  bg-white min-h-[90px]"
               placeholder="Observaciones internas..."
             />
           </div>
@@ -377,13 +377,13 @@ export default function ProveedoresPage() {
         <div className="mt-5 flex items-center justify-end gap-2">
           <button
             onClick={() => setModalOpen(false)}
-            className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900"
+            className="px-4 py-2 rounded-xl border border-slate-200  hover:bg-slate-50 "
           >
             Cancelar
           </button>
           <button
             onClick={submit}
-            className="px-4 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+            className="px-4 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 "
           >
             Guardar
           </button>

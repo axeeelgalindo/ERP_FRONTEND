@@ -1,4 +1,3 @@
-// src/app/(protected)/proyectos/[id]/devengado/page.jsx
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { serverApi } from "@/lib/api";
@@ -15,6 +14,14 @@ function clp(v) {
 function pct(v) {
   const n = Number(v || 0);
   return `${Math.round(n)}%`;
+}
+
+function pct2(v) {
+  const n = Number(v || 0);
+  return `${(Math.round(n * 100) / 100).toLocaleString("es-CL", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}%`;
 }
 
 function fmtDate(iso) {
@@ -47,12 +54,12 @@ function Badge({ children, tone = "slate" }) {
 
 function Card({ title, right, children }) {
   return (
-    <div className="bg-white  border border-slate-200  rounded-2xl p-4 md:p-5 shadow-sm">
+    <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-sm">
       {(title || right) && (
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
             {title && (
-              <h3 className="text-sm md:text-base font-extrabold text-slate-900 ">
+              <h3 className="text-sm md:text-base font-extrabold text-slate-900">
                 {title}
               </h3>
             )}
@@ -69,10 +76,10 @@ function ProgressBar({ value = 0 }) {
   const v = Math.max(0, Math.min(100, Number(value) || 0));
   return (
     <div className="w-full">
-      <div className="h-2.5 rounded-full bg-slate-100  overflow-hidden">
-        <div className="h-full bg-slate-900 " style={{ width: `${v}%` }} />
+      <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+        <div className="h-full bg-slate-900" style={{ width: `${v}%` }} />
       </div>
-      <div className="mt-1 text-xs text-slate-500 ">{pct(v)}</div>
+      <div className="mt-1 text-xs text-slate-500">{pct(v)}</div>
     </div>
   );
 }
@@ -87,18 +94,17 @@ function TaskRow({ t }) {
   else if (estado === "pendiente") tone = "slate";
 
   return (
-    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 py-3 border-b border-slate-100  last:border-b-0">
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 py-3 border-b border-slate-100 last:border-b-0">
       <div className="min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <Badge tone={tone}>{(t?.tipo || "").toLowerCase()}</Badge>
-          <div className="font-semibold text-slate-900  truncate">
+          <div className="font-semibold text-slate-900 truncate">
             {t?.nombre || "Sin nombre"}
           </div>
         </div>
-        <div className="mt-1 text-xs text-slate-500  flex flex-wrap gap-x-3 gap-y-1">
+        <div className="mt-1 text-xs text-slate-500 flex flex-wrap gap-x-3 gap-y-1">
           <span>Plan: {fmtDate(t?.fecha_inicio_plan)} → {fmtDate(t?.fecha_fin_plan)}</span>
           <span>Real: {fmtDate(t?.fecha_inicio_real)} → {fmtDate(t?.fecha_fin_real)}</span>
-          {t?.responsable?.nombre ? <span>Resp: {t.responsable.nombre}</span> : null}
         </div>
       </div>
 
@@ -111,23 +117,102 @@ function TaskRow({ t }) {
 
 function Stat({ label, value, sub }) {
   return (
-    <div className="p-3 md:p-4 rounded-2xl border border-slate-200  bg-white ">
-      <div className="text-xs text-slate-500 ">{label}</div>
-      <div className="mt-1 text-lg md:text-xl font-black text-slate-900 ">
+    <div className="p-3 md:p-4 rounded-2xl border border-slate-200 bg-white">
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="mt-1 text-lg md:text-xl font-black text-slate-900">
         {value}
       </div>
-      {sub ? <div className="mt-1 text-xs text-slate-500 ">{sub}</div> : null}
+      {sub ? <div className="mt-1 text-xs text-slate-500">{sub}</div> : null}
+    </div>
+  );
+}
+
+function WeekMini({ title, range, real, plan }) {
+  const realCount = Number(real?.tareasHechasCount || 0);
+  const realAv = Number(real?.avanceSemanaPct || 0);
+  const realDev = Number(real?.devengadoSemana || 0);
+
+  const planPct = Number(plan?.pct || 0);
+  const planDev = Number(plan?.amount || 0);
+
+  // tonos
+  const toneReal =
+    realDev > 0 || realAv > 0 ? "green" : "slate";
+
+  return (
+    <div className="p-4 rounded-2xl border border-slate-200 bg-white">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-xs text-slate-500">{title}</div>
+          <div className="mt-0.5 text-sm font-extrabold text-slate-900">
+            {fmtDate(range?.inicio)} → {fmtDate(range?.fin)}
+          </div>
+        </div>
+        <Badge tone="slate">Lun–Dom</Badge>
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="rounded-2xl border border-slate-200 p-3">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-500">REAL (audit)</div>
+            <Badge tone={toneReal}>{realCount} tareas</Badge>
+          </div>
+          <div className="mt-2 text-sm text-slate-700">
+            Avance semana: <b className="text-slate-900">{pct2(realAv)}</b>
+          </div>
+          <div className="mt-1 text-sm text-slate-700">
+            Devengado semana: <b className="text-slate-900">{clp(realDev)}</b>
+          </div>
+          <div className="mt-2 text-xs text-slate-500">
+            (inicio: {pct2(real?.avanceInicioPct || 0)} · fin: {pct2(real?.avanceFinPct || 0)})
+          </div>
+
+          {Array.isArray(real?.tareasHechas) && real.tareasHechas.length > 0 ? (
+            <div className="mt-3">
+              <div className="text-xs font-semibold text-slate-700 mb-1">Hechas</div>
+              <div className="space-y-2">
+                {real.tareasHechas.slice(0, 4).map((t) => (
+                  <div key={t.id} className="text-xs text-slate-600 truncate">
+                    • {t.nombre}
+                  </div>
+                ))}
+                {real.tareasHechas.length > 4 ? (
+                  <div className="text-xs text-slate-500">
+                    +{real.tareasHechas.length - 4} más…
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3 text-xs text-slate-500">
+              Sin tareas registradas como “terminadas” por historial en este rango.
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 p-3">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-500">PLAN</div>
+            <Badge tone="blue">{pct2(planPct)}</Badge>
+          </div>
+          <div className="mt-2 text-sm text-slate-700">
+            Devengado plan: <b className="text-slate-900">{clp(planDev)}</b>
+          </div>
+          <div className="mt-2 text-xs text-slate-500">
+            (reparto por días plan + ponderación por costo/horas/días)
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
 export default async function ProyectoDevengadoPage({ params }) {
-  // Next 15: params es Promise
   const { id } = await params;
 
   let data;
   try {
-    data = await serverApi(`/proyectos/${id}/reporte-devengado`);
+    data = await serverApi(`/proyectos/${id}/reporte-devengado?base=VENTA`);
   } catch (err) {
     console.error("Error cargando devengado", err);
     return notFound();
@@ -139,6 +224,7 @@ export default async function ProyectoDevengadoPage({ params }) {
   const rango = data?.rango || {};
   const tareas = data?.tareas || {};
   const fin = data?.financiero || {};
+  const weekly = data?.weekly || {};
 
   const base = fin?.base || {};
   const costos = fin?.costos || {};
@@ -156,21 +242,21 @@ export default async function ProyectoDevengadoPage({ params }) {
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="min-w-0">
-            <div className="text-xs text-slate-500 ">
+            <div className="text-xs text-slate-500">
               <Link
                 href={`/proyectos/${id}`}
-                className="hover:underline text-slate-600 "
+                className="hover:underline text-slate-600"
               >
                 ← Volver al proyecto
               </Link>
             </div>
-            <h1 className="mt-1 text-2xl md:text-3xl font-black tracking-tight text-slate-900  truncate">
+            <h1 className="mt-1 text-2xl md:text-3xl font-black tracking-tight text-slate-900 truncate">
               Devengado · {proyecto?.nombre || "Proyecto"}
             </h1>
 
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <Badge tone="purple">proyecto</Badge>
-              <Badge tone="slate">avance: {pct(avancePct)}</Badge>
+              <Badge tone="slate">avance: {pct2(avancePct)}</Badge>
               <Badge tone={base?.fuente === "VENTA" ? "green" : "blue"}>
                 base: {base?.fuente || "—"}
               </Badge>
@@ -184,7 +270,7 @@ export default async function ProyectoDevengadoPage({ params }) {
           </div>
         </div>
 
-        <div className="text-xs text-slate-500 ">
+        <div className="text-xs text-slate-500">
           Semana pasada: {fmtDate(rango?.semanaPasada?.inicio)} → {fmtDate(rango?.semanaPasada?.fin)} ·
           Semana actual: {fmtDate(rango?.semanaActual?.inicio)} → {fmtDate(rango?.semanaActual?.fin)}
         </div>
@@ -202,7 +288,7 @@ export default async function ProyectoDevengadoPage({ params }) {
         <Stat
           label="Devengado estimado"
           value={clp(dev?.devengado)}
-          sub={`Avance ponderado: ${pct(dev?.avancePct ?? avancePct)}`}
+          sub={`Avance ponderado: ${pct2(dev?.avancePct ?? avancePct)}`}
         />
         <Stat
           label="Costo acumulado"
@@ -224,6 +310,38 @@ export default async function ProyectoDevengadoPage({ params }) {
         />
       </div>
 
+      {/* Resumen semanal PRO */}
+      <Card
+        title="Resumen semanal (devengado real vs plan)"
+        right={<Badge tone="slate">audit</Badge>}
+      >
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+          <WeekMini
+            title="Semana pasada"
+            range={rango?.semanaPasada}
+            real={weekly?.semanaPasada?.real}
+            plan={weekly?.semanaPasada?.plan}
+          />
+          <WeekMini
+            title="Semana actual"
+            range={rango?.semanaActual}
+            real={weekly?.semanaActual?.real}
+            plan={weekly?.semanaActual?.plan}
+          />
+          <WeekMini
+            title="Próxima semana"
+            range={rango?.semanaProxima}
+            real={weekly?.semanaProxima?.real}
+            plan={weekly?.semanaProxima?.plan}
+          />
+        </div>
+
+        <div className="mt-3 text-xs text-slate-500">
+          Tip: si ves todo en 0 en REAL, es porque aún no estás guardando eventos en <b>TareaHistorial</b>
+          (avance/estado por fecha). Apenas tu import Jira o tu UI empiece a registrar cambios, esto queda perfecto.
+        </div>
+      </Card>
+
       {/* Bloque equilibrio + barra */}
       <Card
         title="Avance devengado"
@@ -231,13 +349,13 @@ export default async function ProyectoDevengadoPage({ params }) {
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           <div>
-            <div className="text-sm text-slate-700  font-semibold mb-2">
+            <div className="text-sm text-slate-700 font-semibold mb-2">
               Avance ponderado (por costo/horas plan)
             </div>
             <ProgressBar value={avancePct} />
             {breakevenPct != null && base?.valor > 0 && (
-              <div className="mt-3 text-xs text-slate-500 ">
-                Punto de equilibrio aprox: <b className="text-slate-700 ">{pct(breakevenPct)}</b>{" "}
+              <div className="mt-3 text-xs text-slate-500">
+                Punto de equilibrio aprox: <b className="text-slate-700">{pct(breakevenPct)}</b>{" "}
                 de avance (cuando devengado ≈ costo acumulado).
               </div>
             )}
@@ -263,7 +381,7 @@ export default async function ProyectoDevengadoPage({ params }) {
       {/* Listas de tareas */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <Card
-          title="Hechas la semana pasada"
+          title="Hechas la semana pasada (por plan)"
           right={<Badge tone="green">{tareas?.conteo?.completadasSemanaPasada || 0}</Badge>}
         >
           {Array.isArray(tareas?.completadasSemanaPasada) && tareas.completadasSemanaPasada.length > 0 ? (
@@ -273,12 +391,12 @@ export default async function ProyectoDevengadoPage({ params }) {
               ))}
             </div>
           ) : (
-            <div className="text-sm text-slate-500 ">No hay tareas terminadas en ese rango.</div>
+            <div className="text-sm text-slate-500">No hay tareas terminadas en ese rango (por plan).</div>
           )}
         </Card>
 
         <Card
-          title="Tocan esta semana"
+          title="Tocan esta semana (plan)"
           right={<Badge tone="blue">{tareas?.conteo?.enSemanaActual || 0}</Badge>}
         >
           {Array.isArray(tareas?.enSemanaActual) && tareas.enSemanaActual.length > 0 ? (
@@ -288,7 +406,7 @@ export default async function ProyectoDevengadoPage({ params }) {
               ))}
             </div>
           ) : (
-            <div className="text-sm text-slate-500 ">No hay tareas planificadas para esta semana.</div>
+            <div className="text-sm text-slate-500">No hay tareas planificadas para esta semana.</div>
           )}
         </Card>
       </div>
@@ -302,7 +420,7 @@ export default async function ProyectoDevengadoPage({ params }) {
               ))}
             </div>
           ) : (
-            <div className="text-sm text-slate-500 ">No hay tareas atrasadas 🎉</div>
+            <div className="text-sm text-slate-500">No hay tareas atrasadas 🎉</div>
           )}
         </Card>
 
@@ -317,13 +435,13 @@ export default async function ProyectoDevengadoPage({ params }) {
               ))}
             </div>
           ) : (
-            <div className="text-sm text-slate-500 ">No hay pendientes futuras registradas.</div>
+            <div className="text-sm text-slate-500">No hay pendientes futuras registradas.</div>
           )}
         </Card>
       </div>
 
-      {/* Footer mini */}
-      <div className="text-xs text-slate-500 ">
+      {/* Footer */}
+      <div className="text-xs text-slate-500">
         Nota: el devengado se calcula como <b>Base ({base?.fuente || "—"}) × Avance ponderado</b>. El avance ponderado
         usa costo plan / horas plan cuando existen, para que no todas las tareas “pesen igual”.
       </div>

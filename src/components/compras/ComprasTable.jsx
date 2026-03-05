@@ -1,190 +1,350 @@
 "use client";
 
-function toCLP(v) {
-  const n = Number(v ?? 0);
-  if (!Number.isFinite(n)) return "-";
-  return n.toLocaleString("es-CL", {
-    style: "currency",
-    currency: "CLP",
-    maximumFractionDigits: 0,
-  });
+import React from "react";
+
+function pctBadge(p) {
+  const v = Number(p || 0);
+  if (v >= 100)
+    return "text-emerald-600 ";
+  if (v > 0) return "text-amber-600 ";
+  return "text-slate-400";
 }
 
-function fmtDate(v) {
-  if (!v) return "-";
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return String(v);
-  return d.toLocaleDateString("es-CL");
+function estadoBadge(estado) {
+  const x = String(estado || "").toUpperCase();
+  if (x === "ORDEN_COMPRA")
+    return "bg-blue-100 text-blue-800 ";
+  if (x === "PENDIENTE")
+    return "bg-amber-100 text-amber-800 ";
+  if (x === "VINCULADO")
+    return "bg-emerald-100 text-emerald-800  ";
+  return "bg-slate-100 text-slate-800  ";
 }
+function RendicionCell({ compra }) {
+  const has = !!(compra?.rendicion_id || compra?.rendicionId || compra?.rendicion?.id);
 
-function Badge({ tone = "slate", children }) {
-  const map = {
-    slate: "bg-slate-100 text-slate-700 ring-slate-200",
-    blue: "bg-blue-50 text-blue-700 ring-blue-200",
-    green: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    amber: "bg-amber-50 text-amber-800 ring-amber-200",
-  };
   return (
     <span
       className={[
-        "inline-flex items-center rounded-full px-2 py-0.5 text-xs ring-1",
-        map[tone] || map.slate,
+        "inline-flex items-center justify-center",
+        "h-6 w-6 rounded-full text-xs font-bold",
+        has
+          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+          : "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
       ].join(" ")}
+      title={has ? "Con rendición" : "Sin rendición"}
     >
-      {children}
+      {has ? "✓" : "✕"}
     </span>
   );
 }
-
-function estadoTone(estado) {
-  if (estado === "PAGADA") return "green";
-  if (estado === "FACTURADA") return "blue";
-  if (estado === "ORDEN_COMPRA") return "amber";
-  return "slate";
-}
-
 export default function ComprasTable({
-  rows,
+  API,
   loading,
-  total,
-  page,
+  rows,
+  // filtros header
+  q,
+  onChangeQ,
+  estadoFilter,
+  onChangeEstado,
+  periodo,
+  onChangePeriodo,
+  onClear,
   pageSize,
-  onPageChange,
-  onPageSizeChange,
+  onChangePageSize,
+  // acciones
+  uploadingId,
+  onOpenVincular,
+  onOpenRendicion,
+  onUploadPdfClick,
+  // helpers
+  fmtDateDMY,
+  toCLP,
+  getVincPct,
 }) {
   return (
-    <div className="p-4 md:p-5">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div className="text-xs text-slate-500">
-          Mostrando <b>{rows?.length ?? 0}</b> en esta página · Total registros:{" "}
-          <b>{total ?? 0}</b>
-        </div>
+    <div className="bg-white  rounded-xl border border-slate-200  shadow-sm overflow-hidden">
+      {/* toolbar filtros */}
+      <div className="p-4 border-b border-slate-100  bg-slate-50/50 ">
+        <div className="flex flex-col xl:flex-row items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto">
+            <div className="relative w-full md:w-80">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
+                🔎
+              </span>
+              <input
+                className="w-full pl-10 pr-4 py-2 bg-white  border border-slate-200  rounded-lg text-sm focus:ring-2 focus:ring-slate-200 "
+                placeholder="Proveedor, RUT, folio, proyecto..."
+                value={q}
+                onChange={(e) => onChangeQ?.(e.target.value)}
+              />
+            </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500">Tamaño página</span>
-          <select
-            className="h-9 rounded-lg border px-2 text-sm bg-white"
-            value={pageSize}
-            onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
-          >
-            {[10, 20, 50, 100].map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-slate-500 uppercase">
+                Estado
+              </label>
+              <select
+                className="bg-white  border border-slate-200  rounded-lg text-sm py-2 px-3"
+                value={estadoFilter}
+                onChange={(e) => onChangeEstado?.(e.target.value)}
+              >
+                <option value="ALL">Todos</option>
+                <option value="ORDEN_COMPRA">ORDEN_COMPRA</option>
+                <option value="FACTURADA">FACTURADA</option>
+                <option value="PAGADA">PAGADA</option>
+                <option value="PENDIENTE">PENDIENTE</option>
+                <option value="VINCULADO">VINCULADO</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-slate-500 uppercase">
+                Periodo
+              </label>
+              <input
+                type="month"
+                className="bg-white  border border-slate-200  rounded-lg text-sm py-2 px-3"
+                value={periodo}
+                onChange={(e) => onChangePeriodo?.(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 w-full xl:w-auto justify-end">
+            <button
+              type="button"
+              onClick={onClear}
+              className="px-4 py-2 text-sm font-medium text-slate-600  hover:bg-slate-100  rounded-lg transition-colors"
+            >
+              Limpiar
+            </button>
+            <div className="h-6 w-px bg-slate-200  mx-1" />
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <span>Mostrar</span>
+              <select
+                className="bg-white border border-slate-200  rounded-lg text-xs py-1 px-2"
+                value={pageSize}
+                onChange={(e) => onChangePageSize?.(e.target.value)}
+              >
+                {[10, 20, 50, 100].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="mt-3 overflow-auto rounded-xl border">
-        <table className="min-w-[1100px] w-full text-sm">
-          <thead className="bg-slate-50 text-slate-600">
-            <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:text-left [&>th]:font-medium">
-              <th className="w-[70px]">N°</th>
-              <th className="w-[120px]">Estado</th>
-              <th className="w-[260px]">Proveedor</th>
-              <th className="w-[260px]">Razón social (RCV)</th>
-              <th className="w-[120px]">RUT</th>
-              <th className="w-[90px]">Tipo doc</th>
-              <th className="w-[120px]">Folio</th>
-              <th className="w-[120px]">Fecha docto</th>
-              <th className="w-[120px]">Recepción</th>
-              <th className="w-[220px]">Proyecto</th>
-              <th className="w-[140px] text-right">Total</th>
+      {/* tabla */}
+      <div className="overflow-x-auto custom-scrollbar">
+        <table className="w-full text-left text-sm border-collapse min-w-[1200px]">
+          <thead>
+            <tr className="bg-slate-50/50    text-slate-500  font-semibold border-b border-slate-100 ">
+              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">
+                N°
+              </th>
+              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">
+                Estado
+              </th>
+              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">
+                Proveedor / RUT
+              </th>
+              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">
+                Doc / Folio
+              </th>
+              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">
+                Fecha
+              </th>
+              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">
+                Proyecto
+              </th>
+              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px] text-center">
+                PDF
+              </th>
+              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px] text-center">
+                Rendición
+              </th>
+              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px] text-center">
+                Vínculo Costeo
+              </th>
+              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px] text-right">
+                Monto Total
+              </th>
+              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px] text-center">
+                Acciones
+              </th>
             </tr>
           </thead>
 
-          <tbody className="divide-y">
-            {loading && (
+          <tbody className="divide-y divide-slate-100 ">
+            {loading ? (
+              Array.from({ length: 8 }).map((_, i) => (
+                <tr key={i}>
+                  <td className="px-6 py-4 text-slate-400" colSpan={11}>
+                    Cargando…
+                  </td>
+                </tr>
+              ))
+            ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-3 py-8 text-center text-slate-500">
-                  Cargando…
+                <td className="px-6 py-4 text-slate-500" colSpan={11}>
+                  No hay compras para mostrar.
                 </td>
               </tr>
-            )}
+            ) : (
+              rows.map((c, idx) => {
+                const proveedor = c?.proveedor?.nombre ?? "-";
+                const rut = c?.rut_proveedor ?? c?.proveedor?.rut ?? "-";
+                const proyecto = c?.proyecto?.nombre ?? "—";
+                const pct = getVincPct(c);
+                const hasPdf = Boolean(c?.factura_url);
 
-            {!loading && (!rows || rows.length === 0) && (
-              <tr>
-                <td colSpan={11} className="px-3 py-10 text-center text-slate-500">
-                  Sin compras
-                </td>
-              </tr>
-            )}
-
-            {!loading &&
-              rows?.map((c) => {
-                const provName = c?.proveedor?.nombre ?? "-";
-                const provRut = c?.rut_proveedor ?? c?.proveedor?.rut ?? "-";
-                const razon = c?.razon_social ?? "-";
-                const tipoDoc = c?.tipo_doc ?? "-";
+                const tipoDoc = c?.tipo_doc ?? c?.tipoDoc ?? "-";
                 const folio = c?.folio ?? "-";
 
+                const rendicionId =
+                  c?.rendicion_id ?? c?.rendicionId ?? c?.rendicion?.id ?? null;
+
+                // “numero” ya lo usas como correlativo
+                const numero = c?.numero ?? c?.n ?? idx + 1;
+
                 return (
-                  <tr key={c.id} className="hover:bg-slate-50/60">
-                    <td className="px-3 py-3 font-medium text-slate-800">
-                      {c.numero ?? "-"}
+                  <tr
+                    key={c.id}
+                    className={`hover:bg-slate-50/80  transition-colors ${
+                      idx % 2 ? "bg-slate-50/30 " : ""
+                    }`}
+                  >
+                    <td className="px-6 py-4 font-medium text-slate-400">
+                      {numero}
                     </td>
 
-                    <td className="px-3 py-3">
-                      <Badge tone={estadoTone(c.estado)}>{c.estado ?? "-"}</Badge>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${estadoBadge(
+                          c?.estado,
+                        )}`}
+                      >
+                        {String(c?.estado ?? "-")}
+                      </span>
                     </td>
 
-                    <td className="px-3 py-3">
-                      <div className="font-medium text-slate-900 leading-5">
-                        {provName}
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-slate-900  ">
+                          {proveedor}
+                        </span>
+                        <span className="text-xs text-slate-400">{rut}</span>
                       </div>
-                      <div className="text-xs text-slate-500">{c?.proveedor?.rut || "-"}</div>
                     </td>
 
-                    <td className="px-3 py-3">
-                      <div className="text-slate-900 leading-5">{razon}</div>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-slate-100  px-1.5 py-0.5 rounded text-[10px] font-bold">
+                          {tipoDoc}
+                        </span>
+                        <span className="font-medium">{folio}</span>
+                      </div>
                     </td>
 
-                    <td className="px-3 py-3 text-slate-700">{provRut}</td>
-                    <td className="px-3 py-3 text-slate-700">{tipoDoc}</td>
-                    <td className="px-3 py-3 text-slate-700">{folio}</td>
-
-                    <td className="px-3 py-3 text-slate-700">{fmtDate(c.fecha_docto)}</td>
-                    <td className="px-3 py-3 text-slate-700">{fmtDate(c.fecha_recepcion)}</td>
-
-                    <td className="px-3 py-3 text-slate-700">
-                      {c?.proyecto?.nombre ?? "-"}
+                    <td className="px-6 py-4 text-slate-600  whitespace-nowrap">
+                      {fmtDateDMY(c?.fecha_docto)}
                     </td>
 
-                    <td className="px-3 py-3 text-right font-semibold text-slate-900">
-                      {toCLP(c.total)}
+                    <td className="px-6 py-4">
+                      <span className="text-xs bg-slate-100  px-2 py-1 rounded-md text-slate-600  whitespace-nowrap">
+                        {proyecto}
+                      </span>
+                    </td>
+
+                    <td className="px-6 py-4 text-center">
+                      {hasPdf ? (
+                        <a
+                          href={`${API.replace(/\/$/, "")}${c.factura_url}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Ver factura PDF"
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-slate-200  hover:bg-slate-50 "
+                        >
+                          ✓
+                        </a>
+                      ) : (
+                        <span
+                          title="Sin factura"
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-slate-200   bg-white  text-slate-300 "
+                        >
+                          ✕
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="px-6 py-4 text-center">
+                      <RendicionCell compra={c} />
+                    </td>
+
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <span className={pctBadge(pct)}>
+                          {pct >= 100 ? "⛓️" : pct > 0 ? "🔗" : "⛓️‍💥"}
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold ${
+                            pct >= 100
+                              ? "text-emerald-600"
+                              : pct > 0
+                                ? "text-amber-600"
+                                : "text-slate-400"
+                          }`}
+                        >
+                          {Math.round(pct)}%
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="px-6 py-4 text-right font-bold text-slate-900 ">
+                      {toCLP(c?.total)}
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          className="p-1.5 text-slate-400 hover:text-primary hover:bg-blue-50  rounded-lg transition-all"
+                          title="Vincular a Costeo"
+                          type="button"
+                          onClick={() => onOpenVincular?.(c)}
+                        >
+                          🔗
+                        </button>
+
+                        <button
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50  rounded-lg transition-all"
+                          title="Ver Rendición"
+                          type="button"
+                          onClick={() => onOpenRendicion?.(c)}
+                        >
+                          🧾
+                        </button>
+
+                        <button
+                          className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50  rounded-lg transition-all disabled:opacity-60"
+                          title="Subir PDF"
+                          type="button"
+                          onClick={() => onUploadPdfClick?.(c)}
+                          disabled={uploadingId === c.id}
+                        >
+                          ⬆️
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
-              })}
+              })
+            )}
           </tbody>
         </table>
-      </div>
-
-      {/* paginación simple */}
-      <div className="mt-3 flex items-center justify-between">
-        <div className="text-xs text-slate-500">
-          Página <b>{page}</b>
-        </div>
-
-        <div className="flex gap-2">
-          <button
-            className="h-9 rounded-lg border px-3 text-sm hover:bg-slate-50 disabled:opacity-50"
-            onClick={() => onPageChange?.(Math.max(1, page - 1))}
-            disabled={page <= 1 || loading}
-          >
-            ← Anterior
-          </button>
-
-          <button
-            className="h-9 rounded-lg border px-3 text-sm hover:bg-slate-50 disabled:opacity-50"
-            onClick={() => onPageChange?.(page + 1)}
-            disabled={loading}
-            title="Siguiente página"
-          >
-            Siguiente →
-          </button>
-        </div>
       </div>
     </div>
   );

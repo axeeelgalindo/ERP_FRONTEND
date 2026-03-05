@@ -14,19 +14,19 @@ import {
 
 function StatCard({ icon: Icon, iconBg, iconColor, tag, title, value }) {
   return (
-    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
+    <div className="bg-white  p-6 rounded-xl border border-gray-200  shadow-sm hover:shadow-md transition-shadow">
       <div className="flex justify-between items-start mb-4">
         <div className={`p-3 rounded-lg ${iconBg}`}>
           <Icon className={`w-5 h-5 ${iconColor}`} />
         </div>
         {tag ? (
-          <span className="text-xs font-semibold px-2 py-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full">
+          <span className="text-xs font-semibold px-2 py-1 bg-green-100 text-green-700   rounded-full">
             {tag}
           </span>
         ) : null}
       </div>
-      <h3 className="text-gray-500 dark:text-gray-400 text-sm font-medium">{title}</h3>
-      <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">{value}</p>
+      <h3 className="text-gray-500  text-sm font-medium">{title}</h3>
+      <p className="text-3xl font-bold text-gray-900  mt-1">{value}</p>
     </div>
   );
 }
@@ -125,12 +125,12 @@ export default function ProyectosPageClient({
   };
 
   return (
-    <div className="p-4 lg:p-8 bg-gray-100 dark:bg-slate-900 min-h-[calc(100vh-64px)]">
+    <div className="p-4 lg:p-8 bg-gray-100  min-h-[calc(100vh-64px)]">
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Proyectos</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl font-bold text-gray-900 ">Proyectos</h1>
+          <p className="text-gray-500  mt-1">
             Crea, edita y gestiona el avance de tus proyectos de forma eficiente.
           </p>
         </div>
@@ -138,7 +138,7 @@ export default function ProyectosPageClient({
         <div className="flex items-center gap-3">
           <button
             type="button"
-            className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
+            className="flex items-center gap-2 bg-white  border border-gray-200  text-gray-600  px-4 py-2 rounded-lg hover:bg-gray-50  transition-colors shadow-sm"
             onClick={() => alert("Filtros: pendiente")}
           >
             <Filter className="w-5 h-5" />
@@ -160,38 +160,38 @@ export default function ProyectosPageClient({
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
         <StatCard
           icon={Folder}
-          iconBg="bg-blue-50 dark:bg-blue-900/30"
-          iconColor="text-blue-600 dark:text-blue-400"
+          iconBg="bg-blue-50 "
+          iconColor="text-blue-600 "
           tag="+12%"
           title="Total Proyectos"
           value={stats.totalProyectos}
         />
         <StatCard
           icon={TrendingUp}
-          iconBg="bg-green-50 dark:bg-green-900/30"
-          iconColor="text-green-600 dark:text-green-400"
+          iconBg="bg-green-50 "
+          iconColor="text-green-600 "
           title="En Curso"
           value={stats.enCurso}
         />
         <StatCard
           icon={AlertTriangle}
-          iconBg="bg-amber-50 dark:bg-amber-900/30"
-          iconColor="text-amber-600 dark:text-amber-400"
+          iconBg="bg-amber-50 "
+          iconColor="text-amber-600 "
           tag="Atención"
           title="Próximo Vencimiento"
           value={0}
         />
         <StatCard
           icon={CheckCircle2}
-          iconBg="bg-indigo-50 dark:bg-indigo-900/30"
-          iconColor="text-indigo-600 dark:text-indigo-400"
+          iconBg="bg-indigo-50 "
+          iconColor="text-indigo-600 "
           title="Completados"
           value={0}
         />
       </div>
 
       {/* TABLE CARD */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden">
+      <div className="bg-white  rounded-xl border border-gray-200  shadow-sm overflow-hidden">
         <ProjectsTable
           rows={rows}
           loading={loading}

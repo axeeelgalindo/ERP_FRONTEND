@@ -32,14 +32,16 @@ function uniqueClients(ventas = []) {
 
 function ClientsCell({ ventas }) {
   const clientes = uniqueClients(ventas);
-  if (!clientes.length) return <span className="text-gray-500 dark:text-gray-400">—</span>;
+  if (!clientes.length) return <span className="text-gray-500 ">—</span>;
 
   const visibles = clientes.slice(0, 2);
   const restantes = clientes.length - visibles.length;
 
   const tooltip =
     restantes > 0
-      ? clientes.map((c) => `${c.nombre}${c.rut ? ` (${c.rut})` : ""}`).join("\n")
+      ? clientes
+          .map((c) => `${c.nombre}${c.rut ? ` (${c.rut})` : ""}`)
+          .join("\n")
       : undefined;
 
   return (
@@ -49,7 +51,7 @@ function ClientsCell({ ventas }) {
           key={c.id}
           className="inline-flex items-center gap-1 rounded-full
             bg-blue-50 text-blue-700 border border-blue-100
-            dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800
+              
             px-2 py-0.5 text-xs"
         >
           <Users size={12} />
@@ -60,7 +62,7 @@ function ClientsCell({ ventas }) {
         <span
           className="inline-flex items-center rounded-full
             bg-gray-100 text-gray-700 border border-gray-200
-            dark:bg-slate-700 dark:text-gray-200 dark:border-slate-600
+            
             px-2 py-0.5 text-xs"
         >
           +{restantes}
@@ -95,18 +97,25 @@ function EstadoPill({ estado }) {
 
   const isActivo = ["activo", "en_curso", "en_progreso"].includes(s);
   const isPausado = ["pausado", "pause", "detenido"].includes(s);
-  const isCompletado = ["completado", "completa", "finalizado", "cerrado"].includes(s);
+  const isCompletado = [
+    "completado",
+    "completa",
+    "finalizado",
+    "cerrado",
+  ].includes(s);
 
   const label = isCompletado ? "Completado" : isPausado ? "Pausado" : "Activo";
 
   const cls = isCompletado
-    ? "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800"
+    ? "bg-indigo-50 text-indigo-700 border-indigo-200 "
     : isPausado
-      ? "bg-gray-100 text-gray-600 border-gray-200 dark:bg-slate-700 dark:text-gray-200 dark:border-slate-600"
-      : "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/40 dark:text-green-300 dark:border-green-800";
+      ? "bg-gray-100 text-gray-600 border-gray-200 "
+      : "bg-green-100 text-green-700 border-green-200  ";
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${cls}`}>
+    <span
+      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${cls}`}
+    >
       {label}
     </span>
   );
@@ -115,7 +124,9 @@ function EstadoPill({ estado }) {
 function ProgressDatesCell({ row }) {
   const pct = clampPct(row?.progresoPct ?? row?.avance ?? row?.progress ?? 0);
 
-  const iniP = row?.fecha_inicio_plan ? fmtCLShort(row.fecha_inicio_plan) : null;
+  const iniP = row?.fecha_inicio_plan
+    ? fmtCLShort(row.fecha_inicio_plan)
+    : null;
   const finP = row?.fecha_fin_plan ? fmtCLShort(row.fecha_fin_plan) : null;
 
   const planLine =
@@ -136,30 +147,35 @@ function ProgressDatesCell({ row }) {
           ? "bg-amber-500"
           : pct > 0
             ? "bg-sky-500"
-            : "bg-gray-400 dark:bg-slate-600";
+            : "bg-gray-400 ";
 
   const pctColor =
     pct >= 100
-      ? "text-green-600 dark:text-green-400"
+      ? "text-green-600 "
       : pct >= 90
         ? "text-red-500"
         : pct >= 70
           ? "text-amber-500"
           : pct > 0
-            ? "text-sky-600 dark:text-sky-400"
+            ? "text-sky-600 "
             : "text-gray-400";
 
   return (
     <div className="w-full">
       <div className="flex justify-between text-xs mb-1.5">
-        <span className={iniP && finP ? "text-gray-600 dark:text-gray-400" : "text-gray-400 dark:text-gray-500 italic"}>
+        <span
+          className={iniP && finP ? "text-gray-600 " : "text-gray-400  italic"}
+        >
           {topLeft}
         </span>
         <span className={`font-medium ${pctColor}`}>{pct}%</span>
       </div>
 
-      <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
-        <div className={`${barColor} h-2 rounded-full`} style={{ width: `${pct}%` }} />
+      <div className="w-full bg-gray-200  rounded-full h-2">
+        <div
+          className={`${barColor} h-2 rounded-full`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
 
       {planLine ? (
@@ -241,8 +257,8 @@ function RowMenu({ row, onEdit, onDelete, onStart, onFinish }) {
     <>
       <button
         ref={btnRef}
-        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
-          p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+        className="text-gray-400 hover:text-gray-600 
+          p-2 rounded-full hover:bg-gray-100  transition-colors"
         onClick={() => setOpen((o) => !o)}
         aria-label="Abrir menú"
         type="button"
@@ -254,16 +270,16 @@ function RowMenu({ row, onEdit, onDelete, onStart, onFinish }) {
         <div
           ref={menuRef}
           className="fixed z-[60] w-56 origin-top-right rounded-lg
-            border border-gray-200 dark:border-slate-700
-            bg-white dark:bg-slate-800 shadow-lg overflow-hidden"
+            border border-gray-200 
+            bg-white  shadow-lg overflow-hidden"
           style={{ top: pos.top, left: pos.left }}
         >
           <div className="py-1 text-sm">
             <Link
               href={`/proyectos/${row.id}`}
               className="flex items-center gap-2 px-3 py-2
-                text-gray-700 dark:text-gray-200
-                hover:bg-gray-50 dark:hover:bg-slate-700/60"
+                text-gray-700 
+                hover:bg-gray-50 "
               onClick={() => setOpen(false)}
             >
               <Eye size={14} /> Ver
@@ -272,8 +288,8 @@ function RowMenu({ row, onEdit, onDelete, onStart, onFinish }) {
             {showStart && (
               <button
                 className="w-full flex items-center gap-2 px-3 py-2 text-left
-                  text-gray-700 dark:text-gray-200
-                  hover:bg-gray-50 dark:hover:bg-slate-700/60"
+                  text-gray-700 
+                  hover:bg-gray-50 "
                 onClick={() => {
                   setOpen(false);
                   onStart?.(row);
@@ -287,8 +303,8 @@ function RowMenu({ row, onEdit, onDelete, onStart, onFinish }) {
             {showFinish && (
               <button
                 className="w-full flex items-center gap-2 px-3 py-2 text-left
-                  text-gray-700 dark:text-gray-200
-                  hover:bg-gray-50 dark:hover:bg-slate-700/60"
+                  text-gray-700 
+                  hover:bg-gray-50 "
                 onClick={() => {
                   setOpen(false);
                   onFinish?.(row);
@@ -301,8 +317,8 @@ function RowMenu({ row, onEdit, onDelete, onStart, onFinish }) {
 
             <button
               className="w-full flex items-center gap-2 px-3 py-2 text-left
-                text-gray-700 dark:text-gray-200
-                hover:bg-gray-50 dark:hover:bg-slate-700/60"
+                text-gray-700 
+                hover:bg-gray-50 "
               onClick={() => {
                 setOpen(false);
                 onEdit?.(row);
@@ -314,8 +330,8 @@ function RowMenu({ row, onEdit, onDelete, onStart, onFinish }) {
 
             <button
               className="w-full flex items-center gap-2 px-3 py-2 text-left
-                text-red-600 dark:text-red-400
-                hover:bg-red-50 dark:hover:bg-red-900/20"
+                text-red-600 
+                hover:bg-red-50 "
               onClick={() => {
                 setOpen(false);
                 onDelete?.(row);
@@ -346,24 +362,14 @@ export default function ProjectsTable({
 }) {
   if (loading) {
     return (
-      <div className="p-6 text-sm text-gray-500 dark:text-gray-400">
-        Cargando proyectos…
-      </div>
+      <div className="p-6 text-sm text-gray-500 ">Cargando proyectos…</div>
     );
   }
   if (error) {
-    return (
-      <div className="p-6 text-sm text-red-500">
-        Error: {error}
-      </div>
-    );
+    return <div className="p-6 text-sm text-red-500">Error: {error}</div>;
   }
   if (!rows?.length) {
-    return (
-      <div className="p-6 text-sm text-gray-500 dark:text-gray-400">
-        Sin resultados.
-      </div>
-    );
+    return <div className="p-6 text-sm text-gray-500 ">Sin resultados.</div>;
   }
 
   const _page = Number.isFinite(Number(page)) ? Number(page) : 1;
@@ -379,29 +385,29 @@ export default function ProjectsTable({
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50">
-              <th className="p-5 text-sm font-semibold text-gray-500 dark:text-gray-400">
+            <tr className="border-b border-gray-200  bg-gray-50/50 ">
+              <th className="p-5 text-sm font-semibold text-gray-500 ">
                 Nombre
               </th>
-              <th className="p-5 text-sm font-semibold text-gray-500 dark:text-gray-400">
+              <th className="p-5 text-sm font-semibold text-gray-500 ">
                 Cliente
               </th>
-              <th className="p-5 text-sm font-semibold text-gray-500 dark:text-gray-400">
+              <th className="p-5 text-sm font-semibold text-gray-500 ">
                 Estado
               </th>
-              <th className="p-5 text-sm font-semibold text-gray-500 dark:text-gray-400 w-[360px]">
+              <th className="p-5 text-sm font-semibold text-gray-500  w-[360px]">
                 Progreso / Fechas
               </th>
-              <th className="p-5 text-sm font-semibold text-gray-500 dark:text-gray-400">
+              <th className="p-5 text-sm font-semibold text-gray-500 ">
                 Descripción
               </th>
-              <th className="p-5 text-sm font-semibold text-gray-500 dark:text-gray-400 text-right">
+              <th className="p-5 text-sm font-semibold text-gray-500  text-right">
                 Acciones
               </th>
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+          <tbody className="divide-y divide-gray-200 ">
             {rows.map((row) => {
               const id = row.id;
               const nombre = row.nombre ?? "Sin nombre";
@@ -410,14 +416,15 @@ export default function ProjectsTable({
               return (
                 <tr
                   key={id}
-                  className="group hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors"
+                  className="group hover:bg-gray-50  transition-colors"
                 >
                   <td className="p-5">
-                    <div className="font-semibold text-gray-900 dark:text-white">
-                      {nombre}
-                    </div>
+                    <div className="font-semibold text-gray-900 ">{nombre}</div>
                     <div className="text-xs text-gray-400 mt-1">
-                      ID: {codigo ? `#${String(codigo)}` : `#${String(id).slice(-6)}`}
+                      ID:{" "}
+                      {codigo
+                        ? `#${String(codigo)}`
+                        : `#${String(id).slice(-6)}`}
                     </div>
                   </td>
 
@@ -433,7 +440,7 @@ export default function ProjectsTable({
                     <ProgressDatesCell row={row} />
                   </td>
 
-                  <td className="p-5 text-sm text-gray-500 dark:text-gray-400">
+                  <td className="p-5 text-sm text-gray-500 ">
                     {row.descripcion || "—"}
                   </td>
 
@@ -453,18 +460,19 @@ export default function ProjectsTable({
         </table>
       </div>
 
-      <div className="p-4 border-t border-gray-200 dark:border-slate-700 flex flex-col md:flex-row items-center justify-between gap-4">
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Mostrando{" "}
-          <span className="font-medium text-gray-900 dark:text-white">{from}</span>{" "}
-          a{" "}
-          <span className="font-medium text-gray-900 dark:text-white">{to}</span>{" "}
-          de{" "}
-          <span className="font-medium text-gray-900 dark:text-white">{_total}</span>{" "}
+      <div className="p-4 border-t border-gray-200  flex flex-col md:flex-row items-center justify-between gap-4">
+        <p className="text-sm text-gray-500 ">
+          Mostrando <span className="font-medium text-gray-900 ">{from}</span> a{" "}
+          <span className="font-medium text-gray-900 ">{to}</span> de{" "}
+          <span className="font-medium text-gray-900 ">{_total}</span>{" "}
           resultados
         </p>
 
-        <Pagination page={_page} totalPages={totalPages} onPageChange={onPageChange} />
+        <Pagination
+          page={_page}
+          totalPages={totalPages}
+          onPageChange={onPageChange}
+        />
       </div>
     </div>
   );
