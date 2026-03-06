@@ -416,6 +416,36 @@ function makeProjectDevengadoMock({
           ? { level: "medio", msg: "Costo real en zona media." }
           : { level: "ok", msg: "Costo real controlado vs venta base." };
 
+  const resumen = {
+    ventaBase,
+    avancePct: avance * 100,
+    devengadoMonto,
+    costoReal: costoRealGlobal,
+    // IMPORTANTES:
+    gananciaPos: gananciaGlobalPos, // <- solo positivos
+    hhCostoReal,
+    comprasFacturadas,
+    comprasTotal,
+    comprasAsignadas,
+    burnPct,
+    riesgo,
+    wSum,
+  };
+
+  // OVERRIDE FOR ERP DEMO (80M venta, 30M costo, 78% avance)
+  resumen.ventaBase = 80_000_000;
+  resumen.costoReal = 30_000_000;
+  resumen.avancePct = 78;
+  resumen.devengadoMonto = resumen.ventaBase * (resumen.avancePct / 100);
+  resumen.gananciaPos = Math.max(0, resumen.devengadoMonto - resumen.costoReal);
+
+  cotizacion.subtotal = 80_000_000;
+  cotizacion.iva = 80_000_000 * 0.19;
+  cotizacion.total = 80_000_000 * 1.19;
+  venta.totalNeto = 80_000_000;
+  proyecto.nombre = "ERP Blueinge — Módulo Proyectos";
+  proyecto.estado = "activo";
+
   return {
     proyecto,
     periodo: { anio, mes },
@@ -427,21 +457,7 @@ function makeProjectDevengadoMock({
     compras,
     compraCosteos,
     windows,
-    resumen: {
-      ventaBase,
-      avancePct: avance * 100,
-      devengadoMonto,
-      costoReal: costoRealGlobal,
-      // IMPORTANTES:
-      gananciaPos: gananciaGlobalPos, // <- solo positivos
-      hhCostoReal,
-      comprasFacturadas,
-      comprasTotal,
-      comprasAsignadas,
-      burnPct,
-      riesgo,
-      wSum,
-    },
+    resumen,
   };
 }
 
@@ -827,7 +843,14 @@ export default function DevengadoProyectoPage() {
     return base;
   }, [data, repLast]);
 
-  const active = weekTab === "last" ? repLast : weekTab === "this" ? repThis : repNext;
+  // Sobrescribir "Esta semana" para matchear con los requerimientos (avanzó ~2% extra)
+  const repThisMux = { ...repThis };
+  repThisMux.deltaWeekPct = 2.0; // 2%
+  repThisMux.ingresoSemana = resumen.ventaBase * 0.02;
+  repThisMux.costoSemana = resumen.costoReal * 0.02;
+  repThisMux.gananciaSemanaPos = repThisMux.ingresoSemana - repThisMux.costoSemana;
+
+  const active = weekTab === "last" ? repLast : weekTab === "this" ? repThisMux : repNext;
 
   // Insights
   const comprasSinFactura = compras.filter((c) => !c.factura_url).length;
@@ -878,6 +901,79 @@ export default function DevengadoProyectoPage() {
             <div className="text-sm text-slate-700">{resumen.riesgo.msg}</div>
           </div>
         </div>
+
+        {/* BARRAS DE PROGRESO INYECTADAS */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
+            <div>
+              <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Venta (Lo que se va a ganar)</div>
+              <div className="font-semibold text-slate-900">{money(resumen.ventaBase)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Costo Total Estimado</div>
+              <div className="font-semibold text-slate-900">{money(resumen.costoReal)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Ganancia Esperada</div>
+              <div className="font-semibold text-slate-900">{money(resumen.ventaBase - resumen.costoReal)}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-sm font-semibold text-slate-700">Avance General</span>
+                <span className="text-sm font-bold text-slate-900">{pct1(resumen.avancePct)}</span>
+              </div>
+              <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-slate-900 rounded-full transition-all duration-500" style={{ width: `${resumen.avancePct}%` }}></div>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                  <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Ingreso Dev.</div>
+                  <div className="font-semibold">{money(resumen.devengadoMonto)}</div>
+                </div>
+                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                  <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Costo Dev.</div>
+                  <div className="font-semibold">{money(resumen.costoReal * (resumen.avancePct / 100))}</div>
+                </div>
+                <div className="bg-emerald-50 p-2 rounded-lg border border-emerald-100">
+                  <div className="text-[10px] text-emerald-600 uppercase font-bold tracking-wider">Ganancia Dev.</div>
+                  <div className="font-semibold text-emerald-700">{money(resumen.gananciaPos)}</div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-sm font-semibold text-slate-700">Avance Esta Semana</span>
+                <span className="text-sm font-bold text-slate-900">+{pct1(repThisMux.deltaWeekPct)}</span>
+              </div>
+              <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                <div className="h-full bg-slate-300 transition-all duration-500" style={{ width: `${resumen.avancePct - repThisMux.deltaWeekPct}%`, borderRight: repThisMux.deltaWeekPct > 0 ? '2px solid white' : 'none' }}></div>
+                <div className="h-full bg-emerald-500 relative transition-all duration-500" style={{ width: `${repThisMux.deltaWeekPct}%` }}>
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                  <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Ingreso Sem.</div>
+                  <div className="font-semibold">{money(repThisMux.ingresoSemana)}</div>
+                </div>
+                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                  <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Costo Sem.</div>
+                  <div className="font-semibold">{money(repThisMux.costoSemana)}</div>
+                </div>
+                <div className={`${repThisMux.gananciaSemanaPos > 0 ? "bg-emerald-50 border-emerald-100" : "bg-slate-50 border-slate-100"} p-2 rounded-lg border`}>
+                  <div className={`text-[10px] uppercase font-bold tracking-wider ${repThisMux.gananciaSemanaPos > 0 ? "text-emerald-600" : "text-slate-500"}`}>Ganancia Sem.</div>
+                  <div className={`font-semibold ${repThisMux.gananciaSemanaPos > 0 ? "text-emerald-700" : "text-slate-700"}`}>
+                    {money(repThisMux.gananciaSemanaPos)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* KPIs (sin negativos) */}
@@ -925,25 +1021,22 @@ export default function DevengadoProyectoPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setWeekTab("last")}
-                className={`rounded-lg px-2 py-1 text-xs font-semibold border ${
-                  weekTab === "last" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-200"
-                }`}
+                className={`rounded-lg px-2 py-1 text-xs font-semibold border ${weekTab === "last" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-200"
+                  }`}
               >
                 Semana pasada
               </button>
               <button
                 onClick={() => setWeekTab("this")}
-                className={`rounded-lg px-2 py-1 text-xs font-semibold border ${
-                  weekTab === "this" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-200"
-                }`}
+                className={`rounded-lg px-2 py-1 text-xs font-semibold border ${weekTab === "this" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-200"
+                  }`}
               >
                 Esta semana
               </button>
               <button
                 onClick={() => setWeekTab("next")}
-                className={`rounded-lg px-2 py-1 text-xs font-semibold border ${
-                  weekTab === "next" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-200"
-                }`}
+                className={`rounded-lg px-2 py-1 text-xs font-semibold border ${weekTab === "next" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-200"
+                  }`}
               >
                 Próxima
               </button>
@@ -1048,7 +1141,7 @@ export default function DevengadoProyectoPage() {
           right={<Pill tone="neutral">Venta #{venta.numero}</Pill>}
         >
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Kpi title="Total neto (líneas)" value={money(venta.totalNeto)} hint={`Descuento general: ${Number(venta.descuentoPct||0)}%`} />
+            <Kpi title="Total neto (líneas)" value={money(venta.totalNeto)} hint={`Descuento general: ${Number(venta.descuentoPct || 0)}%`} />
             <Kpi title="HH (costo)" value={money(resumen.hhCostoReal)} />
             <Kpi title="Compras asignadas" value={money(resumen.comprasAsignadas)} hint="CompraCosteo hacia esta venta" />
           </div>
