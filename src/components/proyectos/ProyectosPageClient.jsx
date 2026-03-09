@@ -57,6 +57,7 @@ export default function ProyectosPageClient({
 }) {
   const router = useRouter();
   const [openModal, setOpenModal] = useState(false);
+  const [editingProyecto, setEditingProyecto] = useState(null);
 
   const totalPages = Math.max(1, Math.ceil((Number(total) || 0) / (Number(pageSize) || 10)));
 
@@ -148,7 +149,10 @@ export default function ProyectosPageClient({
           <button
             type="button"
             className="bg-sky-600 hover:bg-sky-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-md shadow-sky-600/20 flex items-center gap-2 transition-all transform hover:-translate-y-0.5"
-            onClick={() => setOpenModal(true)}
+            onClick={() => {
+              setEditingProyecto(null);
+              setOpenModal(true);
+            }}
           >
             <Plus className="w-5 h-5" />
             Nuevo proyecto
@@ -200,21 +204,28 @@ export default function ProyectosPageClient({
           pageSize={pageSize}
           total={total}
           onPageChange={(p) => goTo(p)}
-          onEdit={(row) => onEditProyecto?.(row)}
+          onEdit={(row) => {
+            setEditingProyecto(row);
+            setOpenModal(true);
+          }}
           onDelete={(row) => onDeleteProyecto?.(row)}
           onStart={(row) => onStartProyecto?.(row)}
           onFinish={(row) => onFinishProyecto?.(row)}
         />
       </div>
 
-      {/* MODAL NUEVO PROYECTO */}
+      {/* MODAL NUEVO/EDITAR PROYECTO */}
       <ProyectoFormModal
         open={openModal}
-        onClose={() => setOpenModal(false)}
-        mode="create"
-        initialProyecto={null}
+        onClose={() => {
+          setOpenModal(false);
+          setTimeout(() => setEditingProyecto(null), 200);
+        }}
+        mode={editingProyecto ? "edit" : "create"}
+        initialProyecto={editingProyecto}
         onSaved={() => {
           setOpenModal(false);
+          setTimeout(() => setEditingProyecto(null), 200);
           router.refresh();
         }}
       />
