@@ -1,5 +1,7 @@
 import { StatPill } from "./ProyectoUI";
 import { formatCurrencyCLP } from "@/lib/formatters";
+import Link from "next/link";
+import { TrendingUp } from "lucide-react";
 
 export default function ProyectoHeader({ proyecto }) {
   return (
@@ -22,8 +24,8 @@ export default function ProyectoHeader({ proyecto }) {
               proyecto.estado === "aprobado"
                 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                 : proyecto.estado === "activo"
-                ? "bg-blue-50 text-blue-700 border-blue-200"
-                : "bg-gray-50 text-gray-700 border-gray-200"
+                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                  : "bg-gray-50 text-gray-700 border-gray-200"
             }
           />
           <StatPill
@@ -39,6 +41,16 @@ export default function ProyectoHeader({ proyecto }) {
             }
           />
         </div>
+      </div>
+
+      <div className="pt-3 flex justify-end border-t border-gray-100">
+        <Link
+          href={`/proyectos/${proyecto.id}/devengado`}
+          className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm"
+        >
+          <TrendingUp size={16} />
+          Ver Devengado
+        </Link>
       </div>
     </section>
   );

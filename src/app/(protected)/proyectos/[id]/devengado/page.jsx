@@ -14,9 +14,16 @@ import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import UpdateIcon from '@mui/icons-material/Update';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 
-const money = (n) => `$${Number(n || 0).toLocaleString("es-CL", { maximumFractionDigits: 0 })}`;
+const money = (n) =>
+  new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    maximumFractionDigits: 0
+  }).format(Number(n || 0));
 const pct1 = (n) => `${Number(n || 0).toFixed(1)}%`;
 const fmtDate = (d) => {
   if (!d) return "—";
@@ -42,7 +49,7 @@ export default function ProyectoDevengadoRealPage({ params }) {
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
 
-    fetch(`${apiUrl}/proyectos/${id}/reporte-devengado?base=VENTA`, {
+    fetch(`${apiUrl}/proyectos/${id}/devengado?base=VENTA`, {
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${session.user.accessToken}`,
@@ -96,7 +103,10 @@ export default function ProyectoDevengadoRealPage({ params }) {
   const comprasSinFactura = compras.filter((c) => !c.factura_url && c.estado !== "FACTURADA").length;
   const comprasFact = compras.filter((c) => !!c.factura_url || c.estado === "FACTURADA").length;
 
-  const margenBruto = base.valor > 0 ? ((base.valor - costos.costoAcumulado) / base.valor) * 100 : 0;
+  // El margen debe ser sobre lo devengado (el avance llevado a $) contra los costos reales
+  const margenBruto = devengado.devengado > 0
+    ? ((devengado.devengado - costos.costoAcumulado) / devengado.devengado) * 100
+    : 0;
 
   // Approx weekly values
   const currentWeek = weekly?.semanaActual;
@@ -148,6 +158,13 @@ export default function ProyectoDevengadoRealPage({ params }) {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <Link
+                href={`/proyectos/${id}`}
+                className="flex items-center gap-2 px-4 py-2 text-xs font-bold bg-white border border-slate-200 shadow-sm rounded-lg text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                <ArrowBackIcon fontSize="small" className="text-sm" />
+                Volver
+              </Link>
               <div className="flex bg-slate-100 p-1 rounded-lg">
                 <button className="px-4 py-1.5 text-xs font-bold bg-white shadow-sm rounded-md text-slate-900">Realtime</button>
               </div>
@@ -227,11 +244,15 @@ export default function ProyectoDevengadoRealPage({ params }) {
             <div className="flex-1 flex items-center justify-center relative -mt-4">
               <Gauge
                 value={Number(margenBruto)}
+                valueMin={-100}
+                valueMax={100}
                 startAngle={-110}
                 endAngle={110}
                 innerRadius="75%"
                 sx={{
-                  '& .MuiGauge-valueArc': { fill: '#64748B' },
+                  '& .MuiGauge-valueArc': {
+                    fill: margenBruto >= 65 ? '#10B981' : margenBruto >= 30 ? '#F59E0B' : '#EF4444'
+                  },
                   '& .MuiGauge-referenceArc': { fill: '#F1F5F9' },
                   '& .MuiGauge-valueText': { fontSize: 24, fontWeight: 'bold', fill: '#0F172A', transform: 'translate(0px, 4px)' }
                 }}
@@ -331,8 +352,8 @@ export default function ProyectoDevengadoRealPage({ params }) {
             <div className="flex-1 mb-8 h-48 border-slate-100 pb-2 relative w-full -ml-4">
               <BarChart
                 series={[
-                  { data: daily.map(d => d.costo), color: '#E2E8F0', valueFormatter: (v) => money(v) },
-                  { data: daily.map(d => d.ingreso), color: '#3B82F6', valueFormatter: (v) => money(v) }
+                  { data: daily.map(d => d.costo), color: '#E2E8F0', label: 'Costo Semanal', valueFormatter: (v) => money(v) },
+                  { data: daily.map(d => d.ingreso), color: '#3B82F6', label: 'Ingreso Semanal', valueFormatter: (v) => money(v) }
                 ]}
                 xAxis={[{ data: daily.map(d => d.day), scaleType: 'band' }]}
                 margin={{ left: 10, right: 10, top: 10, bottom: 20 }}
