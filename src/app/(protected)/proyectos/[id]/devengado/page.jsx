@@ -197,7 +197,9 @@ export default function ProyectoDevengadoRealPage({ params }) {
           <div className="bg-white border border-slate-200/60 rounded-[12px] p-6 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-2">
               <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Costo Real</span>
-              <span className={`flex items-center text-xs font-bold px-1.5 py-0.5 rounded ${costos.costoAcumulado > base.valor / 2 ? 'text-amber-500 bg-amber-50' : 'text-emerald-500 bg-emerald-50'}`}>Facturado+HH</span>
+              <span className={`flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded ${costos.costoAcumulado > base.valor / 2 ? 'text-amber-500 bg-amber-50' : 'text-emerald-500 bg-emerald-50'}`}>
+                {costos.costoAcumulado === costos.costoPlan ? 'Costo Base (Venta)' : 'Facturado+HH'}
+              </span>
             </div>
             <div className="text-xl md:text-2xl font-bold mb-4 tracking-tight text-rose-500">{money(costos.costoAcumulado)}</div>
             <div className="h-10 w-full relative -mx-2 -mb-2">
@@ -238,7 +240,9 @@ export default function ProyectoDevengadoRealPage({ params }) {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Margen Bruto</span>
-                <span className="text-slate-400 flex items-center text-[10px] font-bold">Target: 65%</span>
+                <span className="text-slate-400 flex items-center text-[10px] font-bold">
+                  Target: {base.margenObjetivo ? Math.round(base.margenObjetivo) + '%' : '65%'}
+                </span>
               </div>
             </div>
             <div className="flex-1 flex items-center justify-center relative -mt-4">
@@ -251,7 +255,11 @@ export default function ProyectoDevengadoRealPage({ params }) {
                 innerRadius="75%"
                 sx={{
                   '& .MuiGauge-valueArc': {
-                    fill: margenBruto >= 65 ? '#10B981' : margenBruto >= 30 ? '#F59E0B' : '#EF4444'
+                    fill: margenBruto >= (base.margenObjetivo || 65)
+                      ? '#10B981'
+                      : margenBruto >= (base.margenObjetivo || 65) * 0.5
+                        ? '#F59E0B'
+                        : '#EF4444'
                   },
                   '& .MuiGauge-referenceArc': { fill: '#F1F5F9' },
                   '& .MuiGauge-valueText': { fontSize: 24, fontWeight: 'bold', fill: '#0F172A', transform: 'translate(0px, 4px)' }
@@ -426,9 +434,16 @@ export default function ProyectoDevengadoRealPage({ params }) {
                       <p className="text-lg font-bold text-slate-300">{money(costos.totalCompras)}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-emerald-400 font-medium h-6">
-                    <TrendingDownIcon fontSize="small" className="text-sm" />
-                    Costo Actual {pct1((costos.costoAcumulado / (base.valor || 1)) * 100)} del Presupuesto de {base.fuente}
+                  <div className="text-sm border-t border-slate-700 pt-3">
+                    <div className="flex items-center gap-2 text-emerald-400 font-medium">
+                      <TrendingDownIcon fontSize="small" />
+                      <span>Costo Actual {pct1((costos.costoAcumulado / (base.valor || 1)) * 100)} del Presupuesto de {base.fuente}</span>
+                    </div>
+                    {costos.costoAcumulado === costos.costoPlan && (
+                      <div className="text-xs text-slate-400 mt-1">
+                        * El costo actual se mantiene bajo la línea base de los detalles de la Venta ({money(costos.costoPlan)}).
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
