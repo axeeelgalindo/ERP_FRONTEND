@@ -1,8 +1,21 @@
 // src/app/(protected)/devengado/page.jsx
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import { BarChart, LineChart, PieChart, SparkLineChart, Gauge } from '@mui/x-charts';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import BusinessCenterIcon from '@mui/icons-material/BusinessCenter';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import PendingActionsIcon from '@mui/icons-material/PendingActions';
+import PendingIcon from '@mui/icons-material/Pending';
+import SyncIcon from '@mui/icons-material/Sync';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import UpdateIcon from '@mui/icons-material/Update';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 /**
  * ✅ DEVENGADO / GANANCIA (SOLO POSITIVOS) — UI real con forecast semanal
@@ -861,364 +874,484 @@ export default function DevengadoProyectoPage() {
   const stTerminadas = subtareasAll.filter((s) => s.avance >= 100).length;
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900">
-                Devengado · {proyecto.nombre}
-              </h1>
-              <Pill tone={estadoTone}>{proyecto.estado}</Pill>
+    <div className="bg-slate-50 text-slate-900 min-h-screen transition-colors duration-200">
+      <main className="p-8 max-w-[1500px] mx-auto space-y-8">
+        <header className="mb-4">
+          <nav className="flex items-center gap-2 text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
+            <span>Proyectos</span>
+            <ChevronRightIcon fontSize="small" className="text-sm" />
+            <span>{proyecto.nombre.split("—")[0].trim()}</span>
+            <ChevronRightIcon fontSize="small" className="text-sm" />
+            <span className="text-slate-600">{proyecto.nombre.split("—").length > 1 ? proyecto.nombre.split("—")[1].trim() : "Detalle"}</span>
+          </nav>
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="space-y-1">
+              <div className="flex items-center gap-4">
+                <h1 className="text-3xl font-bold tracking-tight text-slate-900">Devengado - {proyecto.nombre}</h1>
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${estadoTone === 'ok' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${estadoTone === 'ok' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                  {proyecto.estado}
+                </span>
+              </div>
+              <div className="flex items-center gap-4 text-slate-500 mt-2">
+                <div className="flex items-center gap-1.5 text-sm">
+                  <CalendarMonthIcon fontSize="small" className="text-[18px]" />
+                  <span>Periodo: {periodo.mes}/{periodo.anio}</span>
+                </div>
+                <div className="w-1 h-1 rounded-full bg-slate-300"></div>
+                <div className="flex items-center gap-1.5 text-sm">
+                  <UpdateIcon fontSize="small" className="text-[18px]" />
+                  <span>Plan: {fmtDate(proyecto.fecha_inicio_plan)} → {fmtDate(proyecto.fecha_fin_plan)}</span>
+                </div>
+              </div>
             </div>
-            <div className="mt-1 text-sm text-slate-600">
-              Periodo: <span className="font-semibold">{periodo.mes}/{periodo.anio}</span> ·
-              Plan: <span className="font-semibold">{fmtDate(proyecto.fecha_inicio_plan)} → {fmtDate(proyecto.fecha_fin_plan)}</span> ·
-              Presupuesto: <span className="font-semibold">{money(proyecto.presupuesto)}</span>
+            <div className="flex items-center gap-3">
+              <div className="flex bg-slate-100 p-1 rounded-lg">
+                <button className="px-4 py-1.5 text-xs font-bold bg-white shadow-sm rounded-md text-slate-900">Realtime</button>
+                <button className="px-4 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700">Histórico</button>
+              </div>
+              <button onClick={() => location.reload()} className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold bg-slate-900 text-white rounded-xl hover:opacity-95 transition-all shadow-lg shadow-slate-900/10">
+                <SyncIcon fontSize="small" className="text-lg" />
+                Refrescar Mock
+              </button>
             </div>
           </div>
+        </header>
 
-          <div className="flex items-center gap-2">
-            <a
-              href={`/devengado?proyectoId=${proyecto.id}`}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50"
-            >
-              Link directo
-            </a>
-            <button
-              onClick={() => location.reload()}
-              className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:opacity-95"
-            >
-              Refrescar mock
-            </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-white border border-slate-200/60 rounded-[12px] p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Venta Total</span>
+              <span className="text-emerald-500 flex items-center text-xs font-bold bg-emerald-50 px-1.5 py-0.5 rounded">Target</span>
+            </div>
+            <div className="text-2xl font-bold mb-4 tracking-tight">{money(resumen.ventaBase)}</div>
+            <div className="h-10 w-full relative -mx-2 -mb-2">
+              <SparkLineChart
+                data={[2, 4, 4, 6, 8, 12, 15]}
+                colors={['#3B82F6']}
+                area
+                curve="step"
+                margin={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                sx={{
+                  '& .MuiAreaElement-root': { fill: 'url(#gradient-blue)' },
+                  '& .MuiLineElement-root': { strokeWidth: 2 }
+                }}
+              />
+              <svg style={{ height: 0 }}><defs><linearGradient id="gradient-blue" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#3B82F6" stopOpacity={0.2} /><stop offset="100%" stopColor="#3B82F6" stopOpacity={0} /></linearGradient></defs></svg>
+            </div>
+          </div>
+          <div className="bg-white border border-slate-200/60 rounded-[12px] p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Costo Real</span>
+              <span className={`flex items-center text-xs font-bold px-1.5 py-0.5 rounded ${resumen.costoReal > resumen.ventaBase / 2 ? 'text-amber-500 bg-amber-50' : 'text-emerald-500 bg-emerald-50'}`}>Facturado</span>
+            </div>
+            <div className="text-2xl font-bold mb-4 tracking-tight text-rose-500">{money(resumen.costoReal)}</div>
+            <div className="h-10 w-full relative -mx-2 -mb-2">
+              <SparkLineChart
+                data={[1, 3, 5, 8, 12, 13, 16]}
+                colors={['#F43F5E']}
+                area
+                curve="monotoneX"
+                margin={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                sx={{
+                  '& .MuiAreaElement-root': { fill: 'url(#gradient-rose)' },
+                  '& .MuiLineElement-root': { strokeWidth: 2 }
+                }}
+              />
+              <svg style={{ height: 0 }}><defs><linearGradient id="gradient-rose" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#F43F5E" stopOpacity={0.2} /><stop offset="100%" stopColor="#F43F5E" stopOpacity={0} /></linearGradient></defs></svg>
+            </div>
+          </div>
+          <div className="bg-white border border-slate-200/60 rounded-[12px] p-6 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Ganancia (Devengada)</span>
+              <span className="text-emerald-500 flex items-center text-[10px] font-bold bg-emerald-50 px-1.5 py-0.5 rounded">Solo Positivos</span>
+            </div>
+            <div className="text-2xl font-bold mb-4 tracking-tight text-emerald-600">{money(resumen.gananciaPos)}</div>
+            <div className="h-12 w-full relative -mx-2 -mb-4">
+              <BarChart
+                series={[{ data: [2, 5, 3, 8, 10, 15, 12], color: '#10B981', valueFormatter: () => '' }]}
+                xAxis={[{ scaleType: 'band', data: ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7'], display: false }]}
+                yAxis={[{ display: false }]}
+                margin={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                tooltip={{ trigger: 'none' }}
+                sx={{ '& .MuiBarElement-root': { rx: 2 } }}
+              />
+            </div>
+          </div>
+          <div className="bg-white border border-slate-200/60 rounded-[12px] p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Margen Bruto</span>
+                <span className="text-slate-400 flex items-center text-[10px] font-bold">Target: 65%</span>
+              </div>
+            </div>
+            <div className="flex-1 flex items-center justify-center relative -mt-4">
+              <Gauge
+                value={Number(((resumen.ventaBase - resumen.costoReal) / resumen.ventaBase) * 100)}
+                startAngle={-110}
+                endAngle={110}
+                innerRadius="75%"
+                sx={{
+                  '& .MuiGauge-valueArc': { fill: '#64748B' },
+                  '& .MuiGauge-referenceArc': { fill: '#F1F5F9' },
+                  '& .MuiGauge-valueText': { fontSize: 24, fontWeight: 'bold', fill: '#0F172A', transform: 'translate(0px, 4px)' }
+                }}
+                text={`${Math.round(((resumen.ventaBase - resumen.costoReal) / resumen.ventaBase) * 100)}%`}
+              />
+            </div>
           </div>
         </div>
 
-        <div className={`rounded-2xl border p-4 ${riesgoTone === "danger" ? "border-red-200 bg-red-50" : riesgoTone === "warn" ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-            <div className="text-sm font-semibold text-slate-900">Estado financiero</div>
-            <div className="text-sm text-slate-700">{resumen.riesgo.msg}</div>
-          </div>
-        </div>
-
-        {/* BARRAS DE PROGRESO INYECTADAS */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 shadow-sm">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
-            <div>
-              <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Venta (Lo que se va a ganar)</div>
-              <div className="font-semibold text-slate-900">{money(resumen.ventaBase)}</div>
-            </div>
-            <div>
-              <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Costo Total Estimado</div>
-              <div className="font-semibold text-slate-900">{money(resumen.costoReal)}</div>
-            </div>
-            <div>
-              <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Ganancia Esperada</div>
-              <div className="font-semibold text-slate-900">{money(resumen.ventaBase - resumen.costoReal)}</div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm font-semibold text-slate-700">Avance General</span>
-                <span className="text-sm font-bold text-slate-900">{pct1(resumen.avancePct)}</span>
+        <div className="grid grid-cols-12 gap-6">
+          <div className="col-span-12 lg:col-span-7 bg-white border border-slate-200/60 rounded-[12px] p-8 shadow-sm">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h3 className="font-bold text-lg text-slate-800">Avance General del Proyecto</h3>
+                <p className="text-sm text-slate-500">Métricas de ejecución física vs. financiera</p>
               </div>
-              <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-slate-900 rounded-full transition-all duration-500" style={{ width: `${resumen.avancePct}%` }}></div>
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
-                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                  <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Ingreso Dev.</div>
-                  <div className="font-semibold">{money(resumen.devengadoMonto)}</div>
-                </div>
-                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                  <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Costo Dev.</div>
-                  <div className="font-semibold">{money(resumen.costoReal * (resumen.avancePct / 100))}</div>
-                </div>
-                <div className="bg-emerald-50 p-2 rounded-lg border border-emerald-100">
-                  <div className="text-[10px] text-emerald-600 uppercase font-bold tracking-wider">Ganancia Dev.</div>
-                  <div className="font-semibold text-emerald-700">{money(resumen.gananciaPos)}</div>
-                </div>
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                <button className="px-3 py-1 bg-white shadow-sm rounded-md text-slate-900 border border-slate-100">Mensual</button>
+                <button className="px-3 py-1 hover:text-slate-600 transition-colors">Acumulado</button>
               </div>
             </div>
-
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm font-semibold text-slate-700">Avance Esta Semana</span>
-                <span className="text-sm font-bold text-slate-900">+{pct1(repThisMux.deltaWeekPct)}</span>
-              </div>
-              <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden flex">
-                <div className="h-full bg-slate-300 transition-all duration-500" style={{ width: `${resumen.avancePct - repThisMux.deltaWeekPct}%`, borderRight: repThisMux.deltaWeekPct > 0 ? '2px solid white' : 'none' }}></div>
-                <div className="h-full bg-emerald-500 relative transition-all duration-500" style={{ width: `${repThisMux.deltaWeekPct}%` }}>
+            <div className="flex flex-col md:flex-row items-center gap-12">
+              <div className="relative w-56 h-56 flex items-center justify-center shrink-0">
+                <PieChart
+                  series={[
+                    {
+                      data: [
+                        { id: 0, value: resumen.avancePct, color: '#3B82F6' },
+                        { id: 1, value: 100 - resumen.avancePct, color: '#E2E8F0' },
+                      ],
+                      innerRadius: 80,
+                      outerRadius: 100,
+                      paddingAngle: 0,
+                      cornerRadius: 0,
+                      startAngle: 0,
+                      endAngle: 360,
+                      cx: 100,
+                      cy: 100,
+                    }
+                  ]}
+                  width={220}
+                  height={220}
+                  margin={{ left: 10, right: 10, top: 10, bottom: 10 }}
+                  sx={{ '& .MuiPieArc-root': { stroke: 'none' } }}
+                  tooltip={{ trigger: 'none' }}
+                />
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-5xl font-extrabold text-slate-900">{Math.round(resumen.avancePct)}<span className="text-2xl font-bold text-slate-400">%</span></span>
+                  <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1">Completado</span>
                 </div>
               </div>
-
-              <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
-                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                  <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Ingreso Sem.</div>
-                  <div className="font-semibold">{money(repThisMux.ingresoSemana)}</div>
+              <div className="flex-1 w-full space-y-6">
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex justify-between items-end">
+                      <span className="text-sm font-semibold text-slate-600">Avance Ponderado</span>
+                      <span className="text-sm font-bold text-blue-500">{pct1(resumen.avancePct)}</span>
+                    </div>
+                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${resumen.avancePct}%` }}></div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 opacity-80">
+                    <div className="flex justify-between items-end">
+                      <span className="text-sm font-semibold text-slate-600">Costeo / Venta Actual</span>
+                      <span className="text-sm font-bold text-slate-800">{pct1((resumen.costoReal / resumen.ventaBase) * 100)}</span>
+                    </div>
+                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-slate-400 rounded-full" style={{ width: `${(resumen.costoReal / resumen.ventaBase) * 100}%` }}></div>
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                  <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Costo Sem.</div>
-                  <div className="font-semibold">{money(repThisMux.costoSemana)}</div>
-                </div>
-                <div className={`${repThisMux.gananciaSemanaPos > 0 ? "bg-emerald-50 border-emerald-100" : "bg-slate-50 border-slate-100"} p-2 rounded-lg border`}>
-                  <div className={`text-[10px] uppercase font-bold tracking-wider ${repThisMux.gananciaSemanaPos > 0 ? "text-emerald-600" : "text-slate-500"}`}>Ganancia Sem.</div>
-                  <div className={`font-semibold ${repThisMux.gananciaSemanaPos > 0 ? "text-emerald-700" : "text-slate-700"}`}>
-                    {money(repThisMux.gananciaSemanaPos)}
+                <div className="pt-6 border-t border-slate-100 grid grid-cols-2 gap-4">
+                  <div className="flex items-start gap-2.5">
+                    <CheckCircleIcon fontSize="small" className="text-blue-500 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-slate-400 uppercase font-bold tracking-tight">Hitos OK</p>
+                      <p className="text-sm font-bold">{stTerminadas} de {stTerminadas + stPendientes}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <PendingActionsIcon fontSize="small" className="text-amber-500 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-slate-400 uppercase font-bold tracking-tight">Pendientes</p>
+                      <p className="text-sm font-bold">{stPendientes} Tareas</p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* KPIs (sin negativos) */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-        <Kpi title="Venta base (neto)" value={money(round0(resumen.ventaBase))} hint="Desde costeo (Venta.detalles neto)" />
-        <Kpi title="Avance ponderado" value={pct1(resumen.avancePct)} hint="Subtareas ponderadas por costo/horas" />
-        <Kpi title="Devengado $" value={money(round0(resumen.devengadoMonto))} hint="Venta base × avance" />
-        <Kpi title="Costo real (facturado)" value={money(round0(resumen.costoReal))} hint="HH + compras facturadas" />
-        <Kpi
-          title="Ganancia (solo positivos)"
-          value={money(round0(resumen.gananciaPos))}
-          hint={`Si era negativo, aquí se muestra 0`}
-          tone={resumen.gananciaPos > 0 ? "ok" : "warn"}
-        />
-      </div>
-
-      {/* Top row: donut + breakdown + Ganancia semanal */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <Section
-          title="Progreso"
-          right={<Pill tone="neutral">{stTerminadas} listas · {stPendientes} pendientes</Pill>}
-        >
-          <Donut valuePct={resumen.avancePct} subtitle="avance" big />
-        </Section>
-
-        <Section
-          title="Breakdown de costos"
-          right={<Pill tone={resumen.comprasFacturadas > 0 ? "ok" : "warn"}>{comprasFact} fact. · {comprasSinFactura} sin fact.</Pill>}
-        >
-          <Bars
-            items={[
-              { label: "HH (costo real)", value: resumen.hhCostoReal },
-              { label: "Compras facturadas", value: resumen.comprasFacturadas },
-              { label: "Compras no facturadas (info)", value: Math.max(0, resumen.comprasTotal - resumen.comprasFacturadas) },
-            ]}
-          />
-          <div className="mt-3 text-xs text-slate-500">
-            Nota: costo real usa compras facturadas. Total compras se muestra para control (OC).
-          </div>
-        </Section>
-
-        <Section
-          title="Ganancia por semana"
-          right={
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setWeekTab("last")}
-                className={`rounded-lg px-2 py-1 text-xs font-semibold border ${weekTab === "last" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-200"
-                  }`}
-              >
-                Semana pasada
-              </button>
-              <button
-                onClick={() => setWeekTab("this")}
-                className={`rounded-lg px-2 py-1 text-xs font-semibold border ${weekTab === "this" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-200"
-                  }`}
-              >
-                Esta semana
-              </button>
-              <button
-                onClick={() => setWeekTab("next")}
-                className={`rounded-lg px-2 py-1 text-xs font-semibold border ${weekTab === "next" ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-200"
-                  }`}
-              >
-                Próxima
-              </button>
+          <div className="col-span-12 lg:col-span-5 bg-white border border-slate-200/60 rounded-[12px] p-8 flex flex-col shadow-sm">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="font-bold text-lg text-slate-800">Weekly Pulse ({active.week.label})</h3>
+              <div className="text-xs font-semibold text-slate-400 flex items-center gap-2">
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Ingreso</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-slate-200"></span> Costo</span>
+              </div>
             </div>
-          }
-        >
-          <div className="flex flex-col gap-3">
-            <Sparkline data={active.daily} valueKey="ganancia" />
-            <div className="grid grid-cols-2 gap-2">
-              <Kpi title="Ingreso devengado" value={money(round0(active.ingresoSemana))} hint={`${active.week.label}`} />
-              <Kpi title="Ganancia (solo positivos)" value={money(round0(active.gananciaSemanaPos))} hint={`Δ avance: ${pct1(active.deltaWeekPct)}`} tone={active.gananciaSemanaPos > 0 ? "ok" : "warn"} />
+            <div className="flex-1 mb-8 h-48 border-slate-100 pb-2 relative w-full -ml-4">
+              <BarChart
+                series={[
+                  { data: active.daily.map(d => d.costo), color: '#E2E8F0', valueFormatter: (v) => money(v) },
+                  { data: active.daily.map(d => d.ingreso), color: '#3B82F6', valueFormatter: (v) => money(v) }
+                ]}
+                xAxis={[{ data: active.daily.map(d => d.date.toLocaleString('es-ES', { weekday: 'short' }).charAt(0).toUpperCase() + d.date.toLocaleString('es-ES', { weekday: 'short' }).slice(1)), scaleType: 'band' }]}
+                margin={{ left: 10, right: 10, top: 10, bottom: 20 }}
+                yAxis={[{ display: false }]}
+                slotProps={{ legend: { hidden: true } }}
+                barLabel={(item, context) => { return null; }}
+              />
             </div>
-            <Table
-              cols={["Día", "Ingreso", "Costo", "Ganancia"]}
-              rows={active.daily.map((d) => [
-                <span key="d" className="text-slate-700">{fmtDate(d.date)}</span>,
-                <span key="i" className="font-semibold text-slate-900">{money(round0(d.ingreso))}</span>,
-                <span key="c" className="text-slate-700">{money(round0(d.costo))}</span>,
-                <span key="g" className="font-semibold text-slate-900">{money(round0(d.ganancia))}</span>,
-              ])}
-            />
-          </div>
-        </Section>
-      </div>
-
-      {/* NUEVO: Breakdown por jerarquía (épicas/tareas/subtareas) */}
-      <Section
-        title={`Detalle de ganancias · ${active.week.label}`}
-        right={<Pill tone="neutral">Todo se muestra en positivo (si era negativo → 0)</Pill>}
-      >
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-          <div className="rounded-2xl border border-slate-200 p-3">
-            <div className="text-sm font-semibold text-slate-900 mb-2">Épicas</div>
-            <Table
-              cols={["Épica", "Ingreso", "Ganancia"]}
-              rows={active.epicasRows.slice(0, 12).map((x) => [
-                <span key="n" className="text-slate-700">{x.nombre}</span>,
-                <span key="i" className="text-slate-700">{money(round0(x.ingreso))}</span>,
-                <span key="g" className="font-semibold text-slate-900">{money(round0(x.ganancia))}</span>,
-              ])}
-              empty="Sin movimiento esta semana"
-            />
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 p-3">
-            <div className="text-sm font-semibold text-slate-900 mb-2">Tareas</div>
-            <Table
-              cols={["Tarea", "Ingreso", "Ganancia"]}
-              rows={active.tareasRows.slice(0, 12).map((x) => [
-                <div key="n" className="text-slate-700">
-                  <div className="font-medium text-slate-900">{x.nombre}</div>
-                  <div className="text-xs text-slate-500">{x.epicaNombre}</div>
-                </div>,
-                <span key="i" className="text-slate-700">{money(round0(x.ingreso))}</span>,
-                <span key="g" className="font-semibold text-slate-900">{money(round0(x.ganancia))}</span>,
-              ])}
-              empty="Sin movimiento esta semana"
-            />
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 p-3">
-            <div className="text-sm font-semibold text-slate-900 mb-2">Subtareas</div>
-            <Table
-              cols={["Subtarea", "Ingreso", "Ganancia"]}
-              rows={active.subtRows.slice(0, 12).map((x) => [
-                <div key="n" className="text-slate-700">
-                  <div className="font-medium text-slate-900">{x.nombre}</div>
-                  <div className="text-xs text-slate-500">{x.tareaNombre}</div>
-                </div>,
-                <span key="i" className="text-slate-700">{money(round0(x.ingreso))}</span>,
-                <span key="g" className="font-semibold text-slate-900">{money(round0(x.ganancia))}</span>,
-              ])}
-              empty="Sin movimiento esta semana"
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                <p className="text-[10px] text-slate-400 uppercase font-bold mb-1 tracking-wider">Ingreso Sem. (+{pct1(active.deltaWeekPct)})</p>
+                <p className="text-xl font-bold text-slate-900">{money(active.ingresoSemana)}</p>
+              </div>
+              <div className={`p-4 rounded-xl border ${active.gananciaSemanaPos > 0 ? "bg-emerald-50 border-emerald-100/50" : "bg-slate-50 border-slate-100"}`}>
+                <p className={`text-[10px] uppercase font-bold mb-1 tracking-wider ${active.gananciaSemanaPos > 0 ? "text-emerald-600" : "text-slate-500"}`}>Neto Sem.</p>
+                <p className={`text-xl font-bold ${active.gananciaSemanaPos > 0 ? "text-emerald-700" : "text-slate-700"}`}>{money(active.gananciaSemanaPos)}</p>
+              </div>
+            </div>
+            {active.gananciaSemanaPos === 0 && (
+              <div className="text-xs text-amber-600 mt-4 font-medium bg-amber-50 p-2 rounded-lg border border-amber-100 flex items-center gap-2">
+                <WarningAmberIcon fontSize="small" className="text-sm" /> Este proyecto lleva semanas sin generar ganancia real.
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="mt-3 text-xs text-slate-500">
-          * “Ingreso” viene del delta de avance (semana) × venta base. “Ganancia” = max(0, ingreso − costo estimado del periodo).
-          Cuando conectes a tu backend, aquí reemplazamos el costo estimado por costo real por fecha (HH y compras por día).
-        </div>
-      </Section>
-
-      {/* Comercial: cotización + venta */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <Section
-          title="Contrato / Cotización"
-          right={<Pill tone="neutral">#{cotizacion.numero} · {cotizacion.estado}</Pill>}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Kpi title="Subtotal (neto)" value={money(cotizacion.subtotal)} />
-            <Kpi title="IVA" value={money(cotizacion.iva)} />
-            <Kpi title="Total" value={money(cotizacion.total)} />
+        <section className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+          <div className="px-8 pt-6 border-b border-slate-100 flex justify-between items-end pb-0">
+            <div className="flex gap-8">
+              <button className="pb-4 text-sm font-bold border-b-2 border-slate-900 text-slate-900">Desglose de Épicas</button>
+              <button className="pb-4 text-sm font-medium text-slate-400 hover:text-slate-600">Tareas Específicas</button>
+            </div>
+            <div className="pb-4 hidden md:block">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest border border-slate-100 px-3 py-1 bg-slate-50 rounded-full">Período: {active.week.label}</span>
+            </div>
           </div>
-          <div className="mt-3 text-sm text-slate-600">
-            Fecha documento: <span className="font-semibold">{fmtDate(cotizacion.fecha)}</span>
+          <div className="grid grid-cols-12">
+            <div className="col-span-12 lg:col-span-8 p-0 border-r border-slate-100">
+              <div className="overflow-x-auto max-h-[350px]">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50/50 text-[11px] text-slate-400 uppercase tracking-widest sticky top-0 z-10 border-b border-slate-100">
+                    <tr>
+                      <th className="text-left px-8 py-4 font-semibold">Identificador de Épica</th>
+                      <th className="text-right px-8 py-4 font-semibold">Ingreso Semanal</th>
+                      <th className="text-right px-8 py-4 font-semibold">Ganancia Neta</th>
+                      <th className="text-right px-8 py-4 font-semibold">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {active.epicasRows.slice(0, 10).map((x, i) => (
+                      <tr key={i} className="hover:bg-slate-50/80 transition-colors group">
+                        <td className="px-8 py-5">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-blue-500' : i === 1 ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
+                            <span className="font-bold text-slate-700 uppercase tracking-tight">{x.nombre}</span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-5 text-right font-medium text-slate-600">{money(round0(x.ingreso))}</td>
+                        <td className="px-8 py-5 text-right">
+                          <span className="font-bold text-emerald-600">{money(round0(x.ganancia))}</span>
+                          <div className="text-[10px] text-slate-400 mt-0.5">Rentabilidad {pct1(x.ingreso > 0 ? (x.ganancia / x.ingreso) * 100 : 0)}</div>
+                        </td>
+                        <td className="px-8 py-5 text-right">
+                          <button className="p-1.5 hover:bg-white rounded-md border border-transparent hover:border-slate-200">
+                            <OpenInNewIcon fontSize="small" className="text-sm text-slate-400" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {active.epicasRows.length === 0 && <tr><td colSpan="4" className="text-center py-6 text-slate-400">Sin movimiento esta semana</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="col-span-12 lg:col-span-4 bg-slate-50/50 p-8">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">Resumen de Drilldown</h4>
+              <div className="space-y-6">
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{money(round0(active.ingresoSemana))}</p>
+                  <p className="text-xs text-slate-400">Ingreso Total Generado (Semana)</p>
+                </div>
+                <div className="h-px bg-slate-200 w-full"></div>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-slate-600">Tareas Activas</span>
+                    <span className="text-sm font-bold px-2 py-0.5 bg-slate-200 rounded text-slate-700">{active.tareasRows.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-slate-600">Subtareas Pendientes</span>
+                    <span className="text-sm font-bold px-2 py-0.5 bg-slate-200 rounded text-slate-700">{stPendientes}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-slate-600">Avance Total</span>
+                    <span className="text-sm font-bold text-emerald-500">{pct1(resumen.avancePct)}</span>
+                  </div>
+                </div>
+                <div className="pt-4">
+                  <button className="w-full py-2.5 text-xs font-bold border border-slate-200 bg-white rounded-lg hover:bg-slate-50 transition-all flex justify-center items-center gap-2">
+                    <span className="material-symbols-outlined text-sm">description</span> Ver Reporte Full
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-        </Section>
+        </section>
 
-        <Section
-          title="Costeo / Venta asociada"
-          right={<Pill tone="neutral">Venta #{venta.numero}</Pill>}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Kpi title="Total neto (líneas)" value={money(venta.totalNeto)} hint={`Descuento general: ${Number(venta.descuentoPct || 0)}%`} />
-            <Kpi title="HH (costo)" value={money(resumen.hhCostoReal)} />
-            <Kpi title="Compras asignadas" value={money(resumen.comprasAsignadas)} hint="CompraCosteo hacia esta venta" />
+        <section className="grid grid-cols-12 gap-8">
+          <div className="col-span-12">
+            <div className="flex items-center gap-3 mb-6">
+              <BusinessCenterIcon className="text-slate-900" />
+              <h2 className="text-lg font-bold">Gestión de Operaciones & Contratos</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white p-8 rounded-2xl border border-slate-200/60 shadow-sm relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-4">
+                  <span className="px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded-full">COT-{cotizacion.numero}</span>
+                </div>
+                <div className="space-y-6">
+                  <div>
+                    <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-1">Cotización Estimada / Contrato</p>
+                    <h3 className="text-4xl font-extrabold text-slate-900 tracking-tight">{money(cotizacion.total)}</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-8 py-6 border-y border-slate-100">
+                    <div>
+                      <p className="text-[10px] text-slate-400 uppercase mb-1 font-bold">Subtotal Neto</p>
+                      <p className="text-lg font-bold text-slate-700">{money(cotizacion.subtotal)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 uppercase mb-1 font-bold">IVA Impuesto (19%)</p>
+                      <p className="text-lg font-bold text-slate-700">{money(cotizacion.iva)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+                    <span>Emisión: {fmtDate(cotizacion.fecha)}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-slate-900 p-8 rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4">
+                  <span className="px-3 py-1 bg-emerald-500 text-white text-[10px] font-bold rounded-full">COSTEO REAL GLOBAL</span>
+                </div>
+                <div className="space-y-6">
+                  <div>
+                    <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-1">Inversión Devengada Real</p>
+                    <h3 className="text-4xl font-extrabold text-white tracking-tight">{money(resumen.costoReal)}</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-8 py-6 border-y border-slate-700/50">
+                    <div>
+                      <p className="text-[10px] text-slate-400 uppercase mb-1 font-bold">Costo HH Acumulado</p>
+                      <p className="text-lg font-bold text-emerald-400">{money(resumen.hhCostoReal)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 uppercase mb-1 font-bold">Compras (OC Facturadas)</p>
+                      <p className="text-lg font-bold text-white">{money(resumen.comprasFacturadas)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-emerald-400 font-medium">
+                    <TrendingDownIcon fontSize="small" className="text-sm" />
+                    Costo Actual {pct1((resumen.costoReal / resumen.ventaBase) * 100)} del Presupuesto de Venta Base
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </Section>
-      </div>
+        </section>
 
-      {/* Compras + facturas + asignación */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <Section
-          title="Compras del proyecto"
-          right={<Pill tone={comprasSinFactura ? "warn" : "ok"}>{comprasFact} con factura · {comprasSinFactura} sin factura</Pill>}
-        >
-          <Table
-            cols={["OC", "Estado", "Proveedor", "Fecha", "Total", "Factura"]}
-            rows={compras
-              .slice()
-              .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
-              .map((c) => [
-                <span key="n" className="font-semibold text-slate-900">#{c.numero}</span>,
-                <Pill key="s" tone={c.estado === "ORDEN_COMPRA" ? "warn" : "ok"}>{c.estado}</Pill>,
-                <span key="p" className="text-slate-700">{c.proveedor}</span>,
-                <span key="f" className="text-slate-700">{fmtDate(c.fecha)}</span>,
-                <span key="t" className="font-semibold text-slate-900">{money(c.total)}</span>,
-                c.factura_url ? <Pill key="x" tone="ok">✅</Pill> : <Pill key="x" tone="warn">—</Pill>,
-              ])}
-            empty="Aún no hay compras"
-          />
-          <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
-            <Kpi title="Total compras (OC)" value={money(resumen.comprasTotal)} />
-            <Kpi title="Facturado" value={money(resumen.comprasFacturadas)} />
-            <Kpi title="No facturado (info)" value={money(Math.max(0, resumen.comprasTotal - resumen.comprasFacturadas))} />
+        <section className="grid grid-cols-12 gap-8 pb-10">
+          <div className="col-span-12 lg:col-span-7">
+            <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden h-full">
+              <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 className="font-bold text-sm text-slate-900">Compras del Proyecto</h3>
+                <div className="flex gap-2">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">{comprasFact} FACTURADAS</span>
+                  {comprasSinFactura > 0 && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">{comprasSinFactura} PENDIENTES</span>}
+                </div>
+              </div>
+              <div className="max-h-[380px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-white text-[10px] text-slate-400 uppercase border-b border-slate-100 z-10 shadow-sm">
+                    <tr>
+                      <th className="text-left px-6 py-4 font-semibold">OC / Ref</th>
+                      <th className="text-left px-6 py-4 font-semibold">Estado</th>
+                      <th className="text-right px-6 py-4 font-semibold">Total Bruto</th>
+                      <th className="text-center px-6 py-4 font-semibold">Docs</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {compras.slice().sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).map((c, i) => (
+                      <tr key={i} className="hover:bg-slate-50 border-transparent transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="font-mono text-xs font-bold text-slate-700">#{c.numero}</div>
+                          <div className="text-[10px] text-slate-400 mt-0.5 flex flex-col"><span className="font-medium text-slate-500 truncate" style={{ maxWidth: '130px' }} title={c.proveedor}>{c.proveedor}</span><span>{fmtDate(c.fecha)}</span></div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${c.factura_url ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                            {c.factura_url ? 'Facturada' : c.estado}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right font-bold text-slate-900">{money(c.total)}</td>
+                        <td className="px-6 py-4 text-center">
+                          {c.factura_url ? <CheckCircleIcon fontSize="small" className="text-emerald-500 text-lg" /> : <PendingIcon fontSize="small" className="text-slate-300 text-lg" />}
+                        </td>
+                      </tr>
+                    ))}
+                    {compras.length === 0 && <tr><td colSpan="4" className="text-center py-6 text-slate-400">Sin historial de OC</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center rounded-b-2xl">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inversión Facturada (OC)</span>
+                <span className="text-sm font-extrabold text-slate-900">{money(resumen.comprasFacturadas)}</span>
+              </div>
+            </div>
           </div>
-        </Section>
+          <div className="col-span-12 lg:col-span-5">
+            <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden h-full flex flex-col">
+              <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 className="font-bold text-sm text-slate-900">Equipo Asignado</h3>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-white border border-slate-200 px-2 py-1 rounded shadow-sm">Impacto HH</span>
+              </div>
+              <div className="p-6 space-y-6 flex-1 overflow-y-auto">
+                {empleados.slice().sort((a, b) => b.costoHH - a.costoHH).map((e, i) => {
+                  const m = Math.max(...empleados.map(o => o.costoHH), 1);
+                  const w = Math.min((e.costoHH / m) * 100, 100);
+                  const cs = ['bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-indigo-500'];
+                  return (
+                    <div key={i}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            <div className="w-10 h-10 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center text-slate-500 font-bold">{e.nombre.slice(0, 2)}</div>
+                            <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 border-2 border-white rounded-full ${cs[i % 4]}`}></div>
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-900">{e.nombre}</p>
+                            <p className="text-[10px] text-slate-400 uppercase font-medium">{e.cargo.slice(0, 25)}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-slate-900">{money(e.costoHH / 1000)}k</p>
+                          <p className="text-[9px] text-slate-400 uppercase">Cost HH: {money(e.costoHH)}</p>
+                        </div>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
+                        <div className={`${cs[i % 4]} h-full rounded-full transition-all duration-700`} style={{ width: `${w}%` }}></div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </section>
 
-        <Section
-          title="Asignación de compras a costeo (CompraCosteo)"
-          right={<Pill tone={resumen.comprasAsignadas > 0 ? "ok" : "warn"}>{money(resumen.comprasAsignadas)}</Pill>}
-        >
-          <Table
-            cols={["Compra", "Venta", "Monto", "Fecha"]}
-            rows={compraCosteos
-              .slice()
-              .sort((a, b) => new Date(b.creado_en).getTime() - new Date(a.creado_en).getTime())
-              .map((x) => [
-                <span key="c" className="text-slate-700">{x.compra_id.slice(0, 8)}…</span>,
-                <span key="v" className="text-slate-700">{x.venta_id.slice(0, 8)}…</span>,
-                <span key="m" className="font-semibold text-slate-900">{money(x.monto)}</span>,
-                <span key="f" className="text-slate-700">{fmtDate(x.creado_en)}</span>,
-              ])}
-            empty="Aún no hay asignaciones"
-          />
-        </Section>
-      </div>
-
-      {/* RRHH */}
-      <Section
-        title="RRHH · Empleados / Costo HH / CIF"
-        right={<Pill tone="neutral">CIF {periodo.mes}/{periodo.anio}: {money(cif.valor)}</Pill>}
-      >
-        <Table
-          cols={["Empleado", "Cargo", "Costo HH", "Estimación mensual (150h)"]}
-          rows={empleados
-            .slice()
-            .sort((a, b) => b.costoHH - a.costoHH)
-            .map((e) => [
-              <span key="n" className="font-semibold text-slate-900">{e.nombre}</span>,
-              <span key="c" className="text-slate-700">{e.cargo}</span>,
-              <span key="h" className="font-semibold text-slate-900">{money(e.costoHH)}</span>,
-              <span key="m" className="text-slate-700">{money(e.costoHH * 150)}</span>,
-            ])}
-        />
-        <div className="mt-3 text-xs text-slate-500">
-          En real: aquí saldrá desde HH (periodos) + CIF mensual real. Este mock es “sensación”.
-        </div>
-      </Section>
-
-      <div className="pb-10" />
+      </main>
     </div>
   );
 }
