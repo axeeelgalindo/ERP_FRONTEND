@@ -262,10 +262,11 @@ export default function SubtareaFormModal({
               const id = m?.empleado_id || m?.empleado?.id || null;
               const label =
                 m?.usuario?.nombre ||
+                m?.empleado?.usuario?.nombre ||
                 m?.nombre ||
                 m?.usuario?.correo ||
                 m?.correo ||
-                `Miembro ${id}`;
+                `Empleado ${id}`;
               if (!id) return null;
               return (
                 <MenuItem key={id} value={id}>
