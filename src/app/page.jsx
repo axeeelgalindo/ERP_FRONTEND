@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation"; // 👈 nuevo
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -70,18 +71,8 @@ export default function HomePage() {
 
         const candidates = [
           { key: "me", path: "/me" },
-          empresaIdFromMe
-            ? { key: "empresa", path: `/empresa/${empresaIdFromMe}` }
-            : null,
-          { key: "usuarios", path: "/usuarios" },
-          { key: "clientes", path: "/clientes" },
-          { key: "proveedores", path: "/proveedores" },
-          { key: "productos", path: "/productos" },
-          { key: "proyectos", path: "/proyectos" },
-          { key: "ventas", path: "/ventas" },
-          { key: "compras", path: "/compras" },
-          { key: "cotizaciones", path: "/cotizaciones" },
-        ].filter(Boolean);
+          { key: "dashboard", path: "/dashboard" }
+        ];
 
         const results = await Promise.allSettled(
           candidates.map(async (c) => {
@@ -159,130 +150,266 @@ export default function HomePage() {
     Array.isArray(x)
       ? x.length
       : Array.isArray(x?.items)
-      ? x.items.length
-      : Array.isArray(x?.data)
-      ? x.data.length
-      : 0;
+        ? x.items.length
+        : Array.isArray(x?.data)
+          ? x.data.length
+          : 0;
 
+  // Formateadores
+  const money = (n) =>
+    new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency: "CLP",
+      maximumFractionDigits: 0
+    }).format(Number(n || 0));
+
+  // --- METRICS DESDE EL BACKEND ---
+  const dbData = bundle.dashboard || {};
+  
+  // KPIs
+  const {
+    ventasMes = 0,
+    comprasSemana = 0,
+    devengadoSemana = 0,
+    flujoCajaMes = 0
+  } = dbData.kpis || {};
+
+  // Charts
+  const pieTrabajos = dbData.charts?.trabajosMes || [];
+  const pieCotizaciones = dbData.charts?.cotizacionesMes || [];
+  const pieFlujo = dbData.charts?.flujoCaja || [];
+  const barChartDataset = dbData.charts?.evolucion6Meses || [];
+
+  // Flags for rendering "Sin Datos"
+  const { proyectosMesActivo, cotizacionesMesDataActivo } = dbData.flags || {};
+
+
+
+  // Render principal
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Bienvenido, {userName}
+    <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8 bg-slate-50 min-h-screen">
+      <header className="flex flex-col gap-1 pb-4 border-b border-slate-200">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          Executive Dashboard, {userName.split(' ')[0]}
         </h1>
-        <p className="text-gray-600">
-          Rol: <span className="font-medium">{rolNombre || rolCodigo}</span>
+        <p className="text-slate-500 text-sm">
+          Vista general y resúmenes financieros. Rol: <span className="font-medium text-slate-700">{rolNombre || rolCodigo}</span>
           {empresa?.nombre ? (
             <>
-              {" "}
-              · Empresa: <span className="font-medium">{empresa.nombre}</span>
+              {" "}· Empresa: <span className="font-medium text-slate-700">{empresa.nombre}</span>
             </>
           ) : null}
         </p>
       </header>
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <CardStat label="Usuarios" value={count(bundle.usuarios)} />
-        <CardStat label="Clientes" value={count(bundle.clientes)} />
-        <CardStat label="Proveedores" value={count(bundle.proveedores)} />
-        <CardStat label="Productos" value={count(bundle.productos)} />
-        <CardStat label="Proyectos" value={count(bundle.proyectos)} />
-        <CardStat label="Ventas" value={count(bundle.ventas)} />
-        <CardStat label="Compras" value={count(bundle.compras)} />
-        <CardStat label="Cotizaciones" value={count(bundle.cotizaciones)} />
+      {/* 4 KPIs Clave Solicitados */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="rounded-2xl border border-slate-200/60 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Ventas Mes</div>
+          <div className="text-3xl font-extrabold text-slate-900 tracking-tight">{money(ventasMes)}</div>
+          <div className="mt-2 text-[11px] text-emerald-600 font-bold bg-emerald-50 inline-block px-2 py-0.5 rounded">Total Facturado / Cotizado</div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200/60 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Generado Semana (EV)</div>
+          <div className="text-3xl font-extrabold text-blue-600 tracking-tight">{money(devengadoSemana)}</div>
+          <div className="mt-2 text-[11px] text-blue-600 font-bold bg-blue-50 inline-block px-2 py-0.5 rounded">Devengado de Proyectos</div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200/60 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Compras Semana</div>
+          <div className="text-3xl font-extrabold text-slate-900 tracking-tight">{money(comprasSemana)}</div>
+          <div className="mt-2 text-[11px] text-amber-600 font-bold bg-amber-50 inline-block px-2 py-0.5 rounded">Gasto proyectado OC</div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200/60 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Flujo Caja Mes</div>
+          <div className={`text-3xl font-extrabold tracking-tight ${flujoCajaMes < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+            {money(flujoCajaMes)}
+          </div>
+          <div className={`mt-2 text-[11px] font-bold inline-block px-2 py-0.5 rounded ${flujoCajaMes < 0 ? 'text-rose-600 bg-rose-50' : 'text-emerald-600 bg-emerald-50'}`}>
+            Entradas - Salidas
+          </div>
+        </div>
       </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Gráficos */}
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm flex flex-col items-center">
+          <h3 className="w-full text-left font-bold text-slate-800 mb-4">Trabajos Mes</h3>
+          <div className="flex-1 w-full min-h-[250px] flex items-center justify-center">
+            {/* Render pie chart if data is present otherwise placeholder */}
+            {proyectosMesActivo ? (
+              // Simulacro visual rápido de PieChart de MaterialUI (requiere importación en top)
+              <div style={{ width: '100%', height: '100%', minHeight: '250px', position: 'relative' }}>
+                <PieChartFallback data={pieTrabajos} />
+              </div>
+            ) : (<span className="text-xs text-slate-400">Sin datos este mes</span>)}
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm flex flex-col items-center">
+          <h3 className="w-full text-left font-bold text-slate-800 mb-4">Cotizaciones Mes</h3>
+          <div className="flex-1 w-full min-h-[250px] flex items-center justify-center">
+            {cotizacionesMesDataActivo ? (
+              <div style={{ width: '100%', height: '100%', minHeight: '250px', position: 'relative' }}>
+                <PieChartFallback data={pieCotizaciones} />
+              </div>
+            ) : (<span className="text-xs text-slate-400">Sin datos este mes</span>)}
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm flex flex-col items-center">
+          <h3 className="w-full text-left font-bold text-slate-800 mb-4">Flujo Entrada vs Salida</h3>
+          <div className="flex-1 w-full min-h-[250px] flex items-center justify-center">
+            {(pieFlujo[0]?.value > 0 || pieFlujo[1]?.value > 0) ? (
+              <div style={{ width: '100%', height: '100%', minHeight: '250px', position: 'relative' }}>
+                <PieChartFallback data={pieFlujo} />
+              </div>
+            ) : (<span className="text-xs text-slate-400">Sin datos de cobro/pago</span>)}
+          </div>
+        </div>
+      </section>
+
+      {/* Gráfico de Barras */}
+      <section className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm">
+        <h3 className="font-bold text-slate-800 mb-6">Evolución Ventas y Flujo Caja (6 Meses)</h3>
+        <div className="w-full h-[350px] flex items-end justify-between gap-4">
+          {barChartDataset.map((d, i) => {
+            // Normalizar la altura en base al máximo
+            const maxVal = Math.max(...barChartDataset.flatMap(x => [x.ventas, Math.abs(x.flujoNeto)])) || 1;
+            const hVentas = (d.ventas / maxVal) * 100;
+            const hFlujo = (Math.abs(d.flujoNeto) / maxVal) * 100;
+            return (
+              <div key={i} className="flex-1 flex flex-col items-center justify-end h-full gap-2 relative group">
+                <div className="w-full h-[80%] flex items-end justify-center gap-1 sm:gap-4 relative px-2">
+                  {/* Barra Ventas */}
+                  <div className="w-full max-w-[40px] bg-blue-500 rounded-t-lg relative group-hover:bg-blue-600 transition-colors" style={{ height: `${Math.max(2, hVentas)}%` }}></div>
+                  {/* Barra Flujo (Si es negativo pintamos diferente o hacia abajo visualmente, aquí se simplifica la barra con color distinto si es en pérdida) */}
+                  <div className={`w-full max-w-[40px] rounded-t-lg transition-colors ${d.flujoNeto < 0 ? 'bg-rose-500 group-hover:bg-rose-600' : 'bg-emerald-400 group-hover:bg-emerald-500'}`} style={{ height: `${Math.max(2, hFlujo)}%` }}></div>
+                </div>
+                <span className="text-xs font-bold text-slate-500 mt-2">{d.mes}</span>
+
+                {/* Tooltip Hover */}
+                <div className="absolute -top-12 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-xs px-3 py-2 rounded shadow-xl pointer-events-none z-10 whitespace-nowrap">
+                  <p className="border-b border-slate-700 pb-1 mb-1 font-bold">{d.mes}</p>
+                  <p>Ventas: <span className="text-blue-400">{money(d.ventas)}</span></p>
+                  <p>Flujo Neto: <span className={d.flujoNeto < 0 ? 'text-rose-400' : 'text-emerald-400'}>{money(d.flujoNeto)}</span></p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <div className="flex justify-center gap-6 mt-6 pt-4 border-t border-slate-100 text-xs font-bold text-slate-500">
+          <span className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-blue-500"></div> Ventas Totales</span>
+          <span className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-emerald-400"></div> Flujo Caja (Positivo)</span>
+          <span className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-rose-500"></div> Flujo Caja (Pérdida)</span>
+        </div>
+      </section>
+
+      {/* Se mantienen las Listas Pequeñas Originales Abajo como tablas de últimos registros */}
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
         <ListPreview
           title="Últimos clientes"
-          rows={takeFirst(bundle.clientes, 8)}
+          rows={dbData.recents?.clientes || []}
           cols={["nombre", "rut", "correo"]}
           href="/clientes"
         />
         <ListPreview
-          title="Últimos proveedores"
-          rows={takeFirst(bundle.proveedores, 8)}
-          cols={["nombre", "rut", "correo"]}
-          href="/proveedores"
-        />
-        <ListPreview
-          title="Productos"
-          rows={takeFirst(bundle.productos, 8)}
-          cols={["nombre", "sku", "precio"]}
-          href="/productos"
+          title="Últimas compras"
+          rows={dbData.recents?.compras || []}
+          cols={["numero", "proveedor", "total"]}
+          href="/compras"
         />
         <ListPreview
           title="Proyectos"
-          rows={takeFirst(bundle.proyectos, 8)}
+          rows={dbData.recents?.proyectos || []}
           cols={["nombre", "estado", "createdAt"]}
           href="/proyectos"
         />
+        <ListPreview
+          title="Cotizaciones Recientes"
+          rows={dbData.recents?.cotizaciones || []}
+          cols={["titulo", "clienteNombre", "totalOtorgar"]}
+          href="/cotizaciones"
+        />
       </section>
+    </div>
+  );
+}
 
-      {/* Si quieres verificar rápido: */}
-      {/* <pre className="text-xs bg-gray-100 p-4 rounded-lg overflow-auto max-h-[50vh]">
-        {JSON.stringify(bundle, null, 2)}
-      </pre> */}
+// Sub-componente para PieChart nativo simple (Evitando problemas de SSR con MUI Charts)
+function PieChartFallback({ data }) {
+  // Un render simple circular si el import d3/MUI falla visualmente o en Server Side
+  const total = data.reduce((acc, current) => acc + current.value, 0);
+  if (total === 0) return <span className="text-xs text-slate-400">Sin valores</span>;
+
+  let currentAngle = 0;
+  const conicGradients = data.map((d, i) => {
+    const angle = (d.value / total) * 360;
+    const segment = `${d.color} ${currentAngle}deg ${currentAngle + angle}deg`;
+    currentAngle += angle;
+    return segment;
+  });
+
+  return (
+    <div className="flex flex-col items-center w-full gap-6">
+      <div
+        className="w-32 h-32 rounded-full shadow-inner"
+        style={{ background: `conic-gradient(${conicGradients.join(', ')})` }}
+      ></div>
+      <div className="flex flex-col gap-2 w-full px-4">
+        {data.map((d, i) => (
+          <div key={i} className="flex justify-between items-center text-xs font-bold text-slate-600">
+            <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }}></span> {d.label}</span>
+            <span>{d.value}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
 /* ====== UI helpers ====== */
-function CardStat({ label, value }) {
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="text-sm text-gray-500">{label}</div>
-      <div className="mt-1 text-2xl font-semibold">
-        {Number.isFinite(value) ? value : "—"}
-      </div>
-    </div>
-  );
-}
-
-function takeFirst(payload, n = 8) {
-  if (!payload) return [];
-  if (Array.isArray(payload)) return payload.slice(0, n);
-  if (Array.isArray(payload?.items)) return payload.items.slice(0, n);
-  if (Array.isArray(payload?.data)) return payload.data.slice(0, n);
-  return [];
-}
-
 function ListPreview({ title, rows = [], cols = [], href = "#" }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-        <h3 className="font-medium">{title}</h3>
-        <Link className="text-sm text-blue-700 hover:underline" href={href}>
-          ver todo
+    <div className="rounded-2xl border border-slate-200/60 bg-white shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <h3 className="font-bold text-sm text-slate-800">{title}</h3>
+        <Link className="text-xs font-bold text-[#2074e9] hover:underline" href={href}>
+          Ver todo &rarr;
         </Link>
       </div>
-      <div className="p-3">
+      <div>
         {rows.length === 0 ? (
-          <div className="text-sm text-gray-500 px-1 py-6 text-center">
-            Sin registros
+          <div className="text-sm text-slate-400 px-1 py-8 text-center font-medium">
+            Sin registros recientes
           </div>
         ) : (
-          <ul className="divide-y divide-gray-100">
+          <ul className="divide-y divide-slate-50">
             {rows.map((r, i) => (
-              <li key={r.id || i} className="py-2 px-1 text-sm">
-                <div className="font-medium">
-                  {r.nombre ||
-                    r.razonSocial ||
-                    r.titulo ||
-                    r.codigo ||
-                    `#${r.id ?? i + 1}`}
+              <li key={r.id || i} className="py-3 px-5 text-sm hover:bg-slate-50 transition-colors flex items-center justify-between">
+                <div>
+                  <div className="font-bold text-slate-800">
+                    {r.nombre ||
+                      r.razonSocial ||
+                      r.titulo ||
+                      r.codigo ||
+                      `#${r.id ?? i + 1}`}
+                  </div>
+                  <div className="text-slate-400 text-[11px] font-medium mt-0.5">
+                    {cols
+                      .filter((c) => r[c] && c !== "nombre")
+                      .slice(0, 3)
+                      .map((c, j) => (
+                        <span key={c}>
+                          {String(r[c])}
+                          {j < Math.min(2, cols.length - 1) ? " · " : ""}
+                        </span>
+                      ))}
+                  </div>
                 </div>
-                <div className="text-gray-500">
-                  {cols
-                    .filter((c) => r[c] && c !== "nombre")
-                    .slice(0, 3)
-                    .map((c, j) => (
-                      <span key={c}>
-                        {String(r[c])}
-                        {j < Math.min(2, cols.length - 1) ? " · " : ""}
-                      </span>
-                    ))}
-                </div>
+                <ChevronRightIcon fontSize="small" className="text-slate-300" />
               </li>
             ))}
           </ul>

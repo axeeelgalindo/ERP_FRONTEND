@@ -11,10 +11,17 @@ import {
   CircularProgress,
   Alert,
   Box,
+  MenuItem,
 } from "@mui/material";
 import { makeHeaders } from "@/lib/api";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
+
+const ESTADOS = [
+  { value: "pendiente", label: "Pendiente" },
+  { value: "en_progreso", label: "En progreso" },
+  { value: "completada", label: "Completada" },
+];
 
 export default function EpicaFormModal({
   open,
@@ -28,6 +35,7 @@ export default function EpicaFormModal({
 
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
+  const [estado, setEstado] = useState("pendiente");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -37,6 +45,7 @@ export default function EpicaFormModal({
     setBusy(false);
     setNombre(epica?.nombre || "");
     setDescripcion(epica?.descripcion || "");
+    setEstado(epica?.estado || "pendiente");
   }, [open, epica]);
 
   const canSave = useMemo(() => nombre.trim().length >= 2 && !!proyectoId, [nombre, proyectoId]);
@@ -60,6 +69,7 @@ export default function EpicaFormModal({
           proyecto_id: proyectoId,
           nombre: nombre.trim(),
           descripcion: descripcion.trim() || null,
+          estado,
         };
 
         const res = await fetch(`${API}/epicas/add`, {
@@ -79,6 +89,7 @@ export default function EpicaFormModal({
       const body = {
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || null,
+        estado,
       };
 
       const res = await fetch(`${API}/epicas/update/${epica.id}`, {
@@ -114,6 +125,22 @@ export default function EpicaFormModal({
 
         <Box sx={{ display: "grid", gap: 2 }}>
           <TextField label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} autoFocus fullWidth />
+          
+          <TextField
+            select
+            label="Estado"
+            value={estado}
+            onChange={(e) => setEstado(e.target.value)}
+            fullWidth
+            SelectProps={{ native: false }}
+          >
+            {ESTADOS.map((x) => (
+              <MenuItem key={x.value} value={x.value}>
+                {x.label}
+              </MenuItem>
+            ))}
+          </TextField>
+
           <TextField
             label="Descripción (opcional)"
             value={descripcion}
