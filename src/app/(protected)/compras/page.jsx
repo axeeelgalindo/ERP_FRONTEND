@@ -10,6 +10,7 @@ import ImportRcvPanel from "@/components/compras/ImportRcvPanel";
 import ComprasTable from "@/components/compras/ComprasTable";
 import ComprasPagination from "@/components/compras/ComprasPagination";
 import CompraManualModal from "@/components/compras/CompraManualModal";
+import QuickProveedorModal from "@/components/compras/QuickProveedorModal";
 import VincularCosteoModal from "@/components/compras/VincularCosteoModal";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -179,12 +180,18 @@ export default function ComprasPage() {
   const [c_folio, setC_folio] = useState("");
   const [c_fechaDocto, setC_fechaDocto] = useState("");
   const [c_total, setC_total] = useState("");
+  const [c_estado, setC_estado] = useState("ORDEN_COMPRA");
 
   // lookups
   const [proveedores, setProveedores] = useState([]);
   const [proyectos, setProyectos] = useState([]);
   const [lookupsLoading, setLookupsLoading] = useState(false);
   const [lookupsErr, setLookupsErr] = useState("");
+
+  // ===== Quick Proveedor =====
+  const [openQuickProv, setOpenQuickProv] = useState(false);
+  const [quickProvLoading, setQuickProvLoading] = useState(false);
+  const [quickProvErr, setQuickProvErr] = useState("");
 
   // ===== Vincular costeos =====
   const [openVincular, setOpenVincular] = useState(false);
@@ -477,6 +484,7 @@ export default function ComprasPage() {
     setC_folio("");
     setC_fechaDocto("");
     setC_total("");
+    setC_estado("ORDEN_COMPRA");
   }
 
   async function createCompraManual() {
@@ -494,8 +502,9 @@ export default function ComprasPage() {
       return setCreateErr("Selecciona centro (PMC/PUQ) para Administración/Taller.");
     }
 
+
     if (!c_tipoDoc) return setCreateErr("Selecciona tipo doc.");
-    if (!c_folio) return setCreateErr("Ingresa folio.");
+    // Folio ya no es obligatorio
     if (!c_fechaDocto) return setCreateErr("Ingresa fecha del documento.");
     if (!c_total || Number(c_total) <= 0)
       return setCreateErr("Ingresa total > 0.");
@@ -512,6 +521,7 @@ export default function ComprasPage() {
         folio: String(c_folio),
         fecha_docto: new Date(c_fechaDocto).toISOString(),
         total: Number(c_total),
+        estado: c_estado,
       };
 
       const res = await fetch(`${API}/compras`, {
@@ -533,6 +543,35 @@ export default function ComprasPage() {
       setCreateErr(e?.message || "Error creando compra");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleCreateQuickProveedor(data) {
+    if (!session) return;
+    try {
+      setQuickProvLoading(true);
+      setQuickProvErr("");
+
+      const res = await fetch(`${API}/proveedores`, {
+        method: "POST",
+        headers: makeHeadersJson(session),
+        body: JSON.stringify(data),
+      });
+
+      const payload = await jsonOrNull(res);
+      if (!res.ok) {
+        throw new Error(payload?.message || payload?.error || "Error creando proveedor");
+      }
+
+      const newProv = payload.row || payload.data || payload;
+      // Recargar lookups y auto-seleccionar
+      await loadLookups();
+      setC_proveedorId(newProv.id);
+      setOpenQuickProv(false);
+    } catch (e) {
+      setQuickProvErr(e?.message || "Error");
+    } finally {
+      setQuickProvLoading(false);
     }
   }
 
@@ -791,7 +830,7 @@ export default function ComprasPage() {
             </button>
 
             <button
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-all font-medium shadow-sm"
+              className="flex items-center gap-2 px-6 py-2 bg-[#1e3a8a] text-white rounded-lg hover:bg-[#1e3a8a]/90 transition-all font-bold shadow-lg shadow-blue-900/10"
               onClick={() => {
                 setCreateErr("");
                 if (proveedores.length === 0 || proyectos.length === 0) {
@@ -932,10 +971,25 @@ export default function ComprasPage() {
         setC_tipoDoc={setC_tipoDoc}
         c_folio={c_folio}
         setC_folio={setC_folio}
+        c_estado={c_estado}
+        setC_estado={setC_estado}
         c_fechaDocto={c_fechaDocto}
         setC_fechaDocto={setC_fechaDocto}
         c_total={c_total}
         setC_total={setC_total}
+        onAddProveedorClick={() => {
+          setQuickProvErr("");
+          setOpenQuickProv(true);
+        }}
+      />
+
+      {/* MODAL QUICK PROVEEDOR */}
+      <QuickProveedorModal
+        open={openQuickProv}
+        onClose={() => setOpenQuickProv(false)}
+        onSubmit={handleCreateQuickProveedor}
+        creating={quickProvLoading}
+        error={quickProvErr}
       />
 
       {/* MODAL VINCULAR COSTEO */}

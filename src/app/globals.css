@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@theme {
+  --color-primary: #1e3a8a;
+  --color-secondary: #64748b;
+  --color-accent: #3b82f6;
+  --color-background-light: #f8fafc;
+  --color-surface: #ffffff;
+}
+
 :root{
   --app-sb: 0px;         /* móvil cerrado por defecto */
   --app-topbar: 3.25rem; /* topbar móvil */
