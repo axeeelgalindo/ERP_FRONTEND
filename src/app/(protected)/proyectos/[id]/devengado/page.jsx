@@ -59,7 +59,7 @@ export default function ProyectoDevengadoRealPage({ params }) {
       return;
     }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
     fetch(`${apiUrl}/proyectos/${id}/devengado?base=VENTA`, {
       headers: {
@@ -154,7 +154,7 @@ export default function ProyectoDevengadoRealPage({ params }) {
               <h1 className="text-2xl font-extrabold tracking-tight flex items-center gap-2">
                 Financial Health Dashboard
                 <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${estadoTone === 'ok' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                  {proyecto.estado.toUpperCase()}
+                  {proyecto.estado?.toUpperCase()}
                 </span>
               </h1>
               <p className="text-slate-500 text-sm">Strategic overview of accruals and project execution performance.</p>
@@ -209,15 +209,15 @@ export default function ProyectoDevengadoRealPage({ params }) {
               </div>
               <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Ppto Consumido</p>
               <div className="mt-2 flex items-baseline gap-2">
-                <h3 className="text-2xl font-bold text-slate-800">{pct1((costos.costoAcumulado / (base.valor || 1)) * 100)}</h3>
-                {costos.costoAcumulado > base.valor * 0.8 ? (
+                <h3 className="text-2xl font-bold text-slate-800">{money(costos.pptoUtilizadoReal)}</h3>
+                {costos.pptoUtilizadoReal > base.valor * 0.8 ? (
                   <span className="text-rose-500 text-[10px] font-bold bg-rose-50 px-1.5 py-0.5 rounded">Riesgo</span>
                 ) : (
                   <span className="text-amber-500 text-[10px] font-bold bg-amber-50 px-1.5 py-0.5 rounded">Normal</span>
                 )}
               </div>
               <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                <div className={`h-full rounded-full ${costos.costoAcumulado > base.valor * 0.8 ? 'bg-rose-500' : 'bg-amber-500'}`} style={{ width: `${Math.min(100, (costos.costoAcumulado / (base.valor || 1)) * 100)}%` }}></div>
+                <div className={`h-full rounded-full ${costos.pptoUtilizadoReal > base.valor * 0.8 ? 'bg-rose-500' : 'bg-amber-500'}`} style={{ width: `${Math.min(100, (costos.pptoUtilizadoReal / (base.valor || 1)) * 100)}%` }}></div>
               </div>
             </div>
 
@@ -225,20 +225,15 @@ export default function ProyectoDevengadoRealPage({ params }) {
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                 <AnalyticsIcon className="text-4xl" style={{ fontSize: '2.5rem' }} />
               </div>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Margen Bruto</p>
+              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">% Asignado</p>
               <div className="mt-2 flex items-baseline gap-2">
-                <h3 className={`text-2xl font-bold ${margenBruto < 0 ? 'text-rose-500' : 'text-slate-800'}`}>{pct1(margenBruto)}</h3>
-                <span className={`${margenBruto >= (base.margenObjetivo || 65) ? 'text-emerald-500' : margenBruto >= 0 ? 'text-amber-500' : 'text-rose-500'} text-[10px] font-bold flex items-center`}>
-                  Target: {Math.round(base.margenObjetivo || 65)}%
+                <h3 className={`text-2xl font-bold text-slate-800`}>{pct1((costos.costoAcumulado / (base.valor || 1)) * 100)}</h3>
+                <span className={`text-slate-400 text-[10px] font-bold`}>
+                  Costeo: {money(costos.costoAcumulado)}
                 </span>
               </div>
               <div className="mt-4 h-1 w-full flex bg-slate-100 rounded-full overflow-hidden">
-                <div className="w-1/2 flex justify-end">
-                  <div className="h-full bg-rose-500" style={{ width: `${margenBruto < 0 ? Math.min(100, Math.abs(margenBruto)) : 0}%` }}></div>
-                </div>
-                <div className="w-1/2 flex justify-start">
-                  <div className={`h-full ${margenBruto >= (base.margenObjetivo || 65) ? 'bg-[#2074e9]' : 'bg-amber-500'}`} style={{ width: `${margenBruto > 0 ? Math.min(100, margenBruto) : 0}%` }}></div>
-                </div>
+                <div className="h-full bg-blue-500" style={{ width: `${Math.min(100, (costos.costoAcumulado / (base.valor || 1)) * 100)}%` }}></div>
               </div>
             </div>
           </div>
@@ -251,43 +246,44 @@ export default function ProyectoDevengadoRealPage({ params }) {
                   <p className="text-xs text-slate-500">Actividad financiera semanal</p>
                 </div>
                 <div className="flex items-center gap-4 text-[10px] font-bold">
-                  <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#2074e9]"></span> INGRESO</div>
-                  <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-slate-400"></span> COSTO</div>
+                  <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#2074e9]"></span> PROYECTADO</div>
+                  <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> REAL</div>
                 </div>
               </div>
-              <div className="flex-1 w-full relative flex items-end justify-between gap-1 mt-4">
+              <div className="flex-1 w-full relative flex items-end justify-between gap-1 mt-4 overflow-x-auto pb-4 custom-scrollbar">
                 {(() => {
-                  const renderWeek = (weekly && weekly.daily && weekly.daily.length > 0) ? weekly.daily : daily;
-                  const rawMax = Math.max(...renderWeek.map(x => Math.max(x.ingreso || 0, x.costo || 0)));
+                  const renderWeek = (weekly && weekly.history && weekly.history.length > 0) ? weekly.history : daily;
+                  const rawMax = Math.max(...renderWeek.map(x => Math.max(x.plan?.amount || 0, x.real?.devengadoSemana || 0)));
                   const maxVal = rawMax > 0 ? (rawMax * 1.1) : 1;
 
                   if (rawMax === 0) return <div className="w-full text-center text-xs text-slate-400 h-full flex items-center justify-center pb-10">Sin actividad registrada</div>;
 
-                  return renderWeek.map((d, i) => {
-                    const hIngreso = ((d.ingreso || 0) / maxVal) * 100;
-                    const hCosto = ((d.costo || 0) / maxVal) * 100;
+                  return renderWeek.map((p, i) => {
+                    const hPlan = ((p.plan?.amount || 0) / maxVal) * 100;
+                    const hReal = ((p.real?.devengadoSemana || 0) / maxVal) * 100;
                     return (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-2 group h-full justify-end pb-6 relative">
-                        <div className="w-full h-full flex items-end justify-center gap-0.5 hover:bg-slate-50 rounded-t transition-colors px-0.5 border-b border-slate-100">
-                          <div className="w-full max-w-[12px] bg-slate-200 rounded-t" style={{ height: `${Math.max(1, hCosto)}%`, opacity: hCosto > 0 ? 1 : 0.2 }}></div>
-                          <div className="w-full max-w-[12px] bg-[#2074e9] rounded-t" style={{ height: `${Math.max(1, hIngreso)}%`, opacity: hIngreso > 0 ? 1 : 0.2 }}></div>
-                        </div>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase absolute bottom-0">{d.day.substring(0, 3)}</span>
-
-                        <div className="absolute -top-6 pb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
-                          <div className="bg-slate-900 border border-slate-700 text-white text-[10px] p-2 rounded shadow-xl whitespace-nowrap">
-                            <div className="flex justify-between items-center gap-4 mb-1">
-                              <span className="text-slate-400">In:</span>
-                              <span className="text-emerald-400 font-bold">{money(d.ingreso)}</span>
+                      <div key={i} className="flex-1 flex flex-col items-center gap-2 group h-full justify-end pb-6 relative min-w-[40px]">
+                        <div className="w-full h-full flex items-end justify-center gap-[2px] hover:bg-slate-50 rounded-t transition-colors px-1 border-b border-slate-100">
+                          <div
+                            className="w-full max-w-[10px] bg-[#2074e9] rounded-t-[2px] transition-all hover:brightness-110 relative group/bar"
+                            style={{ height: `${Math.max(1, hPlan)}%`, opacity: hPlan > 0 ? 1 : 0.2 }}
+                          >
+                            <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded opacity-0 group-hover/bar:opacity-100 transition-opacity z-10 whitespace-nowrap pointer-events-none">
+                              Plan: {money(p.plan?.amount)}
                             </div>
-                            <div className="flex justify-between items-center gap-4">
-                              <span className="text-slate-400">Co:</span>
-                              <span className="text-slate-200 font-bold">{money(d.costo)}</span>
+                          </div>
+                          <div
+                            className="w-full max-w-[10px] bg-emerald-500 rounded-t-[2px] transition-all hover:brightness-110 relative group/bar"
+                            style={{ height: `${Math.max(1, hReal)}%`, opacity: hReal > 0 ? 1 : 0.2 }}
+                          >
+                            <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded opacity-0 group-hover/bar:opacity-100 transition-opacity z-10 whitespace-nowrap pointer-events-none">
+                              Real: {money(p.real?.devengadoSemana)}
                             </div>
                           </div>
                         </div>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase absolute bottom-0">{p.label}</span>
                       </div>
-                    )
+                    );
                   });
                 })()}
               </div>
@@ -296,18 +292,17 @@ export default function ProyectoDevengadoRealPage({ params }) {
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col h-[380px]">
               <div className="mb-6">
                 <h4 className="font-bold text-slate-800">Cumplimiento de Épicas</h4>
-                <p className="text-xs text-slate-500">Costo acumulado por miembro</p>
+                <p className="text-xs text-slate-500">Estado de completación por épica</p>
               </div>
               <div className="space-y-6 overflow-y-auto pr-2 custom-scrollbar flex-1">
-                {empleados?.slice(0, 5).map((e, i) => {
-                  const m = Math.max(...(empleados?.map(o => o.costoHH) || [1]), 1);
-                  const w = Math.min((e.costoHH / m) * 100, 100);
+                {proyecto.epicas?.map((e, i) => {
+                  const w = e.avance || 0;
                   const colors = ['bg-[#2074e9]', 'bg-emerald-500', 'bg-amber-500', 'bg-indigo-500'];
                   return (
                     <div key={i}>
                       <div className="flex justify-between text-xs font-bold mb-2">
                         <span className="text-slate-700 truncate" title={e.nombre}>{e.nombre}</span>
-                        <span className="text-slate-500 ml-2">{money(e.costoHH)}</span>
+                        <span className="text-slate-500 ml-2">{w}%</span>
                       </div>
                       <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                         <div className={`h-full rounded-full ${colors[i % 4]}`} style={{ width: `${w}%` }}></div>
@@ -315,8 +310,8 @@ export default function ProyectoDevengadoRealPage({ params }) {
                     </div>
                   );
                 })}
-                {(!empleados || empleados.length === 0) && (
-                  <p className="text-xs text-slate-400 mt-4 text-center">Sin miembros asignados</p>
+                {(!proyecto.epicas || proyecto.epicas.length === 0) && (
+                  <p className="text-xs text-slate-400 mt-4 text-center">Sin épicas registradas</p>
                 )}
               </div>
             </div>
@@ -393,35 +388,38 @@ export default function ProyectoDevengadoRealPage({ params }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {proyecto.tareas?.slice(0, 7).map((t, i) => (
-                      <tr key={i} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-slate-800">{t.nombre}</span>
-                            <span className="text-[10px] text-slate-400 font-medium">#{t.id.slice(-6).toUpperCase()} • {t.epicaNombre || 'General'}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`px-2 py-1 rounded-full text-[9px] font-bold uppercase ${t.estado === 'completa' ? 'bg-emerald-100 text-emerald-700' : t.estado.includes('curso') ? 'bg-[#2074e9]/10 text-[#2074e9]' : 'bg-slate-100 text-slate-500'}`}>
-                            {t.estado}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-xs text-slate-500 font-medium">{t.fecha_inicio_plan ? fmtDate(t.fecha_inicio_plan) : 'S/F'}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`font-bold ${t.avance === 100 ? 'text-emerald-500' : 'text-slate-700'}`}>{t.avance}%</span>
-                        </td>
-                      </tr>
-                    ))}
-                    {(!proyecto.tareas || proyecto.tareas.length === 0) && (
+                    {(() => {
+                      const displayTasks = (tareas.enSemanaActual?.length > 0) ? tareas.enSemanaActual : (data.tareas_all || []);
+                      return displayTasks.slice(0, 15).map((t, i) => (
+                        <tr key={i} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-800">{t.nombre}</span>
+                              <span className="text-[10px] text-slate-400 font-medium">#{t.id.slice(-6).toUpperCase()}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2 py-1 rounded-full text-[9px] font-bold uppercase ${t.estado === 'completa' ? 'bg-emerald-100 text-emerald-700' : t.estado?.includes('curso') ? 'bg-[#2074e9]/10 text-[#2074e9]' : 'bg-slate-100 text-slate-500'}`}>
+                              {t.estado}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-xs text-slate-500 font-medium">{t.fecha_inicio_plan ? fmtDate(t.fecha_inicio_plan) : 'S/F'}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`font-bold ${t.avance === 100 ? 'text-emerald-500' : 'text-slate-700'}`}>{t.avance}%</span>
+                          </td>
+                        </tr>
+                      ));
+                    })()}
+                    {(!tareas.enSemanaActual || tareas.enSemanaActual.length === 0) && (!data.tareas_all || data.tareas_all.length === 0) && (
                       <tr><td colSpan="4" className="px-6 py-8 text-center text-sm text-slate-400">Sin tareas registradas</td></tr>
                     )}
                   </tbody>
                 </table>
               </div>
               <div className="p-4 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500">
-                <span>Showing {Math.min(7, proyecto.tareas?.length || 0)} of {proyecto.tareas?.length || 0} tasks</span>
+                <span>Mostrando las tareas del proyecto</span>
               </div>
             </div>
 
@@ -431,9 +429,9 @@ export default function ProyectoDevengadoRealPage({ params }) {
                 <ShoppingCartIcon className="text-slate-400" />
               </div>
               <div className="space-y-4 flex-1">
-                {compras?.slice(0, 3).map((c, i) => {
+                {compras?.slice(0, 5).map((c, i) => {
                   const MuiIcons = [DescriptionIcon, MemoryIcon, BoltIcon, InventoryIcon];
-                  const Icon = MuiIcons[i % 4];
+                  const Icon = MuiIcons[i % 4] || InventoryIcon;
                   const colors = ['bg-emerald-100 text-emerald-600', 'bg-[#2074e9]/10 text-[#2074e9]', 'bg-amber-100 text-amber-600', 'bg-slate-100 text-slate-500'];
                   return (
                     <div key={i} className="flex items-start gap-3 p-3 rounded-lg border border-slate-100 hover:bg-slate-50 transition-all cursor-pointer">

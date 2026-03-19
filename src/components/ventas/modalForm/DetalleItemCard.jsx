@@ -41,6 +41,7 @@ export default function DetalleItemCard({
   mes,
   anio,
   previewLine,
+  remainingBudget, // ✅ NUEVO
 }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -372,6 +373,11 @@ export default function DetalleItemCard({
                       <Typography sx={{ fontWeight: 900, color: "primary.main" }}>
                         {formatCLP(subtotal)}
                       </Typography>
+                      {remainingBudget !== null && (
+                        <Typography sx={{ fontSize: 9, color: "text.disabled", mt: 0.25, textAlign: "right" }}>
+                          Máx. disponible: {formatCLP(subtotal + remainingBudget)}
+                        </Typography>
+                      )}
                     </Box>
                   </Box>
 

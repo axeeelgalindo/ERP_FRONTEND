@@ -6,7 +6,11 @@ import {
   TextField,
   FormControlLabel,
   Checkbox,
+  Alert,
+  Button,
 } from "@mui/material";
+
+import { formatCLP } from "@/components/ventas/utils/money";
 
 export default function GeneralInfoSection({
   theme,
@@ -89,6 +93,113 @@ export default function GeneralInfoSection({
           inputProps={{ step: 0.1, min: 0, max: 99.99 }}
           helperText="Se aplica a toda la venta (post-utilidad objetivo)."
         />
+      </Box>
+
+      {/* ✅ NUEVO: Vincular a Cotización */}
+      <Box sx={{ mt: 2 }}>
+        <Typography
+          sx={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: "text.secondary",
+            mb: 0.5,
+          }}
+        >
+          Vincular a Cotización (Opcional)
+        </Typography>
+
+        <Box
+          component="select"
+          value={form.ordenVentaId || ""}
+          onChange={(e) => form.setOrdenVentaId(e.target.value)}
+          style={{
+            width: "100%",
+            borderRadius: 12,
+            border: "1px solid rgba(15,23,42,.12)",
+            padding: "10px 12px",
+            outline: "none",
+            fontFamily: "inherit",
+            fontSize: 13,
+            background: "#fff",
+          }}
+        >
+          <option value="">-- Sin vincular --</option>
+          {form.ordenesVenta.map((ov) => (
+            <option key={ov.id} value={ov.id}>
+              #{ov.numero} - {ov.cliente?.nombre || "Sin cliente"} ({formatCLP(ov.total || 0)})
+            </option>
+          ))}
+        </Box>
+
+        {form.selectedOrdenVenta && (
+          <Box sx={{ mt: 1.5, display: "grid", gap: 1 }}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "primary.main" }}>
+                Presupuesto Cotización: {formatCLP(form.selectedOrdenVenta.total || 0)}
+              </Typography>
+              
+              <Button 
+                size="small" 
+                variant="outlined" 
+                onClick={form.adjustToQuote}
+                sx={{ 
+                  fontSize: 10, 
+                  py: 0.25, 
+                  borderRadius: 1.5,
+                  textTransform: "none",
+                  fontWeight: 700
+                }}
+              >
+                Ajustar para calzar
+              </Button>
+            </Box>
+
+            <Box 
+              sx={{ 
+                p: 1.25, 
+                borderRadius: 2, 
+                bgcolor: form.isOverQuoteLimit ? "rgba(239,68,68,.08)" : "rgba(34,197,94,.08)",
+                border: "1px solid",
+                borderColor: form.isOverQuoteLimit ? "rgba(239,68,68,.2)" : "rgba(34,197,94,.2)",
+                display: "flex",
+                justifyContent: "space-between"
+              }}
+            >
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: "text.secondary" }}>
+                Saldo Disponible:
+              </Typography>
+              <Typography sx={{ 
+                fontSize: 11, 
+                fontWeight: 1000, 
+                color: form.isOverQuoteLimit ? "error.main" : "success.main" 
+              }}>
+                {formatCLP(form.remainingBudget || 0)}
+              </Typography>
+            </Box>
+
+            {form.isOverQuoteLimit && (
+              <Alert 
+                severity="error" 
+                variant="filled" 
+                sx={{ 
+                  py: 0.25, 
+                  px: 1.25, 
+                  borderRadius: 2,
+                  ".MuiAlert-message": { fontSize: 10.5, fontWeight: 700, lineHeight: 1.2 },
+                  ".MuiAlert-icon": { fontSize: 16 }
+                }}
+              >
+                ¡Exceso! El costeo supera el monto cotizado. Pulsa "Ajustar para calzar".
+              </Alert>
+            )}
+          </Box>
+        )}
+
+        {!form.selectedOrdenVenta && (
+          <Typography sx={{ fontSize: 11, color: "text.disabled", mt: 0.25 }}>
+            Si ya tienes una cotización aprobada, vincúlala aquí.
+          </Typography>
+        )}
       </Box>
 
       {/* ✅ Fecha HH (Período) */}

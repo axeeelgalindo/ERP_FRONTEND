@@ -571,7 +571,7 @@ export default function useVentaForm({
   const updateDetalle = (idx, patch) => {
     setDetalles((prev) => {
       const next = [...prev];
-      const merged = { ...next[idx], ...patch };
+      let merged = { ...next[idx], ...patch };
 
       const enabled = isTipoDiaEnabled(merged);
       if (!enabled && merged.tipoDiaId) merged.tipoDiaId = "";
@@ -580,6 +580,76 @@ export default function useVentaForm({
       if ("descuentoPct" in patch) {
         merged.descuentoPct =
           patch.descuentoPct === "" ? "" : normalizeDescPctUI(patch.descuentoPct);
+      }
+
+      // =========================================================
+      // 🚀 LÓGICA DE CAPPING (Límite por Cotización)
+      // =========================================================
+      if (selectedOrdenVenta && (patch.cantidad !== undefined || patch.costoUnitarioManual !== undefined)) {
+        // 1. Calculamos cuánto presupuesto hay para ESTA línea.
+        // El presupuesto total es selectedOrdenVenta.total.
+        // El gasto de las OTRAS líneas es: totalVenta - currentLineVenta.
+        
+        const currentLineVenta = preview.lines[idx]?.ventaTotal || 0;
+        const totalVentaActual = preview.total || 0;
+        const budgetOthers = totalVentaActual - currentLineVenta;
+        const maxVentaForThisLine = Math.max(0, (selectedOrdenVenta.total || 0) - budgetOthers);
+
+        // 2. Convertimos MaxVenta a MaxCosto o MaxCantidad.
+        // VentaLine = CostoUnit * Cantidad * Alpha * k * DescG
+        // Usamos los factores actuales de la línea.
+        
+        const alphaPct = normalizeAlphaPctUI(merged.alphaPct);
+        const alphaMult = 1 + alphaPct / 100;
+        const descG = normalizeDescPctUI(descuentoPct);
+        const descGMult = 1 - descG / 100;
+        const descI = normalizeDescPctUI(merged.descuentoPct);
+        const descIMult = 1 - descI / 100;
+        const k = preview.k || 1;
+
+        const factor = alphaMult * k * descIMult * descGMult;
+
+        if (factor > 0) {
+          if (patch.cantidad !== undefined) {
+             let costoUnit = 0;
+             if (merged.modo === "HH") {
+               const hh = findHHForEmpleado(merged.empleadoId);
+               costoUnit = (hh?.costoHH || 0);
+               const cif = getHHCIFValue(hh);
+               // Nota: CIF se suma directo al costoBase de la línea: (costoHH * cant + cif) * alpha
+               // VentaLine = (CU * Cant + CIF) * factor
+               // Cant = (VentaLine / factor - CIF) / CU
+               if (costoUnit > 0) {
+                 const requestedCant = Number(patch.cantidad) || 0;
+                 const maxCant = (maxVentaForThisLine / factor - cif) / costoUnit;
+                 if (requestedCant > maxCant) {
+                   merged.cantidad = Math.max(1, Math.floor(maxCant * 100) / 100);
+                 }
+               }
+             } else {
+               const manualPU = getManualPUNumber(merged);
+               costoUnit = manualPU;
+               if (costoUnit > 0) {
+                 const requestedCant = Number(patch.cantidad) || 0;
+                 const maxCant = maxVentaForThisLine / (costoUnit * factor);
+                 if (requestedCant > maxCant) {
+                   merged.cantidad = Math.max(1, Math.floor(maxCant * 100) / 100);
+                 }
+               }
+             }
+          } 
+          
+          if (patch.costoUnitarioManual !== undefined && merged.modo === "COMPRA") {
+            const requestedPU = getManualPUNumber({ costoUnitarioManual: patch.costoUnitarioManual });
+            const cant = Number(merged.cantidad) || 1;
+            const maxPU = maxVentaForThisLine / (cant * factor);
+            
+            if (requestedPU > maxPU) {
+              const cappedPU = Math.max(0, Math.floor(maxPU));
+              merged.costoUnitarioManual = toCLPDisplay(cappedPU);
+            }
+          }
+        }
       }
 
       next[idx] = merged;
@@ -610,6 +680,13 @@ export default function useVentaForm({
 
     return (isFeriado ? vFeriado : 0) + (isUrgencia ? vUrgencia : 0);
   }, [tipoDias, isFeriado, isUrgencia]);
+
+  const selectedOrdenVenta = useMemo(() => {
+    if (!ordenVentaId) return null;
+    return (
+      ordenesVenta.find((ov) => String(ov.id) === String(ordenVentaId)) || null
+    );
+  }, [ordenVentaId, ordenesVenta]);
 
   // ===========================
   // ✅ PREVIEW (igual backend: post-k y luego descuentos)
@@ -657,7 +734,8 @@ export default function useVentaForm({
     if (uPct != null && Number.isFinite(uPct) && uPct >= 0) {
       const u = uPct / 100;
       const denom = 1 - u;
-      const ventaObjetivoBase = denom > 0 ? totalVentaActualBase / denom : null;
+      // safety: limit u to 99.99 via normalize, but check denom here too
+      const ventaObjetivoBase = denom > 0.0001 ? totalVentaActualBase / denom : totalVentaActualBase * 100;
 
       if (
         ventaObjetivoBase != null &&
@@ -722,11 +800,47 @@ export default function useVentaForm({
     findHHForEmpleado,
   ]);
 
+  const isOverQuoteLimit = useMemo(() => {
+    if (!selectedOrdenVenta || !preview.total) return false;
+    // damos un margen de 1 peso por redondeos
+    return preview.total > (selectedOrdenVenta.total || 0) + 1;
+  }, [selectedOrdenVenta, preview.total]);
+
+  const remainingBudget = useMemo(() => {
+    if (!selectedOrdenVenta || !preview.total) return null;
+    return (selectedOrdenVenta.total || 0) - preview.total;
+  }, [selectedOrdenVenta, preview.total]);
+
+  const adjustToQuote = () => {
+    if (!selectedOrdenVenta || !preview.baseVenta) return;
+    
+    // Queremos que QuoteTotal = baseVenta / (1 - u)
+    // 1 - u = baseVenta / QuoteTotal
+    // u = 1 - (baseVenta / QuoteTotal)
+    // uPct = 100 * (1 - (baseVenta / QuoteTotal))
+    
+    const targetTotal = selectedOrdenVenta.total || 0;
+    const baseVenta = preview.baseVenta || 0; // sum(costo * alpha)
+    
+    if (targetTotal <= 0 || baseVenta <= 0) return;
+    
+    const u = 1 - (baseVenta / targetTotal);
+    const uPct = Math.max(0, u * 100);
+    
+    if (uPct < 100) {
+      setUtilidadPctObjetivo(uPct.toFixed(2));
+    }
+  };
+
   const validateForm = () => {
     if (!detalles.length) return "Debes agregar al menos un ítem.";
 
     const hasHH = detalles.some((d) => d?.modo === "HH");
     if (hasHH && !hhPeriodoKey) return "Selecciona la Fecha HH (Período).";
+
+    if (isOverQuoteLimit) {
+      return `El total del costeo (${formatCLP(preview.total)}) supera el total de la cotización vinculada (${formatCLP(selectedOrdenVenta.total)}).`;
+    }
 
     if (utilidadPctObjetivo !== "") {
       const u = Number(utilidadPctObjetivo);
@@ -945,5 +1059,11 @@ export default function useVentaForm({
 
     submitVenta,
     setVentaCargada,
+
+    // helpers
+    selectedOrdenVenta,
+    isOverQuoteLimit,
+    remainingBudget,
+    adjustToQuote,
   };
-}
+}

@@ -245,20 +245,9 @@ export default function NuevaVentaDialog({
                         %
                       </Box>
                     </Box>
-                    
-
-                    <Typography
-                      sx={{
-                        fontSize: 11,
-                        color: "text.disabled",
-                        fontStyle: "italic",
-                        mt: 0.5,
-                      }}
-                    >
-                      {/* aquí puedes mostrar un hint si quieres */}
-                    </Typography>
                   </Box>
-                  {/* ✅ NUEVO: Fecha HH (Período) */}
+
+                  {/* ✅ NUEVO: Vincular a Cotización */}
                   <Box>
                     <Typography
                       sx={{
@@ -268,118 +257,236 @@ export default function NuevaVentaDialog({
                         mb: 0.5,
                       }}
                     >
-                      Fecha HH (Período)
+                      Vincular a Cotización (Opcional)
                     </Typography>
 
-                    <Box sx={{ display: "grid", gap: 0.75 }}>
-                      <Box
-                        component="select"
-                        value={form.hhPeriodoKey}
-                        onChange={(e) => form.setHhPeriodoKey(e.target.value)}
-                        style={{
-                          width: "100%",
-                          borderRadius: 12,
-                          border: "1px solid rgba(15,23,42,.12)",
-                          padding: "10px 12px",
-                          outline: "none",
-                          fontFamily: "inherit",
-                          fontSize: 13,
-                          background: "#fff",
-                        }}
-                        disabled={form.loadingHHPeriodos}
-                      >
-                        <option value="">
-                          {form.loadingHHPeriodos
-                            ? "Cargando períodos..."
-                            : "Selecciona un período HH"}
-                        </option>
-
-                        {form.hhPeriodos.map((p) => (
-                          <option
-                            key={`${p.anio}-${p.mes}`}
-                            value={`${p.anio}-${p.mes}`}
-                          >
-                            {p.nombre ||
-                              `${String(p.mes).padStart(2, "0")}/${p.anio}`}
-                          </option>
-                        ))}
-                      </Box>
-
-                      {!!form.hhPeriodosErr && (
-                        <Typography sx={{ fontSize: 11, color: "error.main" }}>
-                          {form.hhPeriodosErr}
-                        </Typography>
-                      )}
-
-                      <Typography sx={{ fontSize: 11, color: "text.disabled" }}>
-                        Este período se usará para validar los HH del costeo.
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  {/* ✅ NUEVO: Tipo día por costeo (1 vez) */}
-                  <Box
-                    sx={{
-                      p: 1.5,
-                      borderRadius: 2.5,
-                      border: "1px solid rgba(15,23,42,.10)",
-                      bgcolor: "#fff",
-                      boxShadow: "0 1px 2px rgba(15,23,42,.04)",
-                      display: "grid",
-                      gap: 1,
-                    }}
-                  >
-                    <Typography
-                      sx={{
-                        fontSize: 12,
-                        fontWeight: 900,
-                        color: "text.secondary",
+                    <Box
+                      component="select"
+                      value={form.ordenVentaId || ""}
+                      onChange={(e) => form.setOrdenVentaId(e.target.value)}
+                      style={{
+                        width: "100%",
+                        borderRadius: 12,
+                        border: "1px solid rgba(15,23,42,.12)",
+                        padding: "10px 12px",
+                        outline: "none",
+                        fontFamily: "inherit",
+                        fontSize: 13,
+                        background: "#fff",
                       }}
                     >
-                      Tipo día (costeo)
-                    </Typography>
-
-                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                      <FormControlLabel
-                        sx={{ m: 0 }}
-                        control={
-                          <Switch
-                            checked={!!form.isFeriado}
-                            onChange={(e) =>
-                              form.setIsFeriado(e.target.checked)
-                            }
-                          />
-                        }
-                        label={
-                          <Typography sx={{ fontSize: 12, fontWeight: 800 }}>
-                            Feriado
-                          </Typography>
-                        }
-                      />
-
-                      <FormControlLabel
-                        sx={{ m: 0 }}
-                        control={
-                          <Switch
-                            checked={!!form.isUrgencia}
-                            onChange={(e) =>
-                              form.setIsUrgencia(e.target.checked)
-                            }
-                          />
-                        }
-                        label={
-                          <Typography sx={{ fontSize: 12, fontWeight: 800 }}>
-                            Urgencia
-                          </Typography>
-                        }
-                      />
+                      <option value="">-- Sin vincular --</option>
+                      {form.ordenesVenta.map((ov) => (
+                        <option key={ov.id} value={ov.id}>
+                          #{ov.numero} - {ov.cliente?.nombre || "Sin cliente"} ({formatCLP(ov.total || 0)})
+                        </option>
+                      ))}
                     </Box>
-                    {/* 
+                    
+                      {form.selectedOrdenVenta && (
+                        <Box sx={{ mt: 1.5, display: "grid", gap: 1 }}>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "primary.main" }}>
+                              Presupuesto Cotización: {formatCLP(form.selectedOrdenVenta.total || 0)}
+                            </Typography>
+                            
+                            <Button 
+                              size="small" 
+                              variant="outlined" 
+                              onClick={form.adjustToQuote}
+                              sx={{ 
+                                fontSize: 10, 
+                                py: 0.25, 
+                                borderRadius: 1.5,
+                                textTransform: "none",
+                                fontWeight: 700
+                              }}
+                            >
+                              Ajustar para calzar
+                            </Button>
+                          </Box>
+
+                          <Box 
+                            sx={{ 
+                              p: 1.25, 
+                              borderRadius: 2, 
+                              bgcolor: form.isOverQuoteLimit ? "rgba(239,68,68,.08)" : "rgba(34,197,94,.08)",
+                              border: "1px solid",
+                              borderColor: form.isOverQuoteLimit ? "rgba(239,68,68,.2)" : "rgba(34,197,94,.2)",
+                              display: "flex",
+                              justifyContent: "space-between"
+                            }}
+                          >
+                            <Typography sx={{ fontSize: 11, fontWeight: 700, color: "text.secondary" }}>
+                              Saldo Disponible:
+                            </Typography>
+                            <Typography sx={{ 
+                              fontSize: 11, 
+                              fontWeight: 1000, 
+                              color: form.isOverQuoteLimit ? "error.main" : "success.main" 
+                            }}>
+                              {formatCLP(form.remainingBudget || 0)}
+                            </Typography>
+                          </Box>
+
+                          {form.isOverQuoteLimit && (
+                            <Alert 
+                              severity="error" 
+                              variant="filled" 
+                              sx={{ 
+                                py: 0.25, 
+                                px: 1.25, 
+                                borderRadius: 2,
+                                ".MuiAlert-message": { fontSize: 10.5, fontWeight: 700, lineHeight: 1.2 },
+                                ".MuiAlert-icon": { fontSize: 16 }
+                              }}
+                            >
+                              ¡Exceso! El costeo supera el monto cotizado. Pulsa "Ajustar para calzar".
+                            </Alert>
+                          )}
+                        </Box>
+                      )}
+
+                    {!form.selectedOrdenVenta && (
+                      <Typography sx={{ fontSize: 11, color: "text.disabled", mt: 0.5 }}>
+                        Si ya tienes una cotización aprobada, vincúlala aquí.
+                      </Typography>
+                    )}
+                  </Box>
+
+                  <Typography
+                    sx={{
+                      fontSize: 11,
+                      color: "text.disabled",
+                      fontStyle: "italic",
+                      mt: 0.5,
+                    }}
+                  >
+                    {/* aquí puedes mostrar un hint si quieres */}
+                  </Typography>
+                </Box>
+
+                {/* ✅ NUEVO: Fecha HH (Período) */}
+                <Box>
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "text.secondary",
+                      mb: 0.5,
+                    }}
+                  >
+                    Fecha HH (Período)
+                  </Typography>
+
+                  <Box sx={{ display: "grid", gap: 0.75 }}>
+                    <Box
+                      component="select"
+                      value={form.hhPeriodoKey}
+                      onChange={(e) => form.setHhPeriodoKey(e.target.value)}
+                      style={{
+                        width: "100%",
+                        borderRadius: 12,
+                        border: "1px solid rgba(15,23,42,.12)",
+                        padding: "10px 12px",
+                        outline: "none",
+                        fontFamily: "inherit",
+                        fontSize: 13,
+                        background: "#fff",
+                      }}
+                      disabled={form.loadingHHPeriodos}
+                    >
+                      <option value="">
+                        {form.loadingHHPeriodos
+                          ? "Cargando períodos..."
+                          : "Selecciona un período HH"}
+                      </option>
+
+                      {form.hhPeriodos.map((p) => (
+                        <option
+                          key={`${p.anio}-${p.mes}`}
+                          value={`${p.anio}-${p.mes}`}
+                        >
+                          {p.nombre ||
+                            `${String(p.mes).padStart(2, "0")}/${p.anio}`}
+                        </option>
+                      ))}
+                    </Box>
+
+                    {!!form.hhPeriodosErr && (
+                      <Typography sx={{ fontSize: 11, color: "error.main" }}>
+                        {form.hhPeriodosErr}
+                      </Typography>
+                    )}
+
+                    <Typography sx={{ fontSize: 11, color: "text.disabled" }}>
+                      Este período se usará para validar los HH del costeo.
+                    </Typography>
+                  </Box>
+                </Box>
+
+                {/* ✅ NUEVO: Tipo día por costeo (1 vez) */}
+                <Box
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 2.5,
+                    border: "1px solid rgba(15,23,42,.10)",
+                    bgcolor: "#fff",
+                    boxShadow: "0 1px 2px rgba(15,23,42,.04)",
+                    display: "grid",
+                    gap: 1,
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      fontWeight: 900,
+                      color: "text.secondary",
+                    }}
+                  >
+                    Tipo día (costeo)
+                  </Typography>
+
+                  <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                    <FormControlLabel
+                      sx={{ m: 0 }}
+                      control={
+                        <Switch
+                          checked={!!form.isFeriado}
+                          onChange={(e) =>
+                            form.setIsFeriado(e.target.checked)
+                          }
+                        />
+                      }
+                      label={
+                        <Typography sx={{ fontSize: 12, fontWeight: 800 }}>
+                          Feriado
+                        </Typography>
+                      }
+                    />
+
+                    <FormControlLabel
+                      sx={{ m: 0 }}
+                      control={
+                        <Switch
+                          checked={!!form.isUrgencia}
+                          onChange={(e) =>
+                            form.setIsUrgencia(e.target.checked)
+                          }
+                        />
+                      }
+                      label={
+                        <Typography sx={{ fontSize: 12, fontWeight: 800 }}>
+                          Urgencia
+                        </Typography>
+                      }
+                    />
+                  </Box>
+                  {/* 
                     <Typography sx={{ fontSize: 11, color: "text.disabled" }}>
                       Se suma 1 vez al total (no por ítem).
                     </Typography>
                       */}
-                  </Box>
                 </Box>
               </Box>
 
@@ -559,6 +666,7 @@ export default function NuevaVentaDialog({
               mes={form.mes}
               anio={form.anio}
               preview={form.preview}
+              remainingBudget={form.remainingBudget}
               formErr={form.formErr}
             />
           </Box>

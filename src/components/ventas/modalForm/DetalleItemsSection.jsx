@@ -30,7 +30,7 @@ export default function DetalleItemsSection({
   mes,
   anio,
   preview,
-
+  remainingBudget, // ✅ NUEVO
   formErr,
 }) {
   return (
@@ -80,6 +80,7 @@ export default function DetalleItemsSection({
             mes={mes}
             anio={anio}
             previewLine={preview?.lines?.[idx]}
+            remainingBudget={remainingBudget}
           />
         ))}
 
