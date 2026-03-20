@@ -231,10 +231,23 @@ export default function ComprasPage() {
       setLoading(true);
       setErr("");
 
-      const res = await fetch(
-        `${API}/compras?page=${p}&pageSize=${clampPageSize(s)}`,
-        { headers: makeHeadersJson(session) },
-      );
+      // ✅ Usar filtros del estado si no se pasan en opts
+      const queryQ = opts.q !== undefined ? opts.q : q;
+      const queryEstado = opts.estado !== undefined ? opts.estado : estadoFilter;
+      const queryPeriodo = opts.periodo !== undefined ? opts.periodo : periodo;
+
+      const params = new URLSearchParams({
+        page: String(p),
+        pageSize: String(clampPageSize(s)),
+      });
+
+      if (queryQ) params.append("q", queryQ);
+      if (queryEstado && queryEstado !== "ALL") params.append("estado", queryEstado);
+      if (queryPeriodo) params.append("periodo", queryPeriodo);
+
+      const res = await fetch(`${API}/compras?${params.toString()}`, {
+        headers: makeHeadersJson(session)
+      });
 
       const payload = await jsonOrNull(res);
       if (!res.ok) {
@@ -305,65 +318,24 @@ export default function ComprasPage() {
     let cancelled = false;
     (async () => {
       if (cancelled) return;
-      await Promise.all([loadCompras({ page: 1, pageSize }), loadLookups()]);
+      // ✅ Cargar datos cuando cambian los filtros principales
+      await Promise.all([
+        loadCompras({ page: 1, pageSize, q, estado: estadoFilter, periodo }),
+        loadLookups(),
+      ]);
     })();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, status]);
+  }, [session, status, q, estadoFilter, periodo]);
 
   /* =========================
      Filters client-side
   ========================= */
   const rows = useMemo(() => {
-    const arr = bundle?.data || [];
-    const term = String(q || "").trim().toLowerCase();
-
-    return arr.filter((c) => {
-      if (estadoFilter !== "ALL" && String(c.estado) !== estadoFilter)
-        return false;
-
-      if (periodo) {
-        const d = getCompraDate(c);
-        if (!d) return false;
-
-        const [py, pm] = String(periodo).split("-").map(Number);
-        const y = d.getFullYear();
-        const m = d.getMonth() + 1;
-
-        if (y !== py) return false;
-        if (m !== pm) return false;
-      }
-
-      if (!term) return true;
-
-      const proveedorNombre = c?.proveedor?.nombre ?? "";
-      const rut = c?.rut_proveedor ?? c?.proveedor?.rut ?? "";
-      const razon = c?.razon_social ?? "";
-      const folio = c?.folio ?? "";
-      const tipoDoc = c?.tipo_doc ?? "";
-      const proyecto = c?.proyecto?.nombre ?? "";
-      const destino = c?.destino ?? "";
-      const centro = c?.centro_costo ?? "";
-
-      const hay = [
-        proveedorNombre,
-        rut,
-        razon,
-        folio,
-        tipoDoc,
-        proyecto,
-        destino,
-        centro,
-        c?.numero ?? "",
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return hay.includes(term);
-    });
-  }, [bundle, q, estadoFilter, periodo]);
+    return bundle?.data || [];
+  }, [bundle]);
 
   /* =========================
      KPIs (en base a lo que tienes disponible)
