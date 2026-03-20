@@ -208,8 +208,11 @@ export default function ProyectoDevengadoRealPage({ params }) {
                 <InventoryIcon className="text-4xl" style={{ fontSize: '2.5rem' }} />
               </div>
               <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Ppto Consumido</p>
+              <div className="flex items-center gap-1 mt-1">
+                <span className="text-2xl font-bold text-slate-900">{money(costos.pptoUtilizadoReal)}</span>
+              </div>
+
               <div className="mt-2 flex items-baseline gap-2">
-                <h3 className="text-2xl font-bold text-slate-800">{money(costos.pptoUtilizadoReal)}</h3>
                 {costos.pptoUtilizadoReal > base.valor * 0.8 ? (
                   <span className="text-rose-500 text-[10px] font-bold bg-rose-50 px-1.5 py-0.5 rounded">Riesgo</span>
                 ) : (
@@ -253,14 +256,27 @@ export default function ProyectoDevengadoRealPage({ params }) {
               <div className="flex-1 w-full relative flex items-end justify-between gap-1 mt-4 overflow-x-auto pb-4 custom-scrollbar">
                 {(() => {
                   const renderWeek = (weekly && weekly.history && weekly.history.length > 0) ? weekly.history : daily;
-                  const rawMax = Math.max(...renderWeek.map(x => Math.max(x.plan?.amount || 0, x.real?.devengadoSemana || 0)));
+                  // Cuando base.valor=0 (sin cotización), usamos costo proporcional para visualizar
+                  const planKey = (w) => w.plan?.amount || w.costo || 0;
+                  const realKey = (w) => w.real?.devengadoSemana || 0;
+                  const rawMax = Math.max(...renderWeek.map(x => Math.max(planKey(x), realKey(x))));
                   const maxVal = rawMax > 0 ? (rawMax * 1.1) : 1;
 
-                  if (rawMax === 0) return <div className="w-full text-center text-xs text-slate-400 h-full flex items-center justify-center pb-10">Sin actividad registrada</div>;
+                  if (rawMax === 0) return (
+                    <div className="w-full text-center text-xs text-slate-400 h-full flex flex-col items-center justify-center gap-2 pb-10">
+                      <span className="text-2xl">📊</span>
+                      <span>Sin datos monetarios registrados</span>
+                      <span className="text-[10px] text-slate-300">El proyecto no tiene cotización aceptada</span>
+                    </div>
+                  );
 
                   return renderWeek.map((p, i) => {
-                    const hPlan = ((p.plan?.amount || 0) / maxVal) * 100;
-                    const hReal = ((p.real?.devengadoSemana || 0) / maxVal) * 100;
+                    const vPlan = p.planValue ?? (p.plan?.amount || p.costo || 0);
+                    const vReal = p.realValue ?? (p.real?.devengadoSemana || 0);
+
+                    const hPlan = (vPlan / maxVal) * 100;
+                    const hReal = (vReal / maxVal) * 100;
+
                     return (
                       <div key={i} className="flex-1 flex flex-col items-center gap-2 group h-full justify-end pb-6 relative min-w-[40px]">
                         <div className="w-full h-full flex items-end justify-center gap-[2px] hover:bg-slate-50 rounded-t transition-colors px-1 border-b border-slate-100">
@@ -269,7 +285,7 @@ export default function ProyectoDevengadoRealPage({ params }) {
                             style={{ height: `${Math.max(1, hPlan)}%`, opacity: hPlan > 0 ? 1 : 0.2 }}
                           >
                             <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded opacity-0 group-hover/bar:opacity-100 transition-opacity z-10 whitespace-nowrap pointer-events-none">
-                              Plan: {money(p.plan?.amount)}
+                              Plan: {money(vPlan)}
                             </div>
                           </div>
                           <div
@@ -277,7 +293,7 @@ export default function ProyectoDevengadoRealPage({ params }) {
                             style={{ height: `${Math.max(1, hReal)}%`, opacity: hReal > 0 ? 1 : 0.2 }}
                           >
                             <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-1 px-2 rounded opacity-0 group-hover/bar:opacity-100 transition-opacity z-10 whitespace-nowrap pointer-events-none">
-                              Real: {money(p.real?.devengadoSemana)}
+                              Real: {money(vReal)}
                             </div>
                           </div>
                         </div>
