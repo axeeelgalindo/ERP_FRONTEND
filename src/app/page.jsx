@@ -169,6 +169,8 @@ export default function HomePage() {
   // KPIs
   const {
     ventasMes = 0,
+    facturadoMes = 0,
+    cotizadoMes = 0,
     comprasSemana = 0,
     devengadoSemana = 0,
     flujoCajaMes = 0
@@ -202,33 +204,55 @@ export default function HomePage() {
         </p>
       </header>
 
-      {/* 4 KPIs Clave Solicitados */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="rounded-2xl border border-slate-200/60 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Ventas Mes</div>
-          <div className="text-3xl font-extrabold text-slate-900 tracking-tight">{money(ventasMes)}</div>
-          <div className="mt-2 text-[11px] text-emerald-600 font-bold bg-emerald-50 inline-block px-2 py-0.5 rounded">Total Facturado / Cotizado</div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200/60 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Generado Semana (EV)</div>
-          <div className="text-3xl font-extrabold text-blue-600 tracking-tight">{money(devengadoSemana)}</div>
-          <div className="mt-2 text-[11px] text-blue-600 font-bold bg-blue-50 inline-block px-2 py-0.5 rounded">Devengado de Proyectos</div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200/60 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Compras Semana</div>
-          <div className="text-3xl font-extrabold text-slate-900 tracking-tight">{money(comprasSemana)}</div>
-          <div className="mt-2 text-[11px] text-amber-600 font-bold bg-amber-50 inline-block px-2 py-0.5 rounded">Gasto proyectado OC</div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200/60 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Flujo Caja Mes</div>
-          <div className={`text-3xl font-extrabold tracking-tight ${flujoCajaMes < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-            {money(flujoCajaMes)}
+      {/* 5 KPIs Clave Solicitados */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 xl:gap-6">
+        <div className="rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm hover:shadow-md transition-shadow relative flex flex-col justify-between">
+          <div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Ventas Mes</div>
+            <div className="text-3xl font-extrabold text-slate-900 tracking-tight">{money(ventasMes)}</div>
+            <div className="mt-2 text-[11px] text-emerald-600 font-bold bg-emerald-50 inline-block px-2 py-0.5 rounded">Órdenes de Venta</div>
           </div>
-          <div className={`mt-2 text-[11px] font-bold inline-block px-2 py-0.5 rounded ${flujoCajaMes < 0 ? 'text-rose-600 bg-rose-50' : 'text-emerald-600 bg-emerald-50'}`}>
-            Entradas - Salidas
+          
+          {/* Cuadro algo más pequeño para Cotizados */}
+          <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Total Cotizados</span>
+            <span className="text-sm font-extrabold text-slate-700">{money(cotizadoMes)}</span>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+          <div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Facturado Mes</div>
+            <div className="text-3xl font-extrabold text-slate-900 tracking-tight">{money(facturadoMes)}</div>
+            <div className="mt-2 text-[11px] text-indigo-600 font-bold bg-indigo-50 inline-block px-2 py-0.5 rounded">Facturación Real</div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+          <div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Generado Semana (EV)</div>
+            <div className="text-3xl font-extrabold text-blue-600 tracking-tight">{money(devengadoSemana)}</div>
+            <div className="mt-2 text-[11px] text-blue-600 font-bold bg-blue-50 inline-block px-2 py-0.5 rounded">Devengado de Proyectos</div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+          <div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Compras Semana</div>
+            <div className="text-3xl font-extrabold text-slate-900 tracking-tight">{money(comprasSemana)}</div>
+            <div className="mt-2 text-[11px] text-amber-600 font-bold bg-amber-50 inline-block px-2 py-0.5 rounded">Gasto proyectado OC</div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
+          <div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Flujo Caja Mes</div>
+            <div className={`text-3xl font-extrabold tracking-tight ${flujoCajaMes < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+              {money(flujoCajaMes)}
+            </div>
+            <div className={`mt-2 text-[11px] font-bold inline-block px-2 py-0.5 rounded ${flujoCajaMes < 0 ? 'text-rose-600 bg-rose-50' : 'text-emerald-600 bg-emerald-50'}`}>
+              Entradas - Salidas
+            </div>
           </div>
         </div>
       </section>
