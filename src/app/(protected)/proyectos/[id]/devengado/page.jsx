@@ -115,9 +115,11 @@ export default function ProyectoDevengadoRealPage({ params }) {
   const comprasSinFactura = compras.filter((c) => !c.factura_url && c.estado !== "FACTURADA").length;
   const comprasFact = compras.filter((c) => !!c.factura_url || c.estado === "FACTURADA").length;
 
-  // El margen debe ser sobre lo devengado (el avance llevado a $) contra los costos reales
+  // El margen debe ser sobre lo devengado (el avance llevado a $) contra los costos reales ejecutados
+  const costosRealesEjecucion = (costos.totalCompras || 0) + (costos.totalRendiciones || 0) + (costos.valorHHReal || 0);
+
   const margenBruto = devengado.devengado > 0
-    ? ((devengado.devengado - costos.costoAcumulado) / devengado.devengado) * 100
+    ? ((devengado.devengado - costosRealesEjecucion) / devengado.devengado) * 100
     : 0;
 
   // Approx weekly values
@@ -207,20 +209,26 @@ export default function ProyectoDevengadoRealPage({ params }) {
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                 <InventoryIcon className="text-4xl" style={{ fontSize: '2.5rem' }} />
               </div>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Ppto Consumido</p>
-              <div className="flex items-center gap-1 mt-1">
-                <span className="text-2xl font-bold text-slate-900">{money(costos.pptoUtilizadoReal)}</span>
+              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Ppto Compras Disponible</p>
+              <div className="flex items-center justify-between gap-1 mt-1">
+                <span className={`text-2xl font-bold ${(costos.costoPlanCompras || 0) - costos.pptoUtilizadoReal < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                  {money((costos.costoPlanCompras || 0) - costos.pptoUtilizadoReal)}
+                </span>
+                <span className="text-[11px] font-bold text-slate-400 text-right leading-tight">
+                  Total: {money(costos.costoPlanCompras || 0)}<br/>
+                  Usado: {money(costos.pptoUtilizadoReal)}
+                </span>
               </div>
 
               <div className="mt-2 flex items-baseline gap-2">
-                {costos.pptoUtilizadoReal > base.valor * 0.8 ? (
-                  <span className="text-rose-500 text-[10px] font-bold bg-rose-50 px-1.5 py-0.5 rounded">Riesgo</span>
+                {costos.pptoUtilizadoReal > (costos.costoPlanCompras || 1) * 0.9 ? (
+                  <span className="text-rose-500 text-[10px] font-bold bg-rose-50 px-1.5 py-0.5 rounded">Excediéndose</span>
                 ) : (
-                  <span className="text-amber-500 text-[10px] font-bold bg-amber-50 px-1.5 py-0.5 rounded">Normal</span>
+                  <span className="text-emerald-500 text-[10px] font-bold bg-emerald-50 px-1.5 py-0.5 rounded">Saludable</span>
                 )}
               </div>
               <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                <div className={`h-full rounded-full ${costos.pptoUtilizadoReal > base.valor * 0.8 ? 'bg-rose-500' : 'bg-amber-500'}`} style={{ width: `${Math.min(100, (costos.pptoUtilizadoReal / (base.valor || 1)) * 100)}%` }}></div>
+                <div className={`h-full rounded-full ${costos.pptoUtilizadoReal > (costos.costoPlanCompras || 1) * 0.9 ? 'bg-rose-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min(100, (costos.pptoUtilizadoReal / (costos.costoPlanCompras || 1)) * 100)}%` }}></div>
               </div>
             </div>
 
@@ -228,15 +236,15 @@ export default function ProyectoDevengadoRealPage({ params }) {
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                 <AnalyticsIcon className="text-4xl" style={{ fontSize: '2.5rem' }} />
               </div>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">% Asignado</p>
+              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">% Asignado (Ppto)</p>
               <div className="mt-2 flex items-baseline gap-2">
-                <h3 className={`text-2xl font-bold text-slate-800`}>{pct1((costos.costoAcumulado / (base.valor || 1)) * 100)}</h3>
+                <h3 className={`text-2xl font-bold text-slate-800`}>{pct1((costos.costoPlan / (base.valor || 1)) * 100)}</h3>
                 <span className={`text-slate-400 text-[10px] font-bold`}>
-                  Costeo: {money(costos.costoAcumulado)}
+                  Costeo plan: {money(costos.costoPlan)}
                 </span>
               </div>
               <div className="mt-4 h-1 w-full flex bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500" style={{ width: `${Math.min(100, (costos.costoAcumulado / (base.valor || 1)) * 100)}%` }}></div>
+                <div className="h-full bg-blue-500" style={{ width: `${Math.min(100, (costos.costoPlan / (base.valor || 1)) * 100)}%` }}></div>
               </div>
             </div>
           </div>
