@@ -57,7 +57,8 @@ export default function DetalleItemCard({
   const hhSelectedCIF = getHHCIFValue(hhSelected);
   const faltaHH = det.modo === "HH" && det.empleadoId && !hhSelected;
 
-  const subtotal = Number(previewLine?.ventaTotal ?? 0);
+  const subtotal = Number(previewLine?.costoTotal ?? 0);
+  const lineVentaTotal = Number(previewLine?.ventaTotal ?? 0);
 
   return (
     <Card
@@ -375,7 +376,7 @@ export default function DetalleItemCard({
                       </Typography>
                       {remainingBudget !== null && (
                         <Typography sx={{ fontSize: 9, color: "text.disabled", mt: 0.25, textAlign: "right" }}>
-                          Máx. disponible: {formatCLP(subtotal + remainingBudget)}
+                          Máx. disponible (Venta): {formatCLP(lineVentaTotal + remainingBudget)}
                         </Typography>
                       )}
                     </Box>

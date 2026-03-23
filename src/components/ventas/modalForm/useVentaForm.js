@@ -498,7 +498,7 @@ export default function useVentaForm({
           return {
             descripcion: d?.descripcion || "",
             modo: "HH",
-            cantidad: Number(d?.cantidad) || 1,
+            cantidad: (d?.cantidad !== null && d?.cantidad !== undefined && d?.cantidad !== "") ? Number(d.cantidad) : 1,
             tipoItemId: hhTipoItem?.id || "",
             tipoDiaId: d?.tipoDiaId || "",
             alphaPct: d?.alpha == null ? 10 : Number(d.alpha),
@@ -521,7 +521,7 @@ export default function useVentaForm({
         return {
           descripcion: d?.descripcion || "",
           modo: "COMPRA",
-          cantidad: Number(d?.cantidad) || 1,
+          cantidad: (d?.cantidad !== null && d?.cantidad !== undefined && d?.cantidad !== "") ? Number(d.cantidad) : 1,
           tipoItemId: d?.tipoItemId || "",
           tipoDiaId: d?.tipoDiaId || "",
           alphaPct: d?.alpha == null ? 10 : Number(d.alpha),
@@ -641,7 +641,7 @@ export default function useVentaForm({
           
           if (patch.costoUnitarioManual !== undefined && merged.modo === "COMPRA") {
             const requestedPU = getManualPUNumber({ costoUnitarioManual: patch.costoUnitarioManual });
-            const cant = Number(merged.cantidad) || 1;
+            const cant = (merged.cantidad !== null && merged.cantidad !== undefined && merged.cantidad !== "") ? Number(merged.cantidad) : 1;
             const maxPU = maxVentaForThisLine / (cant * factor);
             
             if (requestedPU > maxPU) {
@@ -696,7 +696,7 @@ export default function useVentaForm({
     const descGMult = 1 - descG / 100;
 
     const linesBase = (detalles || []).map((d) => {
-      const cantidad = Number(d?.cantidad) || 1;
+      const cantidad = (d?.cantidad !== null && d?.cantidad !== undefined && d?.cantidad !== "") ? Number(d.cantidad) : 1;
       const alphaPct = normalizeAlphaPctUI(d?.alphaPct);
       const alphaMult = 1 + alphaPct / 100;
 
@@ -706,7 +706,7 @@ export default function useVentaForm({
         const hh = findHHForEmpleado(d?.empleadoId);
         const costoHH = hh?.costoHH != null ? Number(hh.costoHH) : 0;
         const cif = getHHCIFValue(hh);
-        costoSinAlpha = costoHH * cantidad + cif;
+        costoSinAlpha = cantidad > 0 ? costoHH * cantidad + cif : 0;
       } else {
         const manualPU = getManualPUNumber(d);
         const costoUnit = Number.isFinite(manualPU) ? manualPU : 0;
