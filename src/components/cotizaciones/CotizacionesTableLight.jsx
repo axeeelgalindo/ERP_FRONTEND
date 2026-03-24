@@ -106,7 +106,7 @@ export default function CotizacionesTableLight({
                   </td>
 
                   <td className="px-6 py-4 text-sm text-slate-600">
-                    {fechaCL(c.creada_en)}
+                    {fechaCL(c.fecha_documento || c.creada_en)}
                   </td>
 
                   <td className="px-6 py-4 text-sm font-medium">

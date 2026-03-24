@@ -355,8 +355,15 @@ export default function CotizacionPDFButton({ cotizacion }) {
       doc.text("Vencimiento", mx + 58, barY + 5);
       doc.text("Vendedor", mx + 128, barY + 5);
 
-      const vendedorNombre =
+      let vendedorNombre =
         safe(cot?.vendedor?.nombre) || safe(cot?.vendedor?.correo) || "-";
+
+      if (vendedorNombre.includes(",")) {
+        const parts = vendedorNombre.split(",");
+        const lastNames = parts[0].trim().split(" ");
+        const firstNames = parts[1].trim().split(" ");
+        vendedorNombre = `${firstNames[0]} ${lastNames[0]}`;
+      }
 
       doc.setFont("cambria", "normal");
       doc.setFontSize(9.2);
@@ -380,13 +387,14 @@ export default function CotizacionPDFButton({ cotizacion }) {
             .map((g) => {
               const descripcion = safe(g.descripcion) || "—";
 
-              const cantidad = 1;
-
-              const unitarioBruto = round0(g.monto ?? 0);
+              const cantidad = Number(g.cantidad ?? 1);
+              const precioUnitario = Number(g.precio_unitario ?? g.monto ?? 0);
+              const brutoLinea = Number(g.monto ?? (cantidad * precioUnitario));
+              
               const pct = clampPct(g.descuento_pct || 0);
 
-              const descMonto = round0(unitarioBruto * (pct / 100));
-              const netoLinea = Math.max(0, unitarioBruto - descMonto);
+              const descMonto = round0(brutoLinea * (pct / 100));
+              const netoLinea = Math.max(0, brutoLinea - descMonto);
 
               const impuestos = round0(netoLinea * ivaRateNum);
               const importe = round0(netoLinea + impuestos);
@@ -394,7 +402,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
               return [
                 descripcion,
                 String(cantidad),
-                clp(unitarioBruto),
+                clp(precioUnitario),
                 pct ? `${pct}%` : "0%",
                 clp(impuestos),
                 clp(importe),

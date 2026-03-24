@@ -92,8 +92,31 @@ export default function EditCotizacionDialog({
   const [ventaIds, setVentaIds] = useState([]);
   const [glosas, setGlosas] = useState([emptyGlosa()]);
 
+  // nuevos campos editables
+  const [vendedorId, setVendedorId] = useState("");
+  const [fechaDocumento, setFechaDocumento] = useState("");
+  const [descuentoPct, setDescuentoPct] = useState("");
+  const [usuarios, setUsuarios] = useState([]);
+
   // ✅ para saber si el usuario tocó glosas manualmente
   const [glosasTouched, setGlosasTouched] = useState(false);
+
+  // ========= cargar usuarios =========
+  useEffect(() => {
+    if (!open || !session) return;
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/usuarios`, {
+          headers: makeHeaders(session),
+          cache: "no-store",
+        });
+        const data = await safeJson(res);
+        if (res.ok) setUsuarios(Array.isArray(data) ? data : data?.data || []);
+      } catch (e) {
+        setUsuarios([]);
+      }
+    })();
+  }, [open, session]);
 
   // ========= cargar cotización completa =========
   useEffect(() => {
@@ -133,6 +156,14 @@ export default function EditCotizacionDialog({
         setTerminos(data?.terminos_condiciones || "");
         setAcuerdoPago(data?.acuerdo_pago || "");
 
+        setVendedorId(data?.vendedor_id ? String(data.vendedor_id) : "");
+        setDescuentoPct(data?.descuento_pct ? String(data.descuento_pct) : "");
+        if (data?.fecha_documento) {
+          setFechaDocumento(data.fecha_documento.split("T")[0]);
+        } else {
+          setFechaDocumento("");
+        }
+
         const vIds = Array.isArray(data?.ventas)
           ? data.ventas.map((v) => String(v.id))
           : [];
@@ -144,6 +175,8 @@ export default function EditCotizacionDialog({
             descripcion: g.descripcion || "",
             monto: g.monto || 0,
             manual: g.manual ?? true,
+            cantidad: Number(g.cantidad || 1),
+            precio_unitario: Number(g.precio_unitario || g.monto || 0),
           }))
         );
 
@@ -380,6 +413,10 @@ export default function EditCotizacionDialog({
       const payload = {
         cliente_id: clienteId,
         cliente_responsable_id: responsableId || null,
+        vendedor_id: vendedorId || null,
+        fecha_documento: fechaDocumento || null,
+        descuento_pct: descuentoPct === "" ? 0 : Number(descuentoPct),
+        
         asunto: asunto || null,
         vigencia_dias: Number(vigenciaDias),
         terminos_condiciones: terminos || null,
@@ -391,6 +428,8 @@ export default function EditCotizacionDialog({
         glosas: glosasFinal.map((g, i) => ({
           descripcion: g.descripcion,
           monto: round0(g.monto || 0),
+          cantidad: g.cantidad || 1,
+          precio_unitario: g.precio_unitario || g.monto,
           manual: true,
           orden: i,
         })),
@@ -462,22 +501,40 @@ export default function EditCotizacionDialog({
           <Typography sx={{ color: "text.secondary" }}>Cargando...</Typography>
         ) : null}
 
-        {/* Cliente */}
-        <TextField
-          select
-          size="small"
-          label="Cliente"
-          value={clienteId}
-          onChange={(e) => setClienteId(e.target.value)}
-          fullWidth
-        >
-          <MenuItem value="">Seleccionar...</MenuItem>
-          {(clientes || []).map((c) => (
-            <MenuItem key={c.id} value={c.id}>
-              {c.nombre || c.razonSocial || c.id}
-            </MenuItem>
-          ))}
-        </TextField>
+        {/* Cliente y Vendedor */}
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
+          <TextField
+            select
+            size="small"
+            label="Cliente"
+            value={clienteId}
+            onChange={(e) => setClienteId(e.target.value)}
+            fullWidth
+          >
+            <MenuItem value="">Seleccionar...</MenuItem>
+            {(clientes || []).map((c) => (
+              <MenuItem key={c.id} value={c.id}>
+                {c.nombre || c.razonSocial || c.id}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            select
+            size="small"
+            label="Vendedor Asignado"
+            value={vendedorId}
+            onChange={(e) => setVendedorId(e.target.value)}
+            fullWidth
+          >
+            <MenuItem value="">Mantener Original</MenuItem>
+            {(usuarios || []).map((u) => (
+              <MenuItem key={u.id} value={u.id}>
+                {u.nombre}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Box>
 
         {/* Responsable */}
         <TextField
@@ -509,11 +566,11 @@ export default function EditCotizacionDialog({
           ))}
         </TextField>
 
-        {/* Asunto + Vigencia */}
+        {/* Asunto + Vigencia + Fecha + Descuento */}
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "1fr 180px" },
+            gridTemplateColumns: { xs: "1fr", md: "1fr 140px 145px 120px" },
             gap: 2,
           }}
         >
@@ -531,6 +588,24 @@ export default function EditCotizacionDialog({
             value={vigenciaDias}
             onChange={(e) => setVigenciaDias(e.target.value)}
             inputProps={{ min: 1, max: 365, step: 1 }}
+            fullWidth
+          />
+          <TextField
+            size="small"
+            type="date"
+            label="Fecha Doc."
+            InputLabelProps={{ shrink: true }}
+            value={fechaDocumento}
+            onChange={(e) => setFechaDocumento(e.target.value)}
+            fullWidth
+          />
+          <TextField
+            size="small"
+            type="number"
+            label="Desc. (%)"
+            value={descuentoPct}
+            onChange={(e) => setDescuentoPct(e.target.value)}
+            inputProps={{ min: 0, max: 100, step: 0.1 }}
             fullWidth
           />
         </Box>
