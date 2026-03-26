@@ -248,6 +248,7 @@ export default function ClientesPage() {
       const res = await fetch(`${API_URL}/clientes/delete/${deleting.id}`, {
         method: "DELETE",
         headers,
+        body: JSON.stringify({}),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok)

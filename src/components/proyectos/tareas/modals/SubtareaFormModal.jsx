@@ -200,6 +200,7 @@ export default function SubtareaFormModal({
       const res = await fetch(`${API}/tareas-detalle/delete/${subtarea.id}`, {
         method: "DELETE",
         headers,
+        body: JSON.stringify({}),
       });
 
       const json = await res.json().catch(() => null);

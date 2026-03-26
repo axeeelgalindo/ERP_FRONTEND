@@ -22,6 +22,7 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
 import ThumbDownAltOutlinedIcon from "@mui/icons-material/ThumbDownAltOutlined";
 import EditIcon from "@mui/icons-material/Edit";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 
 import CotizacionPDFButton from "./CotizacionPDFButton";
 import { fechaCL, formatCLP, nextEstados } from "@/components/cotizaciones/utils/utils";
@@ -47,6 +48,7 @@ export default function CotizacionDrawerLight({
   onClose,
   onEdit,
   onUpdateEstado,
+  onDelete,
   showSnack,
 }) {
   const c = cotizacion;
@@ -205,6 +207,18 @@ export default function CotizacionDrawerLight({
     if (!id) return;
     closeEstadoMenu();
     onEdit?.(id);
+  };
+
+  // Modal Eliminar
+  const [openDelete, setOpenDelete] = useState(false);
+  const openDeleteModal = () => {
+    setOpenDelete(true);
+  };
+
+  const confirmDelete = () => {
+    if (!c?.id) return;
+    onDelete?.(c.id);
+    setOpenDelete(false);
   };
 
   if (!open) return null;
@@ -454,6 +468,15 @@ export default function CotizacionDrawerLight({
           >
             Cambiar Estado
           </button>
+
+          <button
+            className="col-span-2 py-2.5 rounded-xl border border-rose-200 text-rose-600 text-sm font-bold hover:bg-rose-50 transition-colors flex items-center justify-center gap-2"
+            onClick={openDeleteModal}
+            disabled={!c?.id}
+          >
+            <DeleteOutlineIcon fontSize="small" />
+            Eliminar Cotización
+          </button>
         </div>
       </div>
 
@@ -602,6 +625,32 @@ export default function CotizacionDrawerLight({
           </Button>
           <Button variant="contained" color="error" startIcon={<ThumbDownAltOutlinedIcon />} onClick={confirmRechazar}>
             Rechazar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal Eliminar */}
+      <Dialog
+        open={openDelete}
+        onClose={() => setOpenDelete(false)}
+        maxWidth="xs"
+        fullWidth
+        sx={{ zIndex: (t) => t.zIndex.modal + 20 }}
+      >
+        <DialogTitle sx={{ color: 'error.main', display: 'flex', itemsCenter: 'center', gap: 1 }}>
+          <DeleteOutlineIcon color="error" />
+          ¿Eliminar cotización?
+        </DialogTitle>
+        <DialogContent>
+          <p className="text-sm text-slate-500">
+            Esta acción marcará la cotización #{c?.numero} como eliminada. 
+            Esta acción no se puede deshacer fácilmente desde la interfaz.
+          </p>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDelete(false)}>Cancelar</Button>
+          <Button variant="contained" color="error" onClick={confirmDelete}>
+            Sí, eliminar
           </Button>
         </DialogActions>
       </Dialog>

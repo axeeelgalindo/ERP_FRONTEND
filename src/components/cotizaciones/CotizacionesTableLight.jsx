@@ -22,7 +22,7 @@ function EstadoBadge({ estado, siguiente }) {
             ? "bg-red-100 text-red-700"
             : "bg-slate-100 text-slate-600";
 
-  
+
 
   return (
     <div className="flex flex-col">
@@ -87,7 +87,7 @@ export default function CotizacionesTableLight({
               <th className="px-6 py-4 text-right">IVA</th>
               <th className="px-6 py-4 text-right">Total</th>
               <th className="px-6 py-4 text-center">PDF</th>
-              <th className="px-6 py-4 text-center">Acciones</th>
+
             </tr>
           </thead>
 
@@ -136,17 +136,7 @@ export default function CotizacionesTableLight({
                     <CotizacionPDFButton cotizacion={c} />
                   </td>
 
-                  <td
-                    className="px-6 py-4 text-center relative"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <IconButton
-                      size="small"
-                      onClick={(e) => handleOpenMenu(e, c)}
-                    >
-                      <MoreVerticalIcon fontSize="small" />
-                    </IconButton>
-                  </td>
+
                 </tr>
               );
             })}

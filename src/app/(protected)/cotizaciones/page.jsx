@@ -154,6 +154,28 @@ export default function CotizacionesPage() {
     }
   };
 
+  const deleteCotizacion = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/cotizaciones/${id}`, {
+        method: "DELETE",
+        headers: makeHeaders(session),
+        body: JSON.stringify({}),
+      });
+
+      const data = await safeJson(res);
+      if (!res.ok) {
+        throw new Error(data?.error || data?.detalle || "Error al eliminar");
+      }
+
+      showSnack("success", "Cotización eliminada");
+      // Actualizar lista local
+      setCotizaciones((prev) => prev.filter((c) => c.id !== id));
+      setOpenDrawer(false);
+    } catch (e) {
+      showSnack("error", e?.message || "Error al eliminar");
+    }
+  };
+
   // Selección actual para el drawer
   const selected = useMemo(
     () => cotizaciones.find((c) => c.id === selectedId) || null,
@@ -267,6 +289,7 @@ export default function CotizacionesPage() {
         onClose={() => setOpenDrawer(false)}
         onEdit={(id) => openEditCot(id)}
         onUpdateEstado={updateEstado}
+        onDelete={deleteCotizacion}
         showSnack={showSnack}
       />
 

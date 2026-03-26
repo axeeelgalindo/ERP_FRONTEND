@@ -90,6 +90,7 @@ export default function ProveedoresPage() {
     const res = await fetch(`${API_URL}${path}`, {
       ...opts,
       headers,
+      ...(opts.method === "DELETE" && !opts.body ? { body: JSON.stringify({}) } : {}),
     });
 
     if (res.status === 204) return { ok: true };

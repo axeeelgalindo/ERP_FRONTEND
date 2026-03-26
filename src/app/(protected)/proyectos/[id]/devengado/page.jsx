@@ -142,7 +142,7 @@ export default function ProyectoDevengadoRealPage({ params }) {
   const gananciaSemanaPos = Math.max(0, ingresoSemana - costoSemana);
 
   return (
-    <div className="bg-[#f6f7f8] text-slate-900 min-h-screen pb-10">
+    <div className="bg-[#f6f7f8] text-slate-900 min-h-screen p-8">
       <div className="layout-container flex h-full grow flex-col">
         <main className="p-4 lg:p-10 space-y-8">
 
@@ -153,12 +153,9 @@ export default function ProyectoDevengadoRealPage({ params }) {
                 <ChevronRightIcon fontSize="small" className="text-sm" />
                 <span className="text-slate-600 font-bold">{proyecto.nombre}</span>
               </nav>
-              <h1 className="text-2xl font-extrabold tracking-tight flex items-center gap-2">
-                Financial Health Dashboard
-                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${estadoTone === 'ok' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                  {proyecto.estado?.toUpperCase()}
-                </span>
-              </h1>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${estadoTone === 'ok' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                {proyecto.estado?.toUpperCase()}
+              </span>
               <p className="text-slate-500 text-sm">Strategic overview of accruals and project execution performance.</p>
             </div>
             <div className="flex items-center gap-3">
@@ -215,7 +212,7 @@ export default function ProyectoDevengadoRealPage({ params }) {
                   {money((costos.costoPlanCompras || 0) - costos.pptoUtilizadoReal)}
                 </span>
                 <span className="text-[11px] font-bold text-slate-400 text-right leading-tight">
-                  Total: {money(costos.costoPlanCompras || 0)}<br/>
+                  Total: {money(costos.costoPlanCompras || 0)}<br />
                   Usado: {money(costos.pptoUtilizadoReal)}
                 </span>
               </div>

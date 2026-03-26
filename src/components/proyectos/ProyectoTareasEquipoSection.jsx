@@ -300,6 +300,7 @@ export default function ProyectoTareasEquipoSection({
       const res = await fetch(`${API}/tareas/delete/${t.id}`, {
         method: "DELETE",
         headers,
+        body: JSON.stringify({}),
       });
       const json = await res.json().catch(() => null);
 
