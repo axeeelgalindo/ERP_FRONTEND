@@ -3,9 +3,21 @@
 @theme {
   --color-primary: #1e3a8a;
   --color-secondary: #64748b;
+  --color-secondary-container: #e2e8f0;
+  --color-tertiary: #0ea5e9;
+  --color-tertiary-fixed: #bae6fd;
   --color-accent: #3b82f6;
   --color-background-light: #f8fafc;
   --color-surface: #ffffff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f8fafc;
+  --color-surface-container: #f1f5f9;
+  --color-surface-container-high: #e2e8f0;
+  --color-surface-container-highest: #cbd5e1;
+  --color-on-surface: #0f172a;
+  --color-on-surface-variant: #475569;
+  --color-outline-variant: #cbd5e1;
+  --color-error: #ef4444;
 }
 
 :root{

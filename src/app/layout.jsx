@@ -16,6 +16,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="es">
+      <head>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+      </head>
       <body className="bg-gray-50 text-gray-900 font-sans min-h-screen">
         <div id="sidebar-slot" />
 
