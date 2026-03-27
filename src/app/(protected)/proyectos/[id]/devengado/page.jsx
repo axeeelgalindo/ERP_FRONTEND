@@ -3,9 +3,10 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { 
-  LineChart, 
-  Gauge 
+import { ArrowLeft } from "lucide-react";
+import {
+  LineChart,
+  Gauge
 } from '@mui/x-charts';
 
 // Icons using Material Symbols
@@ -36,11 +37,11 @@ export default function ProyectoDevengadoRealPage({ params }) {
   const unwrappedParams = React.use(params);
   const { id } = unwrappedParams;
   const { data: session, status } = useSession();
-  
+
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // UI States
   const [expandedItems, setExpandedItems] = useState(new Set());
   const [showMembersModal, setShowMembersModal] = useState(false);
@@ -103,7 +104,7 @@ export default function ProyectoDevengadoRealPage({ params }) {
       // Get current members IDs
       const currentIds = empleados.map(e => e.id);
       if (currentIds.includes(empleadoId)) return;
-      
+
       const newIds = [...currentIds, empleadoId];
       await fetch(`${apiUrl}/proyectos/update/${id}`, {
         method: "PATCH",
@@ -161,8 +162,18 @@ export default function ProyectoDevengadoRealPage({ params }) {
   }));
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-[#1e1e1e] font-sans p-6 lg:p-10 space-y-10 animate-in fade-in duration-700">
+    <div className="min-h-screen bg-[#f8fafc] text-[#1e1e1e] font-sans p-6 lg:p-10 space-y-6 animate-in fade-in duration-700">
       
+      <div className="flex items-center justify-start">
+        <Link
+          href={`/proyectos/${id}`}
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:text-[#004b98] hover:border-[#004b98] transition-all shadow-sm"
+        >
+          <ArrowLeft size={18} />
+          <span>Volver al Proyecto</span>
+        </Link>
+      </div>
+
       {/* Hero Header */}
       <section className="bg-white p-8 rounded-xl shadow-sm border-l-[10px] border-[#006a3a] flex flex-col lg:flex-row items-center justify-between gap-6 border-t border-r border-b border-slate-100">
         <div className="space-y-4">
@@ -173,27 +184,6 @@ export default function ProyectoDevengadoRealPage({ params }) {
         </div>
 
         <div className="flex items-center gap-12">
-          {/* Health Gauge */}
-          <div className="flex flex-col items-center">
-            <div className="relative flex items-center justify-center h-24 w-24">
-              <Gauge 
-                value={devengado.saludPct || 100} 
-                startAngle={0} 
-                endAngle={360} 
-                innerRadius="80%" 
-                outerRadius="100%"
-                sx={() => ({
-                  [`& .MuiGauge-valueArc`]: { fill: '#006a3a' },
-                  [`& .MuiGauge-referenceArc`]: { fill: '#e2e8f0' },
-                })}
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                 <span className="text-xl font-black text-[#006a3a] leading-none mb-1">{devengado.saludPct || 100}%</span>
-              </div>
-            </div>
-            <p className="text-[10px] font-black uppercase tracking-widest mt-2 text-[#006a3a]">Salud Estable</p>
-          </div>
-
           {/* Members Stack */}
           <div className="space-y-3">
             <p className="text-[10px] font-black uppercase tracking-widest text-[#64748b] text-center lg:text-right">Responsables</p>
@@ -216,8 +206,30 @@ export default function ProyectoDevengadoRealPage({ params }) {
       {/* KPI Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         <KPIItem title="VENTA" val={money(base.valor)} sub="Venta Total" icon="analytics" color="#004b98" />
-        <KPIItem title="OK" val={pct1(devengado.avancePct)} sub="Avance Físico" icon="verified" color="#006a3a" barVal={devengado.avancePct} />
-        
+        <KPIItem title="REAL" val={pct1(devengado.avancePct)} sub="Avance Físico" icon="verified" color="#006a3a" barVal={devengado.avancePct} />
+        <KPIItem title="PLAN" val={pct1(devengado.avancePlanPct)} sub="Avance Proyectado" icon="schedule" color="#64748b" barVal={devengado.avancePlanPct} />
+
+        <div className={`bg-white p-8 rounded-2xl shadow-sm border border-slate-100 space-y-6 group ${devengado.desviacion_devengado < 0 ? 'border-red-100' : 'border-emerald-100'}`}>
+          <div className="flex justify-between items-start">
+            <p className={`text-[11px] font-black uppercase tracking-widest ${devengado.desviacion_devengado < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+              DESVIACIÓN DEVENGADO
+            </p>
+            <Icon name={devengado.desviacion_devengado < 0 ? "trending_down" : "trending_up"} className={devengado.desviacion_devengado < 0 ? "text-red-500" : "text-emerald-500"} />
+          </div>
+          <div>
+            <h3 className={`text-4xl font-black tracking-tight ${devengado.desviacion_devengado < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+              {money(devengado.desviacion_devengado)}
+            </h3>
+            <p className="text-[11px] font-bold text-slate-400 uppercase mt-1">Diferencia Plan vs Real</p>
+          </div>
+          <div className="pt-2 border-t border-slate-100 flex justify-between items-center">
+            <span className="text-[10px] font-black uppercase text-slate-400">Desv. Física:</span>
+            <span className={`text-[10px] font-black ${devengado.desviacion_avance < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+              {devengado.desviacion_avance > 0 ? '+' : ''}{devengado.desviacion_avance}%
+            </span>
+          </div>
+        </div>
+
         {(() => {
           const avail = (costos.costoPlanCompras || 0) - costos.pptoUtilizadoReal;
           const isCritical = avail < 0;
@@ -235,7 +247,7 @@ export default function ProyectoDevengadoRealPage({ params }) {
               </div>
               <div className="pt-2 border-t border-slate-100 text-center">
                 <p className="text-[10px] font-black uppercase tracking-tighter text-slate-400">
-                   TOTAL: {money(costos.costoPlanCompras)} | USADO: {money(costos.pptoUtilizadoReal)}
+                  TOTAL: {money(costos.costoPlanCompras)} | USADO: {money(costos.pptoUtilizadoReal)}
                 </p>
               </div>
             </div>
@@ -270,19 +282,53 @@ export default function ProyectoDevengadoRealPage({ params }) {
           </div>
           <div className="h-[400px] w-full">
             <LineChart
-              xAxis={[{ 
-                data: chartData.map((_, i) => i), 
+              xAxis={[{
+                data: chartData.map((_, i) => i),
                 scaleType: 'point',
                 valueFormatter: (i) => chartData[i]?.subLabel || '',
                 stroke: '#e2e8f0'
               }]}
+              yAxis={[{
+                valueFormatter: (v) => {
+                  if (v === null || v === undefined) return '';
+                  if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
+                  if (v >= 1000) return `${(v / 1000).toFixed(0)}k`;
+                  return String(v);
+                },
+                tickLabelStyle: { fontSize: 10, fontWeight: 700, fill: '#64748b' }
+              }]}
               series={[
-                { data: chartData.map(d => d.plan), label: 'Proyectado', color: '#004b98', area: true, showMark: false, curve: "monotoneX" },
-                { data: chartData.map(d => d.real), label: 'Real', color: '#004b98', showMark: true, curve: "monotoneX" },
+                {
+                  data: chartData.map(d => d.plan),
+                  label: 'Proyectado',
+                  color: '#94a3b8',
+                  area: true,
+                  showMark: false,
+                  curve: "monotoneX"
+                },
+                {
+                  data: chartData.map(d => d.real),
+                  label: 'Real',
+                  color: '#004b98',
+                  showMark: true,
+                  curve: "monotoneX",
+                  area: false
+                },
               ]}
-              slotProps={{ legend: { hidden: true } }}
-              margin={{ left: 100, right: 30, top: 20, bottom: 40 }}
-              sx={{ [`& .MuiAreaElement-root`]: { fill: '#004b98', fillOpacity: 0.05 }, [`& .MuiLineElement-root`]: { strokeWidth: 4 } }}
+              slotProps={{
+                legend: {
+                  hidden: false,
+                  direction: 'row',
+                  position: { vertical: 'bottom', horizontal: 'middle' },
+                  padding: { top: 20 }
+                }
+              }}
+              margin={{ left: 60, right: 30, top: 20, bottom: 60 }}
+              sx={{
+                [`& .MuiAreaElement-root`]: { fill: '#94a3b8', fillOpacity: 0.1 },
+                [`& .MuiLineElement-root`]: { strokeWidth: 3 },
+                [`& .MuiChartsLegend-label`]: { fontSize: 11, fontWeight: 900, textTransform: 'uppercase' }
+              }}
             />
           </div>
         </div>
@@ -298,48 +344,48 @@ export default function ProyectoDevengadoRealPage({ params }) {
               <div key={i} className="space-y-3">
                 <div className="flex justify-between items-center text-xs font-black uppercase tracking-widest">
                   <span className="text-[#1e1e1e] truncate pr-4">{e.nombre}</span>
-                  <span className="text-slate-400">{e.avance || 0}%</span>
+                  <span className="text-slate-400">{e.avance_real_pct || 0}%</span>
                 </div>
                 <div className="h-3 w-full bg-white rounded-full overflow-hidden shadow-inner border border-slate-100">
-                  <div className="bg-[#004b98] h-full rounded-full transition-all duration-1000" style={{ width: `${e.avance || 0}%` }}></div>
+                  <div className="bg-[#004b98] h-full rounded-full transition-all duration-1000" style={{ width: `${e.avance_real_pct || 0}%` }}></div>
                 </div>
               </div>
             ))}
           </div>
           <div className="pt-10 mt-auto border-t border-slate-200">
-              <div className="flex justify-between items-center text-xs font-black uppercase tracking-widest mb-4">
-                <span>Eficiencia Técnica</span>
-                <span className="text-[#004b98]">92.4%</span>
-              </div>
-              <div className="h-4 w-full bg-white rounded-full overflow-hidden shadow-inner border border-slate-100">
-                <div className="bg-[#004b98] h-full w-[92.4%] rounded-full"></div>
-              </div>
+            <div className="flex justify-between items-center text-xs font-black uppercase tracking-widest mb-4">
+              <span>Eficiencia de Ejecución</span>
+              <span className="text-[#004b98]">{pct1(devengado.avancePct / (devengado.avancePlanPct || 1) * 100)}</span>
+            </div>
+            <div className="h-4 w-full bg-white rounded-full overflow-hidden shadow-inner border border-slate-100">
+              <div
+                className="bg-[#004b98] h-full rounded-full transition-all duration-1000"
+                style={{ width: `${Math.min(100, (devengado.avancePct / (devengado.avancePlanPct || 1)) * 100)}%` }}
+              ></div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Hierarchical Task Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden ">
         <div className="p-10 border-b border-slate-50 flex items-center justify-between">
           <div>
             <h4 className="text-2xl font-black text-[#1e1e1e]">Detalle de Ejecución Jerárquico</h4>
             <p className="text-sm text-slate-400 font-bold uppercase tracking-tight">Desglose desde Épica hasta Subtarea</p>
           </div>
-          <button className="bg-[#f1f5f9] px-6 py-3 rounded-lg text-xs font-black uppercase tracking-widest text-[#1e3a8a] flex items-center gap-3 hover:bg-slate-200 transition-all">
-            <Icon name="history" /> Ver Historial Completo
-          </button>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#f8fafc] text-[10px] font-black uppercase tracking-[0.2em] text-[#64748b] border-b border-slate-100">
                 <th className="px-10 py-6 uppercase">ID / Concepto</th>
-                <th className="px-10 py-6 uppercase text-center">Progreso</th>
+                <th className="px-10 py-6 uppercase text-center">Progreso (R / P)</th>
                 <th className="px-10 py-6 uppercase">Planificado (Inicio | Fin)</th>
-                <th className="px-10 py-6 uppercase">Real (Inicio | Fin)</th>
-                <th className="px-10 py-6 uppercase">Monto Devengado</th>
-                <th className="px-10 py-6 uppercase text-right">Acción</th>
+                <th className="px-10 py-6 uppercase">Devengado (Real / Plan)</th>
+                <th className="px-10 py-6 uppercase text-center">Desviación</th>
+                <th className="px-10 py-6 uppercase text-right">Participación</th>
               </tr>
             </thead>
             <tbody>
@@ -348,33 +394,47 @@ export default function ProyectoDevengadoRealPage({ params }) {
                   {/* EPIC ROW */}
                   <tr className="bg-slate-50/50 group border-b border-slate-100 cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => toggleExpand(epica.id)}>
                     <td className="px-10 py-6">
-                       <div className="flex items-center gap-3">
-                          <Icon name={expandedItems.has(epica.id) ? "expand_more" : "chevron_right"} className="text-[#004b98] font-black" />
-                          <div>
-                            <p className="text-sm font-black text-[#1e1e1e] uppercase tracking-tight">ÉPICA: {epica.nombre}</p>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase">FASE DEL PROYECTO</p>
-                          </div>
-                       </div>
+                      <div className="flex items-center gap-3">
+                        <Icon name={expandedItems.has(epica.id) ? "expand_more" : "chevron_right"} className="text-[#004b98] font-black" />
+                        <div>
+                          <p className="text-sm font-black text-[#1e1e1e] uppercase tracking-tight">ÉPICA: {epica.nombre}</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase">FASE DEL PROYECTO</p>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-10 py-6 text-center">
-                       <div className="flex flex-col items-center gap-1">
-                          <span className="text-xs font-black text-[#006a3a]">{epica.avance || 0}%</span>
-                          <div className="w-16 h-1.5 bg-white rounded-full overflow-hidden border border-slate-200 shadow-inner">
-                             <div className="bg-[#006a3a] h-full" style={{ width: `${epica.avance || 0}%` }}></div>
-                          </div>
-                       </div>
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-center gap-1.5 text-[10px] font-black">
+                          <span className="text-[#006a3a]">{epica.avance_real_pct}% R</span>
+                          <span className="text-slate-300">/</span>
+                          <span className="text-slate-400">{epica.avance_plan_pct}% P</span>
+                        </div>
+                        <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                          <div className="bg-[#006a3a] h-full" style={{ width: `${epica.avance_real_pct}%` }}></div>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-10 py-6 text-[11px] font-bold text-[#1e1e1e]">
-                       {fmtRange(epica.fecha_inicio_plan, epica.fecha_fin_plan)}
+                      <div className="flex flex-col">
+                        <span title="Planificado">{fmtRange(epica.fecha_inicio_plan, epica.fecha_fin_plan)}</span>
+                        <span className="text-[10px] text-slate-400 font-normal italic" title="Real (Inicio | Fin)">
+                          Real: {fmtRange(epica.fecha_inicio_real, epica.fecha_fin_real)}
+                        </span>
+                      </div>
                     </td>
-                    <td className="px-10 py-6 text-[11px] font-bold text-slate-400 italic">
-                       {epica.avance === 100 ? fmtRange(epica.fecha_inicio_real, epica.fecha_fin_real) : (epica.fecha_inicio_real ? fmtDate(epica.fecha_inicio_real) : "—")}
+                    <td className="px-10 py-6">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black text-[#1e1e1e]">{money(epica.devengado_real)}</span>
+                        <span className="text-[10px] text-slate-400 font-bold">Planned: {money(epica.devengado_plan)}</span>
+                      </div>
                     </td>
-                    <td className="px-10 py-6 text-sm font-black text-[#1e1e1e]">
-                       {money(base.valor * ((epica.avance || 0) / 100))}
+                    <td className="px-10 py-6 text-center">
+                      <span className={`text-[11px] font-black ${epica.desviacion_pct < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                        {epica.desviacion_pct > 0 ? '+' : ''}{epica.desviacion_pct}%
+                      </span>
                     </td>
                     <td className="px-10 py-6 text-right">
-                       <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">NIVEL 1</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{Number(epica.participacion * 100).toFixed(1)}%</span>
                     </td>
                   </tr>
 
@@ -383,33 +443,47 @@ export default function ProyectoDevengadoRealPage({ params }) {
                     <React.Fragment key={tarea.id}>
                       <tr className="bg-white group border-b border-slate-50 cursor-pointer hover:bg-slate-50/30 transition-colors" onClick={() => toggleExpand(tarea.id)}>
                         <td className="px-10 py-5 pl-24">
-                           <div className="flex items-center gap-3">
-                              <Icon name={expandedItems.has(tarea.id) ? "expand_more" : "chevron_right"} className="text-slate-400 text-sm" />
-                              <div>
-                                <p className="text-[13px] font-black text-[#1e1e1e] leading-tight group-hover:text-[#004b98] transition-colors">{tarea.nombre}</p>
-                                <p className="text-[9px] text-slate-400 font-bold uppercase">TAREA PRINCIPAL</p>
-                              </div>
-                           </div>
+                          <div className="flex items-center gap-3">
+                            <Icon name={expandedItems.has(tarea.id) ? "expand_more" : "chevron_right"} className="text-slate-400 text-sm" />
+                            <div>
+                              <p className="text-[13px] font-black text-[#1e1e1e] leading-tight group-hover:text-[#004b98] transition-colors">{tarea.nombre}</p>
+                              <p className="text-[9px] text-slate-400 font-bold uppercase">TAREA PRINCIPAL</p>
+                            </div>
+                          </div>
                         </td>
                         <td className="px-10 py-5 text-center">
-                           <div className="flex flex-col items-center gap-1">
-                              <span className="text-[11px] font-black text-slate-600">{tarea.avance || 0}%</span>
-                              <div className="w-16 h-1 bg-slate-100 rounded-full overflow-hidden border border-slate-100 shadow-inner">
-                                 <div className="bg-[#004b98] h-full" style={{ width: `${tarea.avance || 0}%` }}></div>
-                              </div>
-                           </div>
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="flex items-center gap-1 text-[9px] font-black">
+                              <span className="text-[#004b98]">{tarea.avance_real_pct}% R</span>
+                              <span className="text-slate-300">/</span>
+                              <span className="text-slate-400">{tarea.avance_plan_pct}% P</span>
+                            </div>
+                            <div className="w-16 h-1 bg-slate-100 rounded-full overflow-hidden border border-slate-100 shadow-inner">
+                              <div className="bg-[#004b98] h-full" style={{ width: `${tarea.avance_real_pct}%` }}></div>
+                            </div>
+                          </div>
                         </td>
                         <td className="px-10 py-5 text-[11px] font-bold text-[#1e1e1e]">
-                           {fmtRange(tarea.fecha_inicio_plan, tarea.fecha_fin_plan)}
+                          <div className="flex flex-col">
+                            <span title="Planificado">{fmtRange(tarea.fecha_inicio_plan, tarea.fecha_fin_plan)}</span>
+                            <span className="text-[9px] text-slate-400 font-normal italic" title="Real (Inicio | Fin)">
+                              Real: {fmtRange(tarea.fecha_inicio_real, tarea.fecha_fin_real)}
+                            </span>
+                          </div>
                         </td>
-                        <td className="px-10 py-5 text-[11px] font-bold text-slate-400 italic">
-                           {tarea.avance === 100 ? fmtRange(tarea.fecha_inicio_real, tarea.fecha_fin_real) : "No finalizada"}
+                        <td className="px-10 py-5">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-[#1e1e1e]">{money(tarea.devengado_real)}</span>
+                            <span className="text-[9px] text-slate-400 font-bold">Plan: {money(tarea.devengado_plan)}</span>
+                          </div>
                         </td>
-                        <td className="px-10 py-5 text-sm font-bold text-slate-500">
-                           {money(base.valor * ((tarea.avance || 0) / 100) / (epica.tareas.length || 1))}
+                        <td className="px-10 py-5 text-center">
+                          <span className={`text-[10px] font-black ${tarea.desviacion_pct < 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                            {tarea.desviacion_pct > 0 ? '+' : ''}{tarea.desviacion_pct}%
+                          </span>
                         </td>
                         <td className="px-10 py-5 text-right">
-                           <span className="text-[9px] font-black text-slate-200 uppercase tracking-widest">NIVEL 2</span>
+                          <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{Number(tarea.participacion * 100).toFixed(1)}%</span>
                         </td>
                       </tr>
 
@@ -417,30 +491,42 @@ export default function ProyectoDevengadoRealPage({ params }) {
                       {expandedItems.has(tarea.id) && (tarea.detalles || []).map((sub) => (
                         <tr key={sub.id} className="bg-slate-50/10 group border-b border-slate-50/30">
                           <td className="px-10 py-4 pl-36">
-                             <div className="flex items-center gap-3">
-                                <span className="w-1.5 h-1.5 rounded-full bg-slate-200"></span>
-                                <div>
-                                  <p className="text-xs font-medium text-[#64748b] leading-tight">{sub.titulo}</p>
-                                  <p className="text-[8px] text-slate-300 font-bold uppercase">SUBTAREA / ITEM</p>
-                                </div>
-                             </div>
+                            <div className="flex items-center gap-3">
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-200"></span>
+                              <div>
+                                <p className="text-xs font-medium text-[#64748b] leading-tight">{sub.titulo}</p>
+                                <p className="text-[8px] text-slate-300 font-bold uppercase">SUBTAREA / ITEM</p>
+                              </div>
+                            </div>
                           </td>
                           <td className="px-10 py-4 text-center">
-                             <span className={`text-[10px] font-black ${sub.avance === 100 ? 'text-emerald-500' : 'text-slate-400'}`}>
-                               {sub.avance === 100 ? 'FINALIZADA' : `${sub.avance || 0}%`}
-                             </span>
+                            <div className="flex flex-col items-center">
+                              <span className={`text-[10px] font-black ${sub.avance_real_pct === 100 ? 'text-emerald-500' : 'text-slate-400'}`}>
+                                {sub.avance_real_pct}% R / {sub.avance_plan_pct}% P
+                              </span>
+                            </div>
                           </td>
                           <td className="px-10 py-4 text-[10px] font-bold text-slate-400">
-                             {fmtRange(sub.fecha_inicio_plan, sub.fecha_fin_plan)}
+                            <div className="flex flex-col">
+                              <span title="Planificado">{fmtRange(sub.fecha_inicio_plan, sub.fecha_fin_plan)}</span>
+                              <span className="text-[9px] text-slate-300 font-normal italic" title="Real (Inicio | Fin)">
+                                Real: {fmtRange(sub.fecha_inicio_real, sub.fecha_fin_real)}
+                              </span>
+                            </div>
                           </td>
-                          <td className="px-10 py-4 text-[10px] font-bold text-slate-400 italic">
-                             {sub.avance === 100 ? fmtRange(sub.fecha_inicio_real, sub.fecha_fin_real) : "Pendiente"}
+                          <td className="px-10 py-4">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-slate-500">{money(sub.devengado_real)}</span>
+                              <span className="text-[9px] text-slate-400">Plan: {money(sub.devengado_plan)}</span>
+                            </div>
                           </td>
-                          <td className="px-10 py-4 text-xs font-medium text-slate-400">
-                             {money(sub.costo_real || 0)}
+                          <td className="px-10 py-4 text-center">
+                            <span className={`text-[10px] font-black ${sub.desviacion_pct < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                              {sub.desviacion_pct > 0 ? '+' : ''}{sub.desviacion_pct}%
+                            </span>
                           </td>
                           <td className="px-10 py-4 text-right">
-                             <Icon name="more_horiz" className="text-slate-200 text-sm opacity-0 group-hover:opacity-100 cursor-pointer" />
+                            <span className="text-[9px] font-black text-slate-200 uppercase tracking-widest">{Number(sub.participacion * 100).toFixed(2)}%</span>
                           </td>
                         </tr>
                       ))}
@@ -458,56 +544,56 @@ export default function ProyectoDevengadoRealPage({ params }) {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-6 animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-[#004b98] text-white">
-               <div>
-                  <h2 className="text-2xl font-black">Equipo Responsable</h2>
-                  <p className="text-blue-100 text-xs font-bold uppercase tracking-widest mt-1">Gestión de acceso y roles del proyecto</p>
-               </div>
-               <button onClick={() => setShowMembersModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-                  <Icon name="close" className="text-2xl" />
-               </button>
+              <div>
+                <h2 className="text-2xl font-black">Equipo Responsable</h2>
+                <p className="text-blue-100 text-xs font-bold uppercase tracking-widest mt-1">Gestión de acceso y roles del proyecto</p>
+              </div>
+              <button onClick={() => setShowMembersModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                <Icon name="close" className="text-2xl" />
+              </button>
             </div>
-            
-            <div className="p-8 space-y-8">
-               {/* Current Members */}
-               <div className="space-y-4">
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#64748b]">Miembros Actuales</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                     {empleados.map((e, i) => (
-                        <div key={i} className="flex items-center gap-4 p-3 rounded-2xl bg-slate-50 border border-slate-100 hover:border-blue-200 transition-colors">
-                           <div className="w-10 h-10 rounded-full bg-[#f1f5f9] flex items-center justify-center text-xs font-bold text-[#004b98] overflow-hidden">
-                              <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(e.nombre)}&background=random&color=fff&bold=true`} alt={e.nombre} />
-                           </div>
-                           <div className="flex-1 min-w-0">
-                              <p className="text-sm font-black text-[#1e1e1e] truncate">{e.nombre}</p>
-                              <p className="text-[10px] text-slate-400 font-bold uppercase">{e.cargo || "Responsable"}</p>
-                           </div>
-                           <Icon name="verified" className="text-emerald-500 text-lg" />
-                        </div>
-                     ))}
-                  </div>
-               </div>
 
-               {/* Add New Member Section */}
-               <div className="space-y-4 pt-4 border-t border-slate-100">
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#64748b]">Asignar Nuevo Responsable</h3>
-                  <div className="flex gap-4">
-                     <select 
-                        className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#004b98] outline-none appearance-none"
-                        onChange={(e) => {
-                           if (e.target.value) handleAddMember(e.target.value);
-                        }}
-                     >
-                        <option value="">Selecciona un colaborador...</option>
-                        {allEmployees.filter(emp => !empleados.some(current => current.id === emp.id)).map(emp => (
-                           <option key={emp.id} value={emp.id}>{emp.usuario?.nombre || emp.nombre}</option>
-                        ))}
-                     </select>
-                     <div className="bg-[#f1f5f9] p-3 rounded-xl">
-                        <Icon name="person_add" className="text-[#004b98]" />
-                     </div>
+            <div className="p-8 space-y-8">
+              {/* Current Members */}
+              <div className="space-y-4">
+                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#64748b]">Miembros Actuales</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {empleados.map((e, i) => (
+                    <div key={i} className="flex items-center gap-4 p-3 rounded-2xl bg-slate-50 border border-slate-100 hover:border-blue-200 transition-colors">
+                      <div className="w-10 h-10 rounded-full bg-[#f1f5f9] flex items-center justify-center text-xs font-bold text-[#004b98] overflow-hidden">
+                        <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(e.nombre)}&background=random&color=fff&bold=true`} alt={e.nombre} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-black text-[#1e1e1e] truncate">{e.nombre}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">{e.cargo || "Responsable"}</p>
+                      </div>
+                      <Icon name="verified" className="text-emerald-500 text-lg" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add New Member Section */}
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#64748b]">Asignar Nuevo Responsable</h3>
+                <div className="flex gap-4">
+                  <select
+                    className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#004b98] outline-none appearance-none"
+                    onChange={(e) => {
+                      if (e.target.value) handleAddMember(e.target.value);
+                    }}
+                  >
+                    <option value="">Selecciona un colaborador...</option>
+                    {allEmployees.filter(emp => !empleados.some(current => current.id === emp.id)).map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.usuario?.nombre || emp.nombre}</option>
+                    ))}
+                  </select>
+                  <div className="bg-[#f1f5f9] p-3 rounded-xl">
+                    <Icon name="person_add" className="text-[#004b98]" />
                   </div>
-                  {addingMember && <p className="text-[10px] font-bold text-blue-600 animate-pulse">Procesando asignación...</p>}
-               </div>
+                </div>
+                {addingMember && <p className="text-[10px] font-bold text-blue-600 animate-pulse">Procesando asignación...</p>}
+              </div>
             </div>
           </div>
         </div>
@@ -539,9 +625,9 @@ function KPIItem({ title, val, sub, icon, color, barVal }) {
         <p className="text-[11px] font-bold text-slate-400 uppercase mt-1">{sub}</p>
       </div>
       <div className="h-1.5 w-full bg-slate-50 rounded-full overflow-hidden">
-        <div 
-           className="h-full rounded-full transition-all duration-1000" 
-           style={{ backgroundColor: color, width: `${barVal ?? 100}%` }}
+        <div
+          className="h-full rounded-full transition-all duration-1000"
+          style={{ backgroundColor: color, width: `${barVal ?? 100}%` }}
         ></div>
       </div>
     </div>
