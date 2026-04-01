@@ -117,6 +117,12 @@ export default function Sidebar() {
         roles: ["superadmin", "admin"],
       },
       {
+        href: "/rendiciones",
+        label: "Rendiciones",
+        Icon: CircleDollarSignIcon,
+        roles: ["superadmin", "admin", "empleado"],
+      },
+      {
         href: "/cotizaciones",
         label: "Cotizaciones",
         Icon: FileText,

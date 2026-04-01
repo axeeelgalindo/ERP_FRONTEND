@@ -14,6 +14,7 @@ import CotizacionesState from "@/components/cotizaciones/CotizacionesState";
 // ✅ Nuevos componentes (los creas abajo)
 import CotizacionesTableLight from "@/components/cotizaciones/CotizacionesTableLight";
 import CotizacionDrawerLight from "@/components/cotizaciones/CotizacionDrawerLight";
+import ImportRcvPanel from "@/components/compras/ImportRcvPanel";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -23,6 +24,25 @@ async function safeJson(res) {
   } catch {
     return null;
   }
+}
+
+function pickEmpresaId(session) {
+  const u = session?.user || session || {};
+  return u.empresaId ?? u.empresa_id ?? u.empresa?.id ?? u.empresa ?? null;
+}
+
+function pickToken(session) {
+  const u = session?.user || session || {};
+  return u.accessToken || session?.accessToken || "";
+}
+
+function makeHeadersMultipart(session) {
+  const token = pickToken(session);
+  const empresaId = pickEmpresaId(session);
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(empresaId ? { "x-empresa-id": String(empresaId) } : {}),
+  };
 }
 
 export default function CotizacionesPage() {
@@ -45,6 +65,11 @@ export default function CotizacionesPage() {
   const [openEdit, setOpenEdit] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [openImport, setOpenImport] = useState(false);
+
+  // RCV Import
+  const [importing, setImporting] = useState(false);
+  const [importErr, setImportErr] = useState("");
+  const [importResult, setImportResult] = useState(null);
 
   // Snackbar (mantienes tu snack MUI)
   const [snack, setSnack] = useState({
@@ -176,6 +201,37 @@ export default function CotizacionesPage() {
     }
   };
 
+  const handleImportRCV = async (file) => {
+    try {
+      setImporting(true);
+      setImportErr("");
+      setImportResult(null);
+
+      const fd = new FormData();
+      fd.append("file", file);
+
+      const res = await fetch(`${API_URL}/cotizaciones/import/rcv`, {
+        method: "POST",
+        headers: makeHeadersMultipart(session),
+        body: fd,
+      });
+
+      const data = await safeJson(res);
+      if (!res.ok) {
+        throw new Error(data?.error || data?.detalle || "Error en importación");
+      }
+
+      setImportResult(data);
+      showSnack("success", `Importación exitosa: ${data.linked} vinculados, ${data.created} creados.`);
+      fetchCotizaciones();
+    } catch (e) {
+      setImportErr(e.message);
+      showSnack("error", e.message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   // Selección actual para el drawer
   const selected = useMemo(
     () => cotizaciones.find((c) => c.id === selectedId) || null,
@@ -261,6 +317,20 @@ export default function CotizacionesPage() {
           </button>
         </div>
 
+        {/* Import RCV Section */}
+        <div className="mb-8">
+          <ImportRcvPanel
+            importing={importing}
+            importErr={importErr}
+            importResult={importResult}
+            onImportFile={handleImportRCV}
+            onClear={() => {
+              setImportErr("");
+              setImportResult(null);
+            }}
+          />
+        </div>
+
         {/* Estado general (loading/error/empty) */}
         <CotizacionesState
           status={status}
@@ -291,6 +361,7 @@ export default function CotizacionesPage() {
         onUpdateEstado={updateEstado}
         onDelete={deleteCotizacion}
         showSnack={showSnack}
+        onRefresh={() => fetchCotizaciones()}
       />
 
       {/* Dialogs que ya tienes */}

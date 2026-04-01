@@ -1,7 +1,9 @@
 // src/components/cotizaciones/CotizacionDrawerLight.jsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
+import { renderAsync } from "docx-preview";
+import * as XLSX from "xlsx";
 import {
   Menu,
   MenuItem,
@@ -23,6 +25,11 @@ import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
 import ThumbDownAltOutlinedIcon from "@mui/icons-material/ThumbDownAltOutlined";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+
+import { useSession } from "next-auth/react";
+import CircularProgress from "@mui/material/CircularProgress";
+import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 
 import CotizacionPDFButton from "./CotizacionPDFButton";
 import { fechaCL, formatCLP, nextEstados } from "@/components/cotizaciones/utils/utils";
@@ -50,8 +57,208 @@ export default function CotizacionDrawerLight({
   onUpdateEstado,
   onDelete,
   showSnack,
+  onRefresh,
 }) {
+  const { data: session } = useSession();
   const c = cotizacion;
+
+  const [uploadingDoc, setUploadingDoc] = useState(null);
+  const [viewUrl, setViewUrl] = useState(null);
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+  // Componente interno para previsualizar archivos
+  const FilePreviewer = ({ url }) => {
+    const containerRef = useRef(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [xlsxData, setXlsxData] = useState(null);
+
+    useEffect(() => {
+      if (!url) return;
+      
+      const isDocx = url.toLowerCase().endsWith(".docx");
+      const isXlsx = url.toLowerCase().endsWith(".xlsx");
+      const isPdf = url.toLowerCase().endsWith(".pdf");
+      const isImg = url.match(/\.(jpeg|jpg|gif|png)$/i);
+
+      if (!isDocx && !isXlsx) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      setXlsxData(null);
+
+      fetch(url)
+        .then((res) => {
+          if (!res.ok) throw new Error("No se pudo cargar el archivo");
+          return res.blob();
+        })
+        .then(async (blob) => {
+          if (isDocx && containerRef.current) {
+            containerRef.current.innerHTML = "";
+            await renderAsync(blob, containerRef.current, undefined, {
+              className: "docx-viewer",
+              inWrapper: false
+            });
+          } else if (isXlsx) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const data = new Uint8Array(e.target.result);
+              const workbook = XLSX.read(data, { type: "array" });
+              const firstSheetName = workbook.SheetNames[0];
+              const worksheet = workbook.Sheets[firstSheetName];
+              const html = XLSX.utils.sheet_to_html(worksheet);
+              setXlsxData(html);
+              setLoading(false);
+            };
+            reader.readAsArrayBuffer(blob);
+            return; // El loading se quita en onload
+          }
+          setLoading(false);
+        })
+        .catch((err) => {
+          console.error(err);
+          setError("Error al procesar el documento");
+          setLoading(false);
+        });
+    }, [url]);
+
+    if (url.match(/\.(jpeg|jpg|gif|png)$/i)) {
+      return (
+        <div className="w-full h-full flex items-center justify-center p-4">
+          <img src={url} alt="Documento" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: "8px" }} />
+        </div>
+      );
+    }
+
+    if (url.toLowerCase().endsWith(".pdf")) {
+      return <iframe src={url} width="100%" height="100%" title="Visor PDF" style={{ border: "none" }} />;
+    }
+
+    return (
+      <div className="relative w-full h-full overflow-auto bg-white p-4">
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/90 z-10 gap-3 flex-col">
+            <CircularProgress size={32} />
+            <p className="text-sm font-medium text-slate-500">Procesando vista previa...</p>
+          </div>
+        )}
+        
+        {error && (
+          <div className="flex flex-col items-center justify-center h-full p-8 text-center text-red-500">
+            <p>{error}</p>
+            <Button size="small" variant="outlined" color="inherit" sx={{ mt: 2 }} href={url} target="_blank" download>
+              Descargar archivo en su lugar
+            </Button>
+          </div>
+        )}
+
+        <div ref={containerRef} className="docx-preview-container" />
+        
+        {xlsxData && (
+          <div 
+            className="excel-preview-container overflow-auto"
+            dangerouslySetInnerHTML={{ __html: xlsxData }}
+            style={{ 
+              maxWidth: "100%",
+              fontSize: "12px",
+              fontFamily: "Inter, system-ui, sans-serif"
+            }}
+          />
+        )}
+
+        {!loading && !error && !xlsxData && !url.match(/\.(docx|pdf|jpeg|jpg|gif|png)$/i) && (
+          <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-white">
+            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-4">
+              <VisibilityOutlinedIcon fontSize="large" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-800 mb-2">Previsualización no disponible</h3>
+            <p className="text-slate-500 mb-6 max-w-sm">
+              Este formato de archivo no puede procesarse en el navegador. Por favor, descárgalo para verlo.
+            </p>
+            <Button variant="contained" href={url} target="_blank" download>
+              Descargar Archivo
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const handleDocUpload = async (e, docType) => {
+    const file = e.target.files?.[0];
+    if (!file || !c?.id) return;
+
+    try {
+      setUploadingDoc(docType);
+      const fd = new FormData();
+      fd.append("file", file);
+
+      const token = session?.user?.accessToken || session?.accessToken || "";
+      const empresaId = session?.user?.empresaId ?? session?.user?.empresa_id ?? session?.user?.empresa?.id ?? null;
+
+      const headers = {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(empresaId ? { "x-empresa-id": String(empresaId) } : {}),
+      };
+
+      const res = await fetch(`${API_URL}/cotizaciones/${c.id}/upload/${docType}`, {
+        method: "POST",
+        headers,
+        body: fd
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Error al subir documento");
+      }
+
+      showSnack("success", "Documento subido correctamente");
+      onRefresh?.();
+    } catch (err) {
+      showSnack("error", err.message);
+    } finally {
+      setUploadingDoc(null);
+      e.target.value = "";
+    }
+  };
+
+  const DocButton = ({ docType, label, url }) => {
+    const isUploading = uploadingDoc === docType;
+    return (
+      <div className="flex items-center justify-between p-3 border border-slate-200 rounded-xl bg-white shadow-sm">
+        <span className="text-sm font-semibold text-slate-700">{label}</span>
+        <div className="flex items-center gap-2">
+          {url ? (
+            <button
+              onClick={() => setViewUrl(`${API_URL?.replace("/api", "")}/api${url}`)}
+              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold"
+              title="Ver documento"
+            >
+              <VisibilityOutlinedIcon fontSize="small" /> Ver
+            </button>
+          ) : (
+            <span className="text-xs text-slate-400 font-medium px-2">Sin doc</span>
+          )}
+
+          <label className={`relative p-1.5 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer ${isUploading ? "text-slate-400" : "text-slate-600 hover:bg-slate-100"}`}>
+            {isUploading ? <CircularProgress size={16} color="inherit" /> : <FileUploadOutlinedIcon fontSize="small" />}
+            {isUploading ? "Subiendo" : "Subir"}
+            <input
+              type="file"
+              className="hidden"
+              accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"
+              onChange={(e) => handleDocUpload(e, docType)}
+              disabled={isUploading}
+            />
+          </label>
+        </div>
+      </div>
+    );
+  };
+
 
   const items = useMemo(() => {
     if (Array.isArray(c?.glosas)) return c.glosas;
@@ -449,6 +656,22 @@ export default function CotizacionDrawerLight({
               </table>
             </div>
           </div>
+
+          {/* Documentos Adjuntos */}
+          <div>
+            <div className="flex items-center justify-between mb-4 mt-8">
+              <h4 className="text-sm font-bold uppercase tracking-wider text-slate-500">
+                Documentos Adjuntos
+              </h4>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <DocButton docType="oc" label="Orden de Compra (OC)" url={c?.doc_oc_url} />
+              <DocButton docType="hes" label="Hoja de Ejecución (HES)" url={c?.doc_hes_url} />
+              <DocButton docType="fac" label="Factura (FAC)" url={c?.doc_fac_url} />
+              <DocButton docType="comprobante" label="Comprobante de Pago" url={c?.doc_comprobante_url} />
+              <DocButton docType="gd" label="Guía de Despacho (GD)" url={c?.doc_gd_url} />
+            </div>
+          </div>
         </div>
 
         {/* Footer botones */}
@@ -653,6 +876,25 @@ export default function CotizacionDrawerLight({
             Sí, eliminar
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* Modal Visor de Documentos */}
+      <Dialog
+        open={!!viewUrl}
+        onClose={() => setViewUrl(null)}
+        maxWidth="md"
+        fullWidth
+        sx={{ zIndex: (t) => t.zIndex.modal + 30 }}
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Visor de Documento</span>
+          <Button onClick={() => setViewUrl(null)} color="inherit" size="small">
+            Cerrar
+          </Button>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0, height: "75vh", backgroundColor: "#f8fafc", overflow: "hidden" }}>
+          {viewUrl && <FilePreviewer url={viewUrl} />}
+        </DialogContent>
       </Dialog>
     </>
   );

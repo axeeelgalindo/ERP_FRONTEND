@@ -15,6 +15,10 @@ export function estadoColor(estado) {
       return "info";
     case "ORDEN_VENTA":
       return "primary";
+    case "ENTREGADO":
+      return "secondary";
+    case "POR_FACTURAR":
+      return "warning";
     case "FACTURADA":
       return "warning";
     case "PAGADA":
@@ -29,7 +33,9 @@ export function estadoColor(estado) {
 export function nextEstados(estadoActual) {
   if (estadoActual === "COTIZACION") return ["ACEPTADA"];
   if (estadoActual === "ACEPTADA") return ["ORDEN_VENTA"];
-  if (estadoActual === "ORDEN_VENTA") return ["FACTURADA"];
+  if (estadoActual === "ORDEN_VENTA") return ["ENTREGADO"];
+  if (estadoActual === "ENTREGADO") return ["POR_FACTURAR"];
+  if (estadoActual === "POR_FACTURAR") return ["FACTURADA"];
   if (estadoActual === "FACTURADA") return ["PAGADA"];
   // ✅ finales: PAGADA, RECHAZADA, etc.
   return [];

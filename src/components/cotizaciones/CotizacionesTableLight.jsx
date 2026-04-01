@@ -86,14 +86,15 @@ export default function CotizacionesTableLight({
               <th className="px-6 py-4 text-right">Subtotal</th>
               <th className="px-6 py-4 text-right">IVA</th>
               <th className="px-6 py-4 text-right">Total</th>
+              <th className="px-6 py-4 text-center">Avance Pago</th>
               <th className="px-6 py-4 text-center">PDF</th>
-
             </tr>
           </thead>
 
           <tbody className="divide-y divide-slate-100">
             {rows.map((c) => {
               const siguiente = getSiguienteEstado(c);
+              const pct = c.avance_pago_pct || 0;
 
               return (
                 <tr
@@ -127,6 +128,22 @@ export default function CotizacionesTableLight({
 
                   <td className="px-6 py-4 text-sm text-right font-bold">
                     {formatCLP(c.total)}
+                  </td>
+
+                  <td className="px-6 py-4 text-center">
+                    <div className="flex flex-col items-center gap-1 min-w-[80px]">
+                      <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-500 ${
+                            pct >= 100 ? "bg-emerald-500" : "bg-blue-500"
+                          }`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-500">
+                        {pct.toFixed(1)}%
+                      </span>
+                    </div>
                   </td>
 
                   <td
