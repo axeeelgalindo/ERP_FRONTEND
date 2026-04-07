@@ -17,9 +17,10 @@ export default function RootLayout({ children }) {
   return (
     <html lang="es">
       <head>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
       </head>
-      <body className="bg-gray-50 text-gray-900 font-sans min-h-screen">
+      <body className="bg-surface text-on-surface font-inter min-h-screen">
         <div id="sidebar-slot" />
 
         <main className="transition-[padding] duration-300 ease-in-out">

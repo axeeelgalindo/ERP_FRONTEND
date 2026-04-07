@@ -110,6 +110,7 @@ export default function RendicionModal({
 
   // form create
   const [r_desc, setR_desc] = useState("");
+  const [r_montoEntregado, setR_montoEntregado] = useState("");
   const [r_empleadoId, setR_empleadoId] = useState("");
   const [r_items, setR_items] = useState([
     {
@@ -240,6 +241,7 @@ export default function RendicionModal({
 
   function resetCreateForm() {
     setR_desc("");
+    setR_montoEntregado("");
     setR_items([
       {
         fecha: "",
@@ -382,6 +384,7 @@ export default function RendicionModal({
         destino,
         centro_costo: destino === "PROYECTO" ? null : centro,
         descripcion: r_desc,
+        monto_entregado: Number(r_montoEntregado || 0),
         estado: "pendiente",
         items,
       };
@@ -835,9 +838,27 @@ export default function RendicionModal({
                           className="w-full rounded-lg border-slate-200   focus:ring-slate-900 focus:border-slate-900"
                           placeholder="Ej: Rendición compra de materiales..."
                           rows={3}
-                          value={r_desc}
-                          onChange={(e) => setR_desc(e.target.value)}
                         />
+                      </div>
+
+                      <div className="pt-2">
+                        <label className="block text-sm font-semibold text-slate-700 mb-1">
+                          Monto Entregado (Anticipo)
+                        </label>
+                        <div className="relative">
+                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                           <input
+                            className="w-full pl-7 rounded-lg border-slate-200 focus:ring-slate-900 focus:border-slate-900"
+                            placeholder="0"
+                            type="number"
+                            min={0}
+                            value={r_montoEntregado}
+                            onChange={(e) => setR_montoEntregado(e.target.value)}
+                           />
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Dinero entregado como adelanto al empleado.
+                        </p>
                       </div>
                     </div>
 
@@ -861,7 +882,19 @@ export default function RendicionModal({
                           </span>
                         </div>
 
-                        <div className="pt-2 border-t border-slate-200 ">
+                        <div className="flex justify-between items-center pt-2 border-t border-slate-200">
+                          <span className="text-sm font-bold text-slate-600">Balance:</span>
+                          <div className="text-right">
+                             <div className="text-sm font-black text-slate-900">
+                                {toCLP(totalItems - Number(r_montoEntregado || 0))}
+                             </div>
+                             <div className="text-[10px] text-slate-400 uppercase font-bold tracking-tighter">
+                                {totalItems >= Number(r_montoEntregado || 0) ? "A Reembolsar" : "A Devolver"}
+                             </div>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-100 ">
                           <p className="text-xs italic text-slate-400">
                             {compraInfo.destino === "PROYECTO"
                               ? "Requiere proyecto_id (se toma desde la compra)."

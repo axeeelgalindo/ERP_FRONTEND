@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import RendicionKpis from "@/components/rendiciones/RendicionKpis";
 import RendicionTable from "@/components/rendiciones/RendicionTable";
 import RendicionDetailDrawer from "@/components/rendiciones/RendicionDetailDrawer";
+import IndependentRendicionModal from "@/components/rendiciones/IndependentRendicionModal";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -23,6 +24,16 @@ function makeHeaders(session) {
   };
 }
 
+function toCLP(v) {
+  const n = Number(v ?? 0);
+  if (!Number.isFinite(n)) return "$0";
+  return n.toLocaleString("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    maximumFractionDigits: 0,
+  });
+}
+
 export default function RendicionesPage() {
   const { data: session, status } = useSession();
 
@@ -38,6 +49,7 @@ export default function RendicionesPage() {
 
   const [selectedRendicion, setSelectedRendicion] = useState(null);
   const [openDrawer, setOpenDrawer] = useState(false);
+  const [openCreate, setOpenCreate] = useState(false);
   const [updating, setUpdating] = useState(false);
 
   async function loadData() {
@@ -65,6 +77,12 @@ export default function RendicionesPage() {
 
       setData(payload.data || []);
       setTotal(payload.total || 0);
+
+      // ✅ Mantener el drawer sincronizado si está abierto
+      if (openDrawer && selectedRendicion) {
+        const updated = payload.data?.find(r => r.id === selectedRendicion.id);
+        if (updated) setSelectedRendicion(updated);
+      }
     } catch (e) {
       setErr(e.message);
     } finally {
@@ -145,8 +163,9 @@ export default function RendicionesPage() {
   }
 
   function handlePagar(r) {
-    if (confirm(`¿Marcar la rendición RD-${String(r.id).slice(-6).toUpperCase()} como PAGADA?`)) {
-      handleUpdateStatus(r.id, "pagada");
+    const balance = Math.abs((r.monto_total || 0) - (r.monto_entregado || 0));
+    if (confirm(`¿Marcar la rendición RD-${String(r.id).slice(-6).toUpperCase()} como PAGADA por un total de ${toCLP(balance)}?`)) {
+      handleUpdatePaidAmount(r.id, balance);
     }
   }
 
@@ -159,6 +178,14 @@ export default function RendicionesPage() {
             Visualiza y gestiona las devoluciones de gastos de tus empleados.
           </p>
         </div>
+
+        <button 
+          onClick={() => setOpenCreate(true)}
+          className="flex items-center gap-2 px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-slate-200 transition-all active:scale-95"
+        >
+          <span className="text-lg">＋</span>
+          Nueva Rendición
+        </button>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="relative flex-1 md:w-64">
@@ -217,7 +244,17 @@ export default function RendicionesPage() {
         onClose={() => setOpenDrawer(false)}
         onUpdateStatus={handleUpdateStatus}
         onUpdatePaidAmount={handleUpdatePaidAmount}
+        onRefresh={loadData}
         loading={updating}
+        session={session}
+      />
+
+      <IndependentRendicionModal
+        open={openCreate}
+        onClose={() => setOpenCreate(false)}
+        session={session}
+        apiBase={API}
+        onSaved={loadData}
       />
     </div>
   );

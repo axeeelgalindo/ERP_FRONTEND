@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export default function NavItem({ href, label, Icon, open, onNavigate }) {
+export default function NavItem({ href, label, icon, open, onNavigate }) {
   const pathname = usePathname();
   const isActive =
     href === "/"
@@ -17,22 +17,23 @@ export default function NavItem({ href, label, Icon, open, onNavigate }) {
         onClick={onNavigate}
         aria-current={isActive ? "page" : undefined}
         className={[
-          "group flex items-center gap-3 px-3 py-2 rounded-lg transition",
+          "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
           isActive
-            ? "bg-blue-50 text-blue-700 ring-1 ring-blue-100"
-            : "text-gray-700 hover:bg-gray-100",
+            ? "text-blue-700 border-r-4 border-blue-700 font-semibold bg-slate-200/50"
+            : "text-slate-600 hover:text-blue-600 hover:bg-slate-200/50",
         ].join(" ")}
         title={!open ? label : undefined}
       >
-        {Icon ? (
-          <Icon
-            size={20}
-            className={
-              isActive
-                ? "text-blue-700"
-                : "text-gray-600 group-hover:text-gray-800"
-            }
-          />
+        {icon ? (
+          <span
+            className="material-symbols-outlined shrink-0"
+            style={{
+               fontVariationSettings: isActive ? "'FILL' 1" : "'FILL' 0",
+               fontSize: '24px'
+            }}
+          >
+            {icon}
+          </span>
         ) : null}
         {open && <span className="text-sm font-medium truncate">{label}</span>}
       </Link>

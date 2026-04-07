@@ -114,22 +114,40 @@ export default function RendicionTable({
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <div className="text-lg font-black text-slate-900 leading-none">
-                    {toCLP(r.monto_total)}
-                  </div>
-                  {r.monto_pagado > 0 && r.monto_pagado < r.monto_total && (
-                    <div className="text-[10px] font-bold text-emerald-600 mt-1 uppercase tracking-tighter">
-                      Pagado: {toCLP(r.monto_pagado)}
+                  <div className="flex flex-col gap-1">
+                    <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                      <span>Rendido:</span>
+                      <span className="text-slate-900">{toCLP(r.monto_total)}</span>
                     </div>
-                  )}
-                  {r.monto_pagado > 0 && r.monto_pagado < r.monto_total && (
-                     <div className="w-full bg-slate-100 h-1 rounded-full mt-1 overflow-hidden">
-                        <div 
-                          className="bg-emerald-500 h-full transition-all" 
-                          style={{ width: `${(r.monto_pagado / r.monto_total) * 100}%` }}
-                        />
-                     </div>
-                  )}
+                    <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                      <span>Anticipo:</span>
+                      <span className={r.monto_entregado > 0 ? "text-slate-600" : ""}>{toCLP(r.monto_entregado)}</span>
+                    </div>
+                    
+                    {/* Balance */}
+                    <div className="pt-1 border-t border-slate-100 flex justify-between items-center">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Saldo:</span>
+                      <span className={`text-sm font-black ${(r.monto_total - r.monto_entregado) > 0 ? "text-blue-600" : (r.monto_total - r.monto_entregado) < 0 ? "text-rose-600" : "text-slate-400"}`}>
+                        {toCLP(r.monto_total - r.monto_entregado)}
+                      </span>
+                    </div>
+
+                    {/* Barra de pago real (reembolso) */}
+                    {r.monto_pagado > 0 && (
+                      <div className="mt-1">
+                        <div className="flex justify-between items-center text-[9px] font-bold text-emerald-600 uppercase tracking-tighter">
+                          <span>Liquidado:</span>
+                          <span>{toCLP(r.monto_pagado)}</span>
+                        </div>
+                        <div className="w-full bg-slate-100 h-1 rounded-full mt-0.5 overflow-hidden">
+                           <div 
+                             className="bg-emerald-500 h-full transition-all" 
+                             style={{ width: `${Math.min(100, (r.monto_pagado / Math.abs(r.monto_total - r.monto_entregado || 1)) * 100)}%` }}
+                           />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </td>
                 <td className="px-6 py-4 text-sm font-medium">
                   <span className={`px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${getEstadoColor(r.estado)}`}>

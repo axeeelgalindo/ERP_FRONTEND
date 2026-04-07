@@ -719,7 +719,18 @@ export default function useVentaForm({
       const descI = normalizeDescPctUI(d?.descuentoPct);
       const descIMult = 1 - descI / 100;
 
-      return { costoBase, ventaBaseActual, descI, descIMult };
+      // ✅ NUEVO: Guardamos el costo sin CIF para la utilidad
+      let costoSinAlphaNeto = 0;
+      if (d?.modo === "HH") {
+        const hh = findHHForEmpleado(d?.empleadoId);
+        const costoHH = hh?.costoHH != null ? Number(hh.costoHH) : 0;
+        costoSinAlphaNeto = cantidad > 0 ? costoHH * cantidad : 0;
+      } else {
+        costoSinAlphaNeto = costoSinAlpha; // COMPRA no tiene CIF
+      }
+      const costoLineNeto = costoSinAlphaNeto * alphaMult;
+
+      return { costoBase, ventaBaseActual, descI, descIMult, costoLineNeto };
     });
 
     const totalCostoBase = linesBase.reduce((acc, x) => acc + (Number(x.costoBase) || 0), 0);
@@ -729,22 +740,17 @@ export default function useVentaForm({
     );
 
     const uPct = utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo);
+    const targetU = uPct != null && Number.isFinite(uPct) && uPct >= 0 ? uPct / 100 : 0;
+
+    // ✅ NUEVO: Cálculo de Venta basado en Markup sobre Costo Neto (sin CIF)
+    // totalVentaTarget = Sum(CostoTotalLine + CostoNetoLine * targetU)
+    const totalCostoFinalBase = linesBase.reduce((acc, x) => acc + (Number(x.costoBase) || 0), 0);
+    const totalProfitTarget = linesBase.reduce((acc, x) => acc + (Number(x.costoLineNeto || 0) * targetU), 0);
+    const totalVentaTarget = totalCostoFinalBase + totalProfitTarget;
+
     let k = 1;
-
-    if (uPct != null && Number.isFinite(uPct) && uPct >= 0) {
-      const u = uPct / 100;
-      const denom = 1 - u;
-      // safety: limit u to 99.99 via normalize, but check denom here too
-      const ventaObjetivoBase = denom > 0.0001 ? totalVentaActualBase / denom : totalVentaActualBase * 100;
-
-      if (
-        ventaObjetivoBase != null &&
-        Number.isFinite(ventaObjetivoBase) &&
-        ventaObjetivoBase > 0 &&
-        totalVentaActualBase > 0
-      ) {
-        k = ventaObjetivoBase / totalVentaActualBase;
-      }
+    if (totalCostoFinalBase > 0) {
+      k = totalVentaTarget / totalCostoFinalBase;
     }
 
     const kk = Number.isFinite(k) ? k : 1;
@@ -752,8 +758,9 @@ export default function useVentaForm({
     const lines = linesBase.map((x) => {
       const costoTotal = Number(x.costoBase) || 0;
 
-      // post-k (bruto)
-      const bruto = (Number(x.ventaBaseActual) || 0) * kk;
+      // ✅ NUEVO: Aplicamos Markup sobre Neto de forma precisa por línea
+      // VentaBrutaLine = CostoTotalLine + (CostoNetoLine * targetU)
+      const bruto = costoTotal + (x.costoLineNeto * targetU);
 
       // descuentos: item + general
       const neto = bruto * (x.descIMult ?? 1) * descGMult;
@@ -812,23 +819,30 @@ export default function useVentaForm({
   }, [selectedOrdenVenta, preview.total]);
 
   const adjustToQuote = () => {
-    if (!selectedOrdenVenta || !preview.baseVenta) return;
-    
-    // Queremos que QuoteTotal = baseVenta / (1 - u)
-    // 1 - u = baseVenta / QuoteTotal
-    // u = 1 - (baseVenta / QuoteTotal)
-    // uPct = 100 * (1 - (baseVenta / QuoteTotal))
-    
+    if (!selectedOrdenVenta || !preview.baseCosto) return;
+
     const targetTotal = selectedOrdenVenta.total || 0;
-    const baseVenta = preview.baseVenta || 0; // sum(costo * alpha)
+    const totalCosto = preview.baseCosto || 0;
     
-    if (targetTotal <= 0 || baseVenta <= 0) return;
+    // ✅ Cálculo de Markup basado en el nuevo modelo:
+    // ProfitGoal = TargetTotal - TotalCosto
+    // markup = ProfitGoal / TotalCostoNeto (sin CIF)
     
-    const u = 1 - (baseVenta / targetTotal);
-    const uPct = Math.max(0, u * 100);
-    
-    if (uPct < 100) {
-      setUtilidadPctObjetivo(uPct.toFixed(2));
+    const profitGoal = targetTotal - totalCosto;
+    const totalNeto = (detalles || []).reduce((acc, d) => {
+      const cantidad = (d.cantidad !== null && d.cantidad !== undefined && d.cantidad !== "") ? Number(d.cantidad) : 1;
+      const alphaMult = 1 + normalizeAlphaPctUI(d.alphaPct) / 100;
+      if (d.modo === "HH") {
+        const hh = findHHForEmpleado(d.empleadoId);
+        return acc + ((hh?.costoHH || 0) * cantidad * alphaMult);
+      }
+      const manualPU = getManualPUNumber(d);
+      return acc + (manualPU * cantidad * alphaMult);
+    }, 0);
+
+    if (totalNeto > 0) {
+      const markupPct = (profitGoal / totalNeto) * 100;
+      setUtilidadPctObjetivo(Math.max(0, markupPct).toFixed(2));
     }
   };
 

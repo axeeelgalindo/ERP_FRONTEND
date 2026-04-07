@@ -4,27 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import NavItem from "./NavItem";
-import {
-  Menu,
-  X,
-  LogOut,
-  Building2,
-  Users,
-  FolderKanban,
-  ShoppingCart,
-  FileSpreadsheet,
-  FileText,
-  Home,
-  IdCardIcon,
-  CircleDollarSignIcon
-  
-} from "lucide-react";
+import { Menu, X } from "lucide-react";
 
 /**
- * Sidebar responsive + role-based
- * - Desktop (≥1024px): fijo a la izquierda, se colapsa/expande (w-20 ↔ w-64).
- * - Mobile: botón hamburguesa arriba; se despliega hacia abajo con overlay difuminado.
- * - Ajuste del contenedor principal: define --app-sb (padding-left) y --app-topbar (padding-top en mobile).
+ * Sidebar responsive + premium "Blue Ingeniería" redesign
  */
 export default function Sidebar() {
   const { data: session } = useSession();
@@ -65,86 +48,85 @@ export default function Sidebar() {
       {
         href: "/",
         label: "Inicio",
-        Icon: Home,
+        icon: "dashboard",
         roles: ["superadmin", "admin", "user"],
       },
       {
         href: "/clientes",
         label: "Clientes",
-        Icon: Users,
-        roles: ["superadmin", "admin", "user", "empleado" ],
+        icon: "group",
+        roles: ["superadmin", "admin", "user", "empleado"],
       },
       {
         href: "/proveedores",
         label: "Proveedores",
-        Icon: Building2,
+        icon: "conveyor_belt",
         roles: ["superadmin", "admin"],
       },
       {
         href: "/productos",
         label: "Productos",
-        Icon: ShoppingCart,
+        icon: "inventory_2",
         roles: ["superadmin", "admin"],
       },
       {
         href: "/proyectos",
         label: "Proyectos",
-        Icon: FolderKanban,
+        icon: "account_tree",
         roles: ["superadmin", "admin"],
       },
       {
         href: "/empleados",
         label: "Empleados",
-        Icon: IdCardIcon,
+        icon: "badge",
         roles: ["superadmin", "admin"],
       },
       {
         href: "/hh",
         label: "HH",
-        Icon: CircleDollarSignIcon,
+        icon: "timer",
         roles: ["superadmin", "admin"],
       },
       {
         href: "/costeos",
         label: "Costeos",
-        Icon: FileText,
+        icon: "payments",
         roles: ["superadmin", "admin", "user", "empleado"],
       },
       {
         href: "/compras",
         label: "Compras",
-        Icon: FileSpreadsheet,
+        icon: "shopping_cart",
         roles: ["superadmin", "admin"],
       },
       {
         href: "/rendiciones",
         label: "Rendiciones",
-        Icon: CircleDollarSignIcon,
+        icon: "receipt_long",
         roles: ["superadmin", "admin", "empleado"],
       },
       {
         href: "/cotizaciones",
         label: "Cotizaciones",
-        Icon: FileText,
+        icon: "request_quote",
         roles: ["superadmin", "admin", "user", "empleado"],
       },
       {
         href: "/empresas",
         label: "Empresas",
-        Icon: Building2,
+        icon: "domain",
         roles: ["superadmin"],
-      }, // solo superadmin crea/gestiona empresas
+      },
       {
         href: "/usuarios",
         label: "Usuarios",
-        Icon: Users,
+        icon: "manage_accounts",
         roles: ["superadmin"],
       },
-      , // solo superadmin crea/gestiona empresas
       {
         href: "/admin/folio-cotizaciones",
         label: "Folio Cotizaciones",
-        Icon: FileText,
+        icon: "description",
         roles: ["superadmin"],
       },
     ];
@@ -154,12 +136,8 @@ export default function Sidebar() {
       return all.filter((i) => i.roles.includes("empleado"));
     if (rol === "cliente")
       return all.filter((i) => i.roles.includes("cliente"));
-    // por defecto, deja lo básico
-    return all.filter(
-      (i) =>
-        ["superadmin", "admin", "empleado", "cliente"].includes("empleado") &&
-        i.roles.includes("empleado")
-    );
+
+    return all.filter((i) => i.roles.includes("empleado"));
   }, [rol]);
 
   function closeOnMobile() {
@@ -183,7 +161,7 @@ export default function Sidebar() {
             {open ? <X size={20} /> : <Menu size={20} />}
           </button>
           <div className="text-sm font-semibold">ERP Blueinge</div>
-          <div className="w-9 "/>
+          <div className="w-9 " />
         </div>
       )}
 
@@ -199,68 +177,74 @@ export default function Sidebar() {
       {/* Sidebar */}
       <aside
         className={[
-          "fixed z-40 bg-white border-r border-gray-200 shadow-lg transition-all duration-300 ease-in-out",
+          "fixed z-40 bg-slate-50 border-r border-outline-variant/10 shadow-lg transition-all duration-300 ease-in-out flex flex-col",
           isDesktop
-            ? "top-0 left-0 h-screen " + (open ? "w-64" : "w-20")
-            : "top-12 left-0 w-full max-h-[70vh] overflow-auto",
+            ? "top-0 left-0 h-screen py-6 px-4 " + (open ? "w-64" : "w-20")
+            : "top-12 left-0 w-full max-h-[70vh] overflow-auto px-4 py-6",
           !isDesktop && !open
             ? "opacity-0 pointer-events-none -translate-y-2"
             : "opacity-100 translate-y-0",
         ].join(" ")}
         aria-label="Barra lateral de navegación"
       >
-        {/* Header dentro del sidebar (solo desktop) */}
-        {isDesktop && (
-          <div className="p-4 flex items-center justify-between border-b border-gray-100">
-            <span className="text-base font-semibold truncate">
-              ERP Blueinge
-            </span>
-            <button
-              onClick={() => setOpen((o) => !o)}
-              className="p-1 rounded hover:bg-gray-100 transition"
-              aria-label={open ? "Colapsar" : "Expandir"}
-            >
-              {open ? <X size={18} /> : <Menu size={18} />}
-            </button>
+        {/* Header / Brand */}
+        <div className={`flex items-center gap-3 mb-6 ${open ? "px-2" : "justify-center"}`}>
+          <div className="w-10 h-10 shrink-0 rounded-lg bg-primary flex items-center justify-center text-on-primary">
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>architecture</span>
           </div>
-        )}
-
-        {/* Navegación */}
-        <nav className="p-3">
-          <ul className="space-y-1">
-            {navItems.map((item) => (
-              <NavItem
-                key={item.href}
-                href={item.href}
-                label={item.label}
-                Icon={item.Icon}
-                open={open}
-                onNavigate={closeOnMobile}
-              />
-            ))}
-          </ul>
-        </nav>
-
-        {/* Footer acciones */}
-        <div className="mt-auto p-3 border-t border-gray-100">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-red-600 hover:bg-red-50"
-          >
-            <LogOut size={18} />
-            {open && <span className="text-sm font-medium">Cerrar sesión</span>}
-          </button>
-
-          {/* Perfil / empresa actual (opcional) */}
-          {open && session?.user?.empresaNombre && (
-            <div className="mt-3 text-xs text-gray-500">
-              Empresa:{" "}
-              <span className="font-medium text-gray-700">
-                {session.user.empresaNombre}
-              </span>
+          {open && (
+            <div>
+              <h1 className="text-lg font-bold tracking-tighter text-blue-900 leading-none">Blue Ingeniería</h1>
             </div>
           )}
         </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 flex flex-col gap-1 overflow-y-auto pr-1">
+          {navItems.map((item) => (
+            <NavItem
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              icon={item.icon}
+              open={open}
+              onNavigate={closeOnMobile}
+            />
+          ))}
+        </nav>
+
+        {/* Footer actions */}
+        <div className={`pt-4 mt-4 border-t border-slate-200 ${!open && isDesktop ? "flex justify-center" : ""}`}>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:text-error hover:bg-error-container/20 transition-all duration-200"
+          >
+            <span className="material-symbols-outlined">logout</span>
+            {open && <span className="text-sm font-medium">Logout</span>}
+          </button>
+
+          {/* Perfil / empresa actual */}
+          {open && session?.user?.empresaNombre && (
+            <div className="mt-3 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-bold">
+              {session.user.empresaNombre}
+            </div>
+          )}
+        </div>
+
+        {/* Toggle Collapse (Desktop only) */}
+        {isDesktop && (
+          <button
+            onClick={() => setOpen((o) => !o)}
+            className="absolute -right-5 top-7 w-10 h-10 bg-white border border-outline-variant/30 rounded-full shadow-lg flex items-center justify-center text-slate-500 hover:text-primary hover:scale-110 active:scale-95 transition-all duration-200 z-50 cursor-pointer group"
+            aria-label={open ? "Colapsar" : "Expandir"}
+          >
+            <div className={`transition-transform duration-300 ${open ? "" : "rotate-180"}`}>
+               <span className="material-symbols-outlined text-[24px] font-bold">
+                 chevron_left
+               </span>
+            </div>
+          </button>
+        )}
       </aside>
     </>
   );
