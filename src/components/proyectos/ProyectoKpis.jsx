@@ -1,9 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
-import { ClipboardList, CircleDollarSign, User2, Layers3 } from "lucide-react";
-import { AdvancedMetricsCard, Row, Bar } from "./ProyectoUI";
-import { formatCurrencyCLP, formatPercent } from "@/lib/formatters";
+import { useState, useMemo } from "react";
+import { ClipboardList, Calendar, Layers3, AlertTriangle, MessageSquarePlus, ChevronDown, ChevronUp, History } from "lucide-react";
+import { Row, Bar } from "./ProyectoUI";
+import { formatPercent } from "@/lib/formatters";
+import { makeHeaders } from "@/lib/api";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 /**
  * Normalizadores seguros
@@ -192,16 +195,20 @@ function computeKpisFromItems(items = []) {
       subtareasCompletas: subtDone,
       subtareasEnCurso: subtProgress,
       subtareasPendientes: subtPending,
-      porcentajeCompletado:
-        totalSubtareas > 0 ? clampPct((subtDone / totalSubtareas) * 100) : 0, // 0-100
     },
+    extra: {
+      tareasExtraPlanificacion: tareasArr.filter(t => t.es_planificado === false).length,
+      subtareasExtraPlanificacion: tareasArr.flatMap(t => getDetalles(t)).filter(d => d.es_planificado === false).length
+    }
   };
 }
 
-export default function ProyectoKpis({ fin, tareas, clientePrincipal, items = [] }) {
-  // ✅ defaults para que NUNCA reviente
-  const finSafe = fin || {};
-  const tareasSafe = tareas || {};
+export default function ProyectoKpis({ proyecto = {}, items = [] }) {
+  const router = useRouter();
+  const { data: session } = useSession();
+  const [comentarioRetraso, setComentarioRetraso] = useState("");
+  const [isSavingComentario, setIsSavingComentario] = useState(false);
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
 
   // ✅ KPIs reales desde items (tareas + subtareas + épicas)
   const computed = useMemo(() => computeKpisFromItems(items), [items]);
@@ -209,138 +216,179 @@ export default function ProyectoKpis({ fin, tareas, clientePrincipal, items = []
   // ✅ si el backend ya te manda "tareas", lo respetamos pero completamos con computed
   // (si no viene, usamos computed)
   const tareasFinal = {
-    totalTareas: tareasSafe.totalTareas ?? computed.tareas.totalTareas,
-    tareasCompletas: tareasSafe.tareasCompletas ?? computed.tareas.tareasCompletas,
-    tareasEnCurso: tareasSafe.tareasEnCurso ?? computed.tareas.tareasEnCurso,
-    tareasPendientes: tareasSafe.tareasPendientes ?? computed.tareas.tareasPendientes,
-    avancePromedio: tareasSafe.avancePromedio ?? computed.tareas.avancePromedio,
-    porcentajeCompletado:
-      tareasSafe.porcentajeCompletado ?? computed.tareas.porcentajeCompletado,
+    totalTareas: computed.tareas.totalTareas,
+    tareasCompletas: computed.tareas.tareasCompletas,
+    tareasEnCurso: computed.tareas.tareasEnCurso,
+    tareasPendientes: computed.tareas.tareasPendientes,
+    avancePromedio: computed.tareas.avancePromedio,
+    porcentajeCompletado: computed.tareas.porcentajeCompletado,
   };
 
   // Ojo: formatPercent -> asumimos que quiere 0..100
   const pct = (v) => formatPercent(clampPct(v));
+  
+  const fInicio = proyecto?.fecha_inicio_plan ? new Date(proyecto.fecha_inicio_plan).toLocaleDateString() : "No definida";
+  const fFin = proyecto?.fecha_fin_plan ? new Date(proyecto.fecha_fin_plan).toLocaleDateString() : "No definida";
+  
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const finPlanDate = proyecto?.fecha_fin_plan ? new Date(proyecto.fecha_fin_plan) : null;
+  if (finPlanDate) finPlanDate.setHours(0,0,0,0);
+  
+  const isDelayed = finPlanDate && today > finPlanDate && clampPct(tareasFinal.porcentajeCompletado) < 100;
+
+  let delayedDays = 0;
+  if (finPlanDate) {
+    if (clampPct(tareasFinal.porcentajeCompletado) < 100) {
+      if (today > finPlanDate) {
+        delayedDays = Math.ceil((today.getTime() - finPlanDate.getTime()) / (1000 * 3600 * 24));
+      }
+    } else {
+      const finRealDate = proyecto?.fecha_fin_real ? new Date(proyecto.fecha_fin_real) : null;
+      if (finRealDate) {
+        finRealDate.setHours(0,0,0,0);
+        if (finRealDate > finPlanDate) {
+          delayedDays = Math.ceil((finRealDate.getTime() - finPlanDate.getTime()) / (1000 * 3600 * 24));
+        }
+      }
+    }
+  }
+
+  const fInicioReal = proyecto?.fecha_inicio_real ? new Date(proyecto.fecha_inicio_real).toLocaleDateString() : (clampPct(tareasFinal.avancePromedio) > 0 ? "En curso" : "No iniciada");
+  const fFinReal = proyecto?.fecha_fin_real ? new Date(proyecto.fecha_fin_real).toLocaleDateString() : (clampPct(tareasFinal.porcentajeCompletado) >= 100 ? "Completada sin fecha" : "Pendiente");
+
+  // Validate if we should ask for a delay comment
+  // "Solo aparece cuando no hay epicas, tareas, subtareas planificadas y/o fuera de planificacion"
+  let hasOngoingTasksCoveringToday = false;
+  if (isDelayed) {
+    const checkCoveringToday = (itemsArr) => {
+      for (const t of itemsArr) {
+        if (estadoOf(t) === "completada" || clampPct(t.avance) >= 100) continue;
+        const eDate = t.fecha_fin_real ? new Date(t.fecha_fin_real) : t.fecha_fin_plan ? new Date(t.fecha_fin_plan) : null;
+        if (eDate) {
+          eDate.setHours(0,0,0,0);
+          if (eDate >= today) {
+            hasOngoingTasksCoveringToday = true;
+            break;
+          }
+        }
+      }
+    };
+    checkCoveringToday(items);
+    if (!hasOngoingTasksCoveringToday) {
+      const allSubtareas = items.flatMap(t => t.detalles || t.detalle || t.tareasDetalle || []);
+      checkCoveringToday(allSubtareas);
+    }
+  }
+
+  const showDelayCommentInput = isDelayed && !hasOngoingTasksCoveringToday;
+
+  const handleSaveComentario = async () => {
+    if (!session || !proyecto.id || !comentarioRetraso.trim()) return;
+    try {
+      setIsSavingComentario(true);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/proyectos/${proyecto.id}/retrasos`, {
+        method: "POST",
+        headers: makeHeaders(session),
+        body: JSON.stringify({
+          comentario: comentarioRetraso
+        })
+      });
+      if (res.ok) {
+        setComentarioRetraso("");
+        router.refresh();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSavingComentario(false);
+    }
+  };
+
+  const retrasosHistory = proyecto.retrasos || [];
 
   return (
-    <section className="grid gap-4 lg:grid-cols-4">
-      {/* 1: Resumen financiero */}
-      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
-        <h2 className="text-sm font-medium text-gray-900 flex items-center gap-2">
-          <CircleDollarSign size={16} className="text-blue-600" />
-          Resumen financiero
-        </h2>
-
-        <div className="space-y-2 text-sm">
-          <Row label="Total ventas" value={formatCurrencyCLP(n0(finSafe.totalVentas))} />
-          <Row label="Total compras" value={formatCurrencyCLP(n0(finSafe.totalCompras))} />
-          <Row label="Rendiciones" value={formatCurrencyCLP(n0(finSafe.totalRendiciones))} />
-          <Row label="Costo total" value={formatCurrencyCLP(n0(finSafe.costoTotal))} />
-
-          {/* HH desde subtareas (si tu backend lo manda en fin, lo mostramos) */}
-          <Row label="Valor HH plan" value={formatCurrencyCLP(n0(finSafe.valorHHPlan))} />
-          <Row label="Valor HH real" value={formatCurrencyCLP(n0(finSafe.valorHHReal))} />
-        </div>
-
-        <div className="mt-3 border-t pt-3 space-y-2">
-          <Row label="Margen bruto" value={formatCurrencyCLP(n0(finSafe.margenBruto))} strong />
-          <Row label="Utilidad neta" value={formatCurrencyCLP(n0(finSafe.utilidadNeta))} strong />
-        </div>
-      </div>
-
-      {/* 2: Estado de tareas */}
-      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
-        <h2 className="text-sm font-medium text-gray-900 flex items-center gap-2">
-          <ClipboardList size={16} className="text-indigo-600" />
-          Estado de tareas
-        </h2>
-
-        <div className="grid grid-cols-3 gap-2 text-center text-xs">
-          <div className="rounded-lg bg-slate-50 p-2">
-            <div className="text-[11px] text-gray-500">Total</div>
-            <div className="text-base font-semibold text-gray-800">
-              {tareasFinal.totalTareas ?? 0}
-            </div>
+    <div className="space-y-4">
+      {/* Delay Comment Prompt */}
+      {showDelayCommentInput && (
+        <div className="bg-error-container/10 p-6 rounded-xl border-l-4 border-error border-y border-r border-outline-variant/10">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-bold text-on-surface flex items-center gap-2">
+              <History size={18} className="text-error" />
+              Retraso Detectado
+            </h4>
+            <span className="text-[10px] font-bold text-error uppercase tracking-widest px-2 py-0.5 bg-error-container rounded">
+              Atrasado ({delayedDays > 0 ? `+${delayedDays} Días` : 'Pendiente'})
+            </span>
           </div>
-          <div className="rounded-lg bg-emerald-50 p-2">
-            <div className="text-[11px] text-emerald-600">Completas</div>
-            <div className="text-base font-semibold text-emerald-700">
-              {tareasFinal.tareasCompletas ?? 0}
-            </div>
-          </div>
-          <div className="rounded-lg bg-amber-50 p-2">
-            <div className="text-[11px] text-amber-600">En curso</div>
-            <div className="text-base font-semibold text-amber-700">
-              {tareasFinal.tareasEnCurso ?? 0}
-            </div>
+          <div className="space-y-3">
+             <p className="text-[12px] text-on-surface-variant leading-relaxed">
+               El proyecto ha superado su plazo planificado y no tiene tareas futuras documentadas. Por favor documente el estado real o justifique el retraso en la plataforma:
+             </p>
+             <div className="flex gap-2">
+                <textarea 
+                  className="flex-1 rounded-md border-error/30 bg-surface-container-lowest text-sm p-3 focus:border-error focus:ring-error shadow-sm"
+                  rows={2}
+                  placeholder="Ej. Esperando respuesta de cliente, retraso logístico..."
+                  value={comentarioRetraso}
+                  onChange={(e) => setComentarioRetraso(e.target.value)}
+                />
+                <button 
+                  disabled={isSavingComentario || !comentarioRetraso.trim()}
+                  onClick={handleSaveComentario}
+                  className="bg-error hover:bg-error/90 text-on-error px-5 py-2 rounded-md font-bold text-xs disabled:opacity-50 flex items-center gap-2 transition-colors shadow-sm"
+                >
+                  <MessageSquarePlus size={16} /> 
+                  {isSavingComentario ? "..." : "REPORTAR"}
+                </button>
+             </div>
           </div>
         </div>
+      )}
 
-        <div className="space-y-2 text-sm mt-2">
-          <Row label="Pendientes" value={tareasFinal.tareasPendientes ?? 0} />
-          <Row label="Avance promedio" value={pct(tareasFinal.avancePromedio ?? 0)} />
-          <Row label="Proyecto completado" value={pct(tareasFinal.porcentajeCompletado ?? 0)} />
-        </div>
-
-        {/* Subtareas */}
-        <div className="mt-4 border-t pt-3 space-y-2">
-          <Row label="Subtareas (total)" value={computed.subtareas.totalSubtareas ?? 0} />
-          <Row label="Subtareas completadas" value={computed.subtareas.subtareasCompletas ?? 0} />
-          <Row label="Subtareas completado %" value={pct(computed.subtareas.porcentajeCompletado ?? 0)} />
-        </div>
-      </div>
-
-      {/* 3: Cliente + presupuesto */}
-      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
-        <h2 className="text-sm font-medium text-gray-900 flex items-center gap-2">
-          <User2 size={16} className="text-purple-600" />
-          Cliente y presupuesto
-        </h2>
-
-        <div className="space-y-3 text-sm">
-          <div>
-            <div className="text-xs text-gray-500 mb-1">Cliente principal</div>
-            {clientePrincipal ? (
-              <div className="rounded-lg border border-gray-200 bg-slate-50 px-3 py-2">
-                <div className="font-medium text-gray-800">{clientePrincipal.nombre}</div>
-                <div className="text-xs text-gray-500">
-                  {clientePrincipal.correo || "Sin correo"} ·{" "}
-                  {clientePrincipal.telefono || "Sin teléfono"}
-                </div>
+      {/* Primary Delay History Collapsible */}
+      {retrasosHistory.length > 0 && (
+        <div className="group mt-2">
+          <button
+            type="button"
+            onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+            className="w-full py-4 flex items-center justify-between text-left bg-surface-container-lowest hover:bg-surface-container-low px-5 rounded-xl transition-all border border-outline-variant/10 shadow-sm"
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 bg-error-container text-error rounded-lg">
+                <AlertTriangle size={24} />
               </div>
-            ) : (
-              <div className="text-xs text-gray-500">Sin ventas asociadas aún.</div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Row label="Presupuesto asignado" value={formatCurrencyCLP(n0(finSafe.presupuesto))} />
-            <Row label="Presupuesto usado" value={formatCurrencyCLP(n0(finSafe.presupuestoUsado))} />
-            <Row label="Saldo de presupuesto" value={formatCurrencyCLP(n0(finSafe.presupuestoRestante))} />
-          </div>
-
-          <div className="mt-2">
-            <div className="flex justify-between text-xs text-gray-500 mb-1">
-              <span>Uso de presupuesto</span>
-              <span>{pct(finSafe.usoPresupuestoPct ?? 0)}</span>
+              <div>
+                <h3 className="text-sm font-bold text-on-surface">Historial de Retrasos</h3>
+                <p className="text-[11px] text-on-surface-variant">
+                  {retrasosHistory.length} eventos críticos reportados en el proyecto
+                </p>
+              </div>
             </div>
-            <Bar percent={clampPct(finSafe.usoPresupuestoPct ?? 0)} />
-          </div>
-
-          {/* Épicas */}
-          <div className="mt-4 border-t pt-3 space-y-2">
-            <div className="text-xs font-semibold text-gray-700 flex items-center gap-2">
-              <Layers3 size={14} className="text-slate-500" />
-              Épicas
+            <ChevronDown size={20} className={`text-on-surface-variant transition-transform ${isHistoryExpanded ? 'rotate-180' : 'group-hover:translate-x-1 -rotate-90'}`} />
+          </button>
+          
+          {isHistoryExpanded && (
+            <div className="p-5 mt-2 bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/10 space-y-4">
+              {retrasosHistory.map((ret, i) => (
+                <div key={ret.id || i} className="bg-error-container/5 p-4 rounded-lg border-l-2 border-error border-y border-r border-outline-variant/10 shadow-sm">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs text-error font-semibold flex items-center gap-1">
+                      <Calendar size={14}/> {new Date(ret.creado_en).toLocaleString()}
+                    </span>
+                    {i === 0 && (
+                      <span className="text-[9px] font-bold text-error uppercase tracking-widest px-2 py-0.5 bg-error-container rounded">Último Reporte</span>
+                    )}
+                  </div>
+                  <div className="text-on-surface text-sm leading-relaxed font-medium">
+                    {ret.comentario}
+                  </div>
+                </div>
+              ))}
             </div>
-            <Row label="Total épicas" value={computed.epicas.totalEpicas ?? 0} />
-            <Row label="Épicas completadas" value={computed.epicas.epicasCompletas ?? 0} />
-            <Row label="Avance épicas (promedio)" value={pct(computed.epicas.avancePromedio ?? 0)} />
-          </div>
+          )}
         </div>
-      </div>
-
-      {/* 4: Indicadores avanzados */}
-      <AdvancedMetricsCard fin={finSafe} tareas={tareasFinal} />
-    </section>
+      )}
+    </div>
   );
 }

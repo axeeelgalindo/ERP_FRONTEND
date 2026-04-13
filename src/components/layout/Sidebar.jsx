@@ -63,12 +63,14 @@ export default function Sidebar() {
         icon: "conveyor_belt",
         roles: ["superadmin", "admin"],
       },
-      {
-        href: "/productos",
-        label: "Productos",
-        icon: "inventory_2",
-        roles: ["superadmin", "admin"],
-      },
+      /* { 
+       {
+         href: "/productos",
+         label: "Productos",
+         icon: "inventory_2",
+         roles: ["superadmin", "admin"],
+       },
+       }*/
       {
         href: "/proyectos",
         label: "Proyectos",
@@ -239,9 +241,9 @@ export default function Sidebar() {
             aria-label={open ? "Colapsar" : "Expandir"}
           >
             <div className={`transition-transform duration-300 ${open ? "" : "rotate-180"}`}>
-               <span className="material-symbols-outlined text-[24px] font-bold">
-                 chevron_left
-               </span>
+              <span className="material-symbols-outlined text-[24px] font-bold">
+                chevron_left
+              </span>
             </div>
           </button>
         )}

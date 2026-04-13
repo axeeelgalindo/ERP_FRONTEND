@@ -12,6 +12,7 @@ import {
   FolderOpen as FolderOpenIcon,
   TaskAlt as TaskAltIcon,
   Commit as CommitIcon,
+  Visibility as VisibilityIcon,
 } from "@mui/icons-material";
 import { Avatar, Tooltip, CircularProgress } from "@mui/material";
 
@@ -42,13 +43,17 @@ function EstadoPill({ estado }) {
       ? "Completada"
       : s === "en_progreso"
         ? "En Progreso"
+        : s === "en_revision"
+        ? "En Revisión"
         : "Pendiente";
 
   const cls =
     s === "completada"
       ? "bg-emerald-100 text-emerald-700 border-emerald-200"
       : s === "en_progreso"
-        ? "bg-amber-100 text-amber-700 border-amber-200"
+        ? "bg-blue-100 text-blue-700 border-blue-200"
+        : s === "en_revision"
+        ? "bg-yellow-100 text-yellow-800 border-yellow-200"
         : "bg-slate-100 text-slate-700 border-slate-200";
 
   return (
@@ -115,6 +120,9 @@ export default function TasksTreePremium({
 
   // subtarea action cell (start/finish/reset)
   renderSubtareaAccionCell,
+
+  // evidence preview
+  onViewEvidencia,
 }) {
   return (
     <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
@@ -325,6 +333,18 @@ export default function TasksTreePremium({
 
                             <div className="col-span-1 flex justify-end">
                               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {t.estado === "en_revision" && (
+                                  <Tooltip title="Ver evidencias">
+                                    <button
+                                      className="p-1.5 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-all"
+                                      type="button"
+                                      onClick={() => onViewEvidencia?.(t)}
+                                    >
+                                      <VisibilityIcon sx={{ fontSize: 18 }} />
+                                    </button>
+                                  </Tooltip>
+                                )}
+
                                 <Tooltip title="Editar tarea">
                                   <button
                                     className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all"
@@ -397,6 +417,18 @@ export default function TasksTreePremium({
 
                                     <div className="col-span-1 flex justify-end">
                                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {d.estado === "en_revision" && (
+                                          <Tooltip title="Ver evidencias">
+                                            <button
+                                              className="p-1.5 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-all"
+                                              type="button"
+                                              onClick={() => onViewEvidencia?.(d)}
+                                            >
+                                              <VisibilityIcon sx={{ fontSize: 18 }} />
+                                            </button>
+                                          </Tooltip>
+                                        )}
+
                                         {renderSubtareaAccionCell ? renderSubtareaAccionCell(d) : null}
 
                                         <Tooltip title="Editar subtarea">

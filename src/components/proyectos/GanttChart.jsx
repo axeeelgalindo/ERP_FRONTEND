@@ -297,6 +297,22 @@ export default function GanttChart({
       };
     }
 
+    // ✅ EXTEND DATE TO TODAY IF PROJECT IS ACTIVE BUT DELAYED
+    let hasIncomplete = false;
+    for (const e of epics) {
+      for (const t of e.tareas) {
+        if (t.__avance < 100 && t.__estado !== "completada") {
+          hasIncomplete = true;
+          break;
+        }
+      }
+      if(hasIncomplete) break;
+    }
+    const todayRaw = new Date();
+    if (hasIncomplete && gMax < todayRaw) {
+      gMax = todayRaw;
+    }
+
     const minDate = startOfLocalDay(gMin);
     const maxDate = startOfLocalDay(gMax);
 

@@ -10,6 +10,13 @@ import EditCotizacionDialog from "@/components/cotizaciones/EditCotizacionDialog
 import ImportCotizacionPdfDialog from "@/components/cotizaciones/ImportCotizacionPdfDialog";
 import CotizacionesSnack from "@/components/cotizaciones/CotizacionesSnack";
 import CotizacionesState from "@/components/cotizaciones/CotizacionesState";
+import CotizacionesSummary from "@/components/cotizaciones/CotizacionesSummary";
+
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
+import 'dayjs/locale/es';
 
 // ✅ Nuevos componentes (los creas abajo)
 import CotizacionesTableLight from "@/components/cotizaciones/CotizacionesTableLight";
@@ -58,8 +65,12 @@ export default function CotizacionesPage() {
   const [openDrawer, setOpenDrawer] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
 
-  // UI: search (solo frontend)
-  const [q, setQ] = useState("");
+  // UI: filters
+  const [fAsunto, setFAsunto] = useState("");
+  const [fCliente, setFCliente] = useState("");
+  const [fNumero, setFNumero] = useState("");
+  const [filterDate, setFilterDate] = useState(null);
+  const [filterEstado, setFilterEstado] = useState("");
 
   // Dialogs
   const [openEdit, setOpenEdit] = useState(false);
@@ -238,24 +249,37 @@ export default function CotizacionesPage() {
     [cotizaciones, selectedId],
   );
 
-  // Filtro local (cliente / id / estado / numero)
   const filtered = useMemo(() => {
-    const qq = q.trim().toLowerCase();
-    if (!qq) return cotizaciones;
-
     return (cotizaciones || []).filter((c) => {
-      const cliente = String(c?.cliente?.nombre || "").toLowerCase();
-      const id = String(c?.id || "").toLowerCase();
-      const estado = String(c?.estado || "").toLowerCase();
-      const numero = String(c?.numero ?? "").toLowerCase();
-      return (
-        cliente.includes(qq) ||
-        id.includes(qq) ||
-        estado.includes(qq) ||
-        numero.includes(qq)
-      );
+      // Filtro mes/año
+      if (filterDate && filterDate.isValid()) {
+        const d = c.creada_en ? new Date(c.creada_en) : null;
+        if (!d) return false;
+        if (filterDate.month() + 1 !== d.getMonth() + 1) return false;
+        if (filterDate.year() !== d.getFullYear()) return false;
+      }
+      // Estado
+      if (filterEstado && c?.estado !== filterEstado) return false;
+      // Nº COT
+      if (fNumero.trim() && !String(c?.numero ?? "").toLowerCase().includes(fNumero.trim().toLowerCase())) return false;
+      // Asunto
+      if (fAsunto.trim()) {
+        const asunto = String(c?.asunto || c?.descripcion || "").toLowerCase();
+        if (!asunto.includes(fAsunto.trim().toLowerCase())) return false;
+      }
+      // Cliente (nombre o RUT)
+      if (fCliente.trim()) {
+        const nombre = String(c?.cliente?.nombre || "").toLowerCase();
+        const rut = String(c?.cliente?.rut || "").toLowerCase();
+        const t = fCliente.trim().toLowerCase();
+        if (!nombre.includes(t) && !rut.includes(t)) return false;
+      }
+      return true;
     });
-  }, [cotizaciones, q]);
+  }, [cotizaciones, filterDate, filterEstado, fNumero, fAsunto, fCliente]);
+
+  const hasFilters = filterDate || filterEstado || fNumero || fAsunto || fCliente;
+  const clearFilters = () => { setFAsunto(""); setFCliente(""); setFNumero(""); setFilterEstado(""); setFilterDate(null); };
 
   const stateUI = (
     <CotizacionesState status={status} loading={loading} err={err} />
@@ -293,28 +317,100 @@ export default function CotizacionesPage() {
           Gestiona estados, revisa detalle y exporta a PDF de manera centralizada.
         </p>
 
-        {/* Toolbar búsqueda + filtros */}
-        <div className="mb-6 flex flex-wrap items-center gap-4">
-          <div className="relative flex-1 min-w-[260px]">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-              🔎
-            </span>
+        <CotizacionesSummary cotizaciones={filtered} />
+
+        {/* Filtros */}
+        <div className="mb-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+
+          {/* Nº COT */}
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-bold">#</span>
             <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all"
-              placeholder="Buscar por cliente, ID o estado..."
+              value={fNumero}
+              onChange={(e) => setFNumero(e.target.value)}
+              className="w-full pl-7 pr-4 h-[46px] border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all"
+              placeholder="Nº Cotización"
               type="text"
             />
           </div>
 
-          <button
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium hover:bg-slate-50"
-            title="(Pendiente) conectar filtros reales"
-            onClick={() => showSnack("info", "Filtros: pendiente de conectar")}
-          >
-            <span className="text-lg">⏷</span> Filtros
-          </button>
+          {/* Asunto */}
+          <input
+            value={fAsunto}
+            onChange={(e) => setFAsunto(e.target.value)}
+            className="w-full px-4 h-[46px] border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all"
+            placeholder="Asunto / descripción"
+            type="text"
+          />
+
+          {/* Cliente */}
+          <input
+            value={fCliente}
+            onChange={(e) => setFCliente(e.target.value)}
+            className="w-full px-4 h-[46px] border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all"
+            placeholder="Cliente (nombre o RUT)"
+            type="text"
+          />
+
+          {/* Estado */}
+          <div className="relative">
+            <select
+              value={filterEstado}
+              onChange={(e) => setFilterEstado(e.target.value)}
+              className="w-full h-[46px] px-3 pr-9 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all appearance-none cursor-pointer"
+            >
+              <option value="">Todos los estados</option>
+              <option value="COTIZACION">Cotización</option>
+              <option value="ACEPTADA">Aceptada</option>
+              <option value="RECHAZADA">Rechazada</option>
+              <option value="ORDEN_VENTA">Orden de Venta</option>
+              <option value="ENTREGADO">Entregado</option>
+              <option value="POR_FACTURAR">Por Facturar</option>
+              <option value="FACTURADA">Facturada</option>
+              <option value="PAGADA">Pagada</option>
+            </select>
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">▾</span>
+          </div>
+
+          {/* Mes/Año */}
+          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
+            <DatePicker
+              views={['year', 'month']}
+              label="Mes y Año"
+              format="MM/YYYY"
+              value={filterDate}
+              onChange={(newValue) => setFilterDate(newValue)}
+              slotProps={{
+                textField: {
+                  size: "small",
+                  fullWidth: true,
+                  sx: {
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '0.75rem',
+                      backgroundColor: '#fff',
+                      height: '46px',
+                    }
+                  }
+                },
+                field: { clearable: true, onClear: () => setFilterDate(null) }
+              }}
+            />
+          </LocalizationProvider>
+        </div>
+
+        {/* Conteo + limpiar */}
+        <div className="flex items-center justify-between mb-5">
+          <span className="text-xs text-slate-400">
+            {filtered.length} resultado{filtered.length !== 1 ? "s" : ""}
+          </span>
+          {hasFilters && (
+            <button
+              onClick={clearFilters}
+              className="text-xs font-semibold text-slate-500 hover:text-rose-600 transition-colors flex items-center gap-1"
+            >
+              <span>✕</span> Limpiar filtros
+            </button>
+          )}
         </div>
 
         {/* Import RCV Section */}

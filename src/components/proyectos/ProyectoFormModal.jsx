@@ -25,6 +25,9 @@ export default function ProyectoFormModal({
   const [descripcion, setDescripcion] = useState("");
   const [presupuesto, setPresupuesto] = useState("");
 
+  const [fechaInicioReal, setFechaInicioReal] = useState("");
+  const [fechaFinReal, setFechaFinReal] = useState("");
+
   // cliente principal (en tu schema Proyecto no existe cliente_id, pero lo dejo en UI por si luego lo agregas)
   const [clienteId, setClienteId] = useState("");
   const [clientes, setClientes] = useState([]);
@@ -60,6 +63,9 @@ export default function ProyectoFormModal({
           ? ""
           : String(initialProyecto.presupuesto),
       );
+
+      setFechaInicioReal(initialProyecto?.fecha_inicio_real ? new Date(initialProyecto.fecha_inicio_real).toISOString().split("T")[0] : "");
+      setFechaFinReal(initialProyecto?.fecha_fin_real ? new Date(initialProyecto.fecha_fin_real).toISOString().split("T")[0] : "");
 
       // si en el futuro guardas cliente_id en Proyecto:
       setClienteId(initialProyecto?.cliente_id || "");
@@ -143,6 +149,8 @@ export default function ProyectoFormModal({
     setNombre("");
     setDescripcion("");
     setPresupuesto("");
+    setFechaInicioReal("");
+    setFechaFinReal("");
     setClienteId("");
     setMiembrosIds([]);
     setErr("");
@@ -176,6 +184,8 @@ export default function ProyectoFormModal({
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || null,
         presupuesto: presupuesto === "" ? null : Number(presupuesto),
+        fecha_inicio_real: fechaInicioReal ? new Date(fechaInicioReal).toISOString() : null,
+        fecha_fin_real: fechaFinReal ? new Date(fechaFinReal).toISOString() : null,
         // si después agregas cliente_id a Proyecto, quedará listo:
         cliente_id: clienteId || null,
         miembros: miembrosIds, // ✅ importante para update también (backend debe soportarlo)
@@ -264,6 +274,34 @@ export default function ProyectoFormModal({
             min={0}
           />
         </div>
+
+        {/* FECHAS REALES (solo al editar) */}
+        {isEdit && (
+          <div className="grid grid-cols-2 gap-4">
+               <div className="space-y-1">
+                <label className="block text-xs font-medium text-gray-700 ">
+                  Fecha Inicio Real
+                </label>
+                <input
+                  type="date"
+                  className="w-full rounded-lg border border-gray-300  bg-white  px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  value={fechaInicioReal}
+                  onChange={(e) => setFechaInicioReal(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-gray-700 ">
+                  Fecha Fin Real
+                </label>
+                <input
+                  type="date"
+                  className="w-full rounded-lg border border-gray-300  bg-white  px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  value={fechaFinReal}
+                  onChange={(e) => setFechaFinReal(e.target.value)}
+                />
+              </div>
+          </div>
+        )}
 
         {/* Cliente (opcional) */}
         <div className="space-y-1">

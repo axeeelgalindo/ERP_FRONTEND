@@ -131,30 +131,30 @@ export default async function ProyectoDetailPage({ params }) {
   const tareasGantt = buildGanttRows(tareasList);
 
   return (
-    <div className="px-6 py-6 space-y-6">
-      <ProyectoBreadcrumbs id={id} nombre={proyecto.nombre} />
+    <div className="flex-1 flex flex-col min-h-full bg-surface-bright text-on-surface">
+      <div className="px-4 md:px-8 py-6 md:py-10 space-y-8 mx-auto w-full">
+        <ProyectoBreadcrumbs id={id} nombre={proyecto.nombre} />
 
-      <ProyectoHeader proyecto={proyecto} />
+        <ProyectoHeader proyecto={proyecto} metrics={metrics} tareas={tareasList} />
 
-      <ProyectoKpis
-        fin={fin}
-        tareas={tareasMetrics ?? {}} // ✅ existe (metrics.tareas)
-        clientePrincipal={clientePrincipal}
-        items={tareasList} // ✅ existe (proyecto.tareas)
-      />
-      {tareasGantt.length > 0 && (
-        <ProyectoGanttSection
-          tareas={tareasGantt}
+        <ProyectoKpis
+          proyecto={proyecto}
+          items={tareasList} // ✅ existe (proyecto.tareas)
+        />
+        {tareasGantt.length > 0 && (
+          <ProyectoGanttSection
+            tareas={tareasGantt}
+            proyectoId={proyecto.id}
+            miembros={miembros}
+          />
+        )}
+
+        <ProyectoTareasEquipoSection
           proyectoId={proyecto.id}
+          tareas={tareasList}
           miembros={miembros}
         />
-      )}
-
-      <ProyectoTareasEquipoSection
-        proyectoId={proyecto.id}
-        tareas={tareasList}
-        miembros={miembros}
-      />
+      </div>
     </div>
   );
 }

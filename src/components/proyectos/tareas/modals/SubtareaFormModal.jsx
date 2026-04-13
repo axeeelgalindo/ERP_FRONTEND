@@ -12,14 +12,45 @@ import {
   Alert,
   Box,
   MenuItem,
+  FormControlLabel,
+  Switch,
+  FormControl,
+  InputLabel,
+  Select,
+  Typography,
 } from "@mui/material";
 import { makeHeaders } from "@/lib/api";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
+async function handleRevisionTask(id, action, comentario, session, isSubtarea) {
+  try {
+    const estadoParams = action === "approve" ? "completada" : "en_progreso";
+    const body = {
+      estado: estadoParams,
+      comentario_revision: comentario,
+      ...(action === "approve" ? { avance: 100 } : {})
+    };
+    const endpoint = isSubtarea ? `tareas-detalle/update/${id}` : `tareas/update/${id}`;
+    
+    const res = await fetch(`${API}/${endpoint}`, {
+      method: "PATCH",
+      headers: { ...makeHeaders(session), "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error("Error en revisión");
+    return true;
+  } catch (err) {
+    alert("Error al guardar revisión: " + err.message);
+    return false;
+  }
+}
+
+
 const ESTADOS = [
   { value: "pendiente", label: "Pendiente" },
   { value: "en_progreso", label: "En progreso" },
+  { value: "en_revision", label: "En Revisión" },
   { value: "completada", label: "Completada" },
 ];
 
@@ -43,22 +74,21 @@ function daysBetweenInclusive(dateStartStr, dateEndStr) {
   const b = new Date(dateEndStr);
   if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return null;
 
-  // normalizar a medianoche
   a.setHours(0, 0, 0, 0);
   b.setHours(0, 0, 0, 0);
 
   const MS = 24 * 60 * 60 * 1000;
   const diff = Math.round((b.getTime() - a.getTime()) / MS);
-  return diff >= 0 ? diff + 1 : null; // inclusive
+  return diff >= 0 ? diff + 1 : null;
 }
 
 export default function SubtareaFormModal({
   open,
   onClose,
   session,
-  tarea, // necesitamos tarea.id
+  tarea,
   miembros = [],
-  subtarea, // null => create, obj => edit
+  subtarea,
   onSaved,
 }) {
   const isEdit = !!subtarea?.id;
@@ -66,11 +96,17 @@ export default function SubtareaFormModal({
   const [titulo, setTitulo] = useState("");
   const [estado, setEstado] = useState("pendiente");
   const [responsableId, setResponsableId] = useState("");
+  const [esPlanificado, setEsPlanificado] = useState(true);
+  const [avance, setAvance] = useState(0);
 
-  // plan
   const [fechaInicioPlan, setFechaInicioPlan] = useState("");
   const [fechaFinPlan, setFechaFinPlan] = useState("");
-  const [diasPlanManual, setDiasPlanManual] = useState(""); // por si no usan fin
+  const [diasPlanManual, setDiasPlanManual] = useState("");
+
+  const [fechaInicioReal, setFechaInicioReal] = useState("");
+  const [fechaFinReal, setFechaFinReal] = useState("");
+
+  const [comentarioRevision, setComentarioRevision] = useState("");
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -83,6 +119,9 @@ export default function SubtareaFormModal({
 
     setTitulo(subtarea?.titulo || "");
     setEstado(subtarea?.estado || "pendiente");
+    setAvance(subtarea?.avance || 0);
+    setEsPlanificado(subtarea?.es_planificado ?? true);
+    setComentarioRevision(subtarea?.comentario_revision || "");
 
     setResponsableId(
       subtarea?.responsable_id ||
@@ -97,7 +136,9 @@ export default function SubtareaFormModal({
     setFechaInicioPlan(fip);
     setFechaFinPlan(ffp);
 
-    // si viene dias_plan, lo mostramos
+    setFechaInicioReal(toISODateInput(subtarea?.fecha_inicio_real));
+    setFechaFinReal(toISODateInput(subtarea?.fecha_fin_real));
+
     setDiasPlanManual(subtarea?.dias_plan != null ? String(subtarea.dias_plan) : "");
   }, [open, subtarea]);
 
@@ -107,9 +148,7 @@ export default function SubtareaFormModal({
   }, [fechaInicioPlan, fechaFinPlan]);
 
   const diasPlanFinal = useMemo(() => {
-    // si hay fin, se calcula
     if (diasPlanComputed != null) return diasPlanComputed;
-    // si no, usar manual
     const n = Number(diasPlanManual);
     if (!Number.isFinite(n) || n <= 0) return null;
     return Math.trunc(n);
@@ -133,16 +172,15 @@ export default function SubtareaFormModal({
       };
 
       if (!isEdit) {
-        // ✅ backend: POST /tareas-detalle/add
         const body = {
-          tarea_id: tarea.id, // ✅ requerido
+          tarea_id: tarea.id,
           titulo: titulo.trim(),
           descripcion: null,
           responsable_id: responsableId || null,
           estado,
-          fecha_inicio_plan: new Date(fechaInicioPlan).toISOString(), // ✅ requerido
-          dias_plan: diasPlanFinal, // ✅ requerido
-          // los reales son opcionales (los dejamos fuera)
+          fecha_inicio_plan: new Date(fechaInicioPlan).toISOString(),
+          dias_plan: diasPlanFinal,
+          es_planificado: esPlanificado,
         };
 
         const res = await fetch(`${API}/tareas-detalle/add`, {
@@ -159,13 +197,17 @@ export default function SubtareaFormModal({
         return;
       }
 
-      // ✅ backend: PATCH /tareas-detalle/update/:id
       const body = {
         titulo: titulo.trim(),
         responsable_id: responsableId || null,
         estado,
         fecha_inicio_plan: new Date(fechaInicioPlan).toISOString(),
         dias_plan: diasPlanFinal,
+        es_planificado: esPlanificado,
+        comentario_revision: comentarioRevision,
+        avance,
+        ...(fechaInicioReal ? { fecha_inicio_real: new Date(fechaInicioReal).toISOString() } : {}),
+        ...(fechaFinReal ? { fecha_fin_real: new Date(fechaFinReal).toISOString() } : {}),
       };
 
       const res = await fetch(`${API}/tareas-detalle/update/${subtarea.id}`, {
@@ -237,19 +279,20 @@ export default function SubtareaFormModal({
             fullWidth
           />
 
-          <TextField
-            select
-            label="Estado"
-            value={estado}
-            onChange={(e) => setEstado(e.target.value)}
-            fullWidth
-          >
-            {ESTADOS.map((x) => (
-              <MenuItem key={x.value} value={x.value}>
-                {x.label}
-              </MenuItem>
-            ))}
-          </TextField>
+          <FormControl fullWidth>
+            <InputLabel>Estado</InputLabel>
+            <Select
+              value={estado}
+              label="Estado"
+              onChange={(e) => setEstado(e.target.value)}
+            >
+              {ESTADOS.map((x) => (
+                <MenuItem key={x.value} value={x.value}>
+                  {x.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
           <TextField
             select
@@ -296,6 +339,27 @@ export default function SubtareaFormModal({
             />
           </Box>
 
+          {isEdit && (
+            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+              <TextField
+                label="Inicio real (manual)"
+                type="date"
+                value={fechaInicioReal}
+                onChange={(e) => setFechaInicioReal(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+              />
+              <TextField
+                label="Fin real (manual)"
+                type="date"
+                value={fechaFinReal}
+                onChange={(e) => setFechaFinReal(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+              />
+            </Box>
+          )}
+
           {diasPlanComputed != null ? (
             <Alert severity="info">
               Días plan calculados: <b>{diasPlanComputed}</b>
@@ -309,6 +373,92 @@ export default function SubtareaFormModal({
               inputProps={{ min: 1 }}
               fullWidth
             />
+          )}
+
+          <FormControlLabel
+            control={<Switch checked={esPlanificado} onChange={(e) => setEsPlanificado(e.target.checked)} color="primary" />}
+            label="Definido en Planificación Inicial"
+          />
+
+          {estado === "en_revision" && isEdit && (
+            <Box sx={{ mt: 3, p: 2, border: '1px solid', borderColor: 'warning.main', borderRadius: 2, bgcolor: 'warning.light', gridColumn: { xs: "1 / -1", md: "1 / -1" } }}>
+              <Typography variant="subtitle2" color="warning.dark" sx={{ mb: 1, fontWeight: 'bold' }}>
+                Subtarea en Revisión - Evidencias
+              </Typography>
+
+              {/* ✅ VISUALIZACIÓN DE EVIDENCIAS SUBIDAS POR TRABAJADOR */}
+              {subtarea?.evidencias?.length > 0 && (
+                <Box sx={{ mb: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {subtarea.evidencias.map((ev) => (
+                    <Box key={ev.id} sx={{ p: 1.5, bgcolor: 'white', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+                      <Typography variant="caption" sx={{ display: 'block', mb: 0.5, fontWeight: 'bold', color: 'text.secondary' }}>
+                        Enviado el {new Date(ev.creado_en).toLocaleString()}
+                      </Typography>
+                      {ev.comentario && (
+                        <Typography variant="body2" sx={{ mb: 1, fontStyle: 'italic' }}>
+                          "{ev.comentario}"
+                        </Typography>
+                      )}
+                      {ev.archivo_url && (
+                        <Box sx={{ mt: 1, borderRadius: 1, overflow: 'hidden', border: '1px solid #eee' }}>
+                          {ev.archivo_url.toLowerCase().match(/\.(mp4|webm|ogg)$/) ? (
+                            <video controls style={{ width: '100%', maxHeight: '300px', display: 'block' }}>
+                              <source src={`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001'}${ev.archivo_url}`} />
+                            </video>
+                          ) : (
+                            <img 
+                              src={`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001'}${ev.archivo_url}`} 
+                              alt="Evidencia" 
+                              style={{ width: '100%', maxHeight: '400px', objectFit: 'contain', display: 'block', cursor: 'pointer' }}
+                              onClick={() => window.open(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001'}${ev.archivo_url}`, '_blank')}
+                            />
+                          )}
+                        </Box>
+                      )}
+                    </Box>
+                  ))}
+                </Box>
+              )}
+
+              <Typography variant="body2" sx={{ mb: 2 }}>
+                El trabajador ha indicado que terminó esta subtarea. Revisa e indica si la apruebas o la rechazas.
+              </Typography>
+              <TextField
+                label="Comentario al Trabajador"
+                multiline
+                rows={2}
+                value={comentarioRevision}
+                onChange={(e) => setComentarioRevision(e.target.value)}
+                fullWidth
+                sx={{ mb: 2, bgcolor: 'white' }}
+              />
+              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                 <Button 
+                   variant="contained" 
+                   color="error"
+                   onClick={async () => {
+                     setBusy(true);
+                     const ok = await handleRevisionTask(subtarea.id, "reject", comentarioRevision, session, true);
+                     if(ok) { onSaved?.(); onClose?.(); }
+                     setBusy(false);
+                   }}
+                 >
+                   Rechazar
+                 </Button>
+                 <Button 
+                   variant="contained" 
+                   color="success"
+                   onClick={async () => {
+                     setBusy(true);
+                     const ok = await handleRevisionTask(subtarea.id, "approve", comentarioRevision, session, true);
+                     if(ok) { onSaved?.(); onClose?.(); }
+                     setBusy(false);
+                   }}
+                 >
+                   Aprobar (Completar)
+                 </Button>
+              </Box>
+            </Box>
           )}
         </Box>
       </DialogContent>

@@ -14,11 +14,15 @@ import {
   Typography,
   Box,
   Alert,
+  Collapse
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ReplayIcon from "@mui/icons-material/Replay";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import ListAltIcon from "@mui/icons-material/ListAlt";
 import dayjs from "dayjs";
 
 import AssignEpicToTaskModal from "./tareas/AssignEpicToTaskModal";
@@ -31,6 +35,7 @@ import { makeHeaders } from "@/lib/api";
 import EpicaFormModal from "./tareas/modals/EpicaFormModal";
 import TareaFormModal from "./tareas/modals/TareaFormModal";
 import SubtareaFormModal from "./tareas/modals/SubtareaFormModal";
+import EvidencePreviewModal from "./tareas/modals/EvidencePreviewModal";
 
 import TasksTreePremium from "./tareas/TasksTreePremium";
 
@@ -158,6 +163,12 @@ export default function ProyectoTareasEquipoSection({
   // expand/collapse
   const [expandedEpicaIds, setExpandedEpicaIds] = useState([]);
   const [expandedTareaIds, setExpandedTareaIds] = useState([]);
+  const [isSectionExpanded, setIsSectionExpanded] = useState(false);
+
+  // evidence preview modal
+  const [evidenceItem, setEvidenceItem] = useState(null);
+  const openEvidenceModal = (item) => setEvidenceItem(item);
+  const closeEvidenceModal = () => setEvidenceItem(null);
 
   // update subtarea action
   const [updatingDetalleId, setUpdatingDetalleId] = useState(null);
@@ -409,8 +420,8 @@ export default function ProyectoTareasEquipoSection({
           epId === "SIN_EPICA"
             ? "Sin épica"
             : epicasById.get(epId)?.nombre?.trim() ||
-              t?.epica?.nombre?.trim() ||
-              "Épica sin nombre";
+            t?.epica?.nombre?.trim() ||
+            "Épica sin nombre";
 
         map.set(epId, { id: epId, nombre: epNombre, tareas: [] });
       }
@@ -467,115 +478,141 @@ export default function ProyectoTareasEquipoSection({
 
   return (
     <>
-      <Card>
-        <CardContent sx={{ p: 2 }}>
-          {loadingEpicas ? (
-            <Box sx={{ p: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                Cargando épicas...
-              </Typography>
-            </Box>
-          ) : epicasAgrupadas.length === 0 ? (
-            <Alert severity="info">
-              Aún no hay tareas para este proyecto. Usa <b>Agregar tarea</b> o{" "}
-              <b>Importar Jira (CSV)</b>.
-            </Alert>
-          ) : (
-            <TasksTreePremium
-              proyectoId={proyectoId}
-              epicasAgrupadas={epicasAgrupadas}
-              expandedEpicaIds={expandedEpicaIds}
-              expandedTareaIds={expandedTareaIds}
-              deletingId={deletingId}
-              onToggleEpica={(epId, ev) => toggleExpandedEpica(epId, ev)}
-              onToggleTarea={(tId, ev) => toggleExpandedTarea(tId, ev)}
-              onOpenNewEpica={openNewEpica}
-              onOpenWizard={() => openWizard(null)}
-              onOpenNewTarea={openNewTarea}
-              onEditEpica={openEditEpica}
-              onNewTareaInEpica={openNewTareaInEpica}
-              onEditTarea={openEditTarea}
-              onDeleteTarea={handleDelete}
-              onNewSubtareaInTarea={openNewSubtarea}
-              onEditSubtarea={openEditSubtarea}
-              renderSubtareaAccionCell={renderSubtareaAccionCell}
-            />
-          )}
-        </CardContent>
+      <div className="bg-surface-container-lowest rounded-xl shadow-md border-t-4 border-primary overflow-hidden border-x border-b border-outline-variant/10 mt-6">
+        <div
+          className="px-6 py-5 flex items-center justify-between bg-surface-container-low/40 border-b border-outline-variant/10 cursor-pointer hover:bg-surface-container-low/60 transition-colors"
+          onClick={() => setIsSectionExpanded(!isSectionExpanded)}
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary-container/10 text-primary rounded flex items-center justify-center">
+              <ListAltIcon fontSize="small" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-on-surface leading-none text-left">Listado Maestro de Tareas</h3>
+              <p className="text-[10px] text-on-surface-variant mt-1 uppercase font-semibold tracking-wider text-left">Control Operativo y Ejecución</p>
+            </div>
+          </div>
+          <div className="flex items-center text-on-surface-variant">
+            {isSectionExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          </div>
+        </div>
+        <Collapse in={isSectionExpanded} unmountOnExit>
+          <CardContent sx={{ p: 2 }}>
+            {loadingEpicas ? (
+              <Box sx={{ p: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Cargando épicas...
+                </Typography>
+              </Box>
+            ) : epicasAgrupadas.length === 0 ? (
+              <Alert severity="info">
+                Aún no hay tareas para este proyecto. Usa <b>Agregar tarea</b> o{" "}
+                <b>Importar Jira (CSV)</b>.
+              </Alert>
+            ) : (
+              <TasksTreePremium
+                proyectoId={proyectoId}
+                epicasAgrupadas={epicasAgrupadas}
+                expandedEpicaIds={expandedEpicaIds}
+                expandedTareaIds={expandedTareaIds}
+                deletingId={deletingId}
+                onToggleEpica={(epId, ev) => toggleExpandedEpica(epId, ev)}
+                onToggleTarea={(tId, ev) => toggleExpandedTarea(tId, ev)}
+                onOpenNewEpica={openNewEpica}
+                onOpenWizard={() => openWizard(null)}
+                onOpenNewTarea={openNewTarea}
+                onEditEpica={openEditEpica}
+                onNewTareaInEpica={openNewTareaInEpica}
+                onEditTarea={openEditTarea}
+                onDeleteTarea={handleDelete}
+                onNewSubtareaInTarea={openNewSubtarea}
+                onEditSubtarea={openEditSubtarea}
+                renderSubtareaAccionCell={renderSubtareaAccionCell}
+                onViewEvidencia={openEvidenceModal}
+              />
+            )}
+          </CardContent>
 
-        <EpicaFormModal
-          open={epicaModalOpen}
-          onClose={() => setEpicaModalOpen(false)}
-          session={session}
-          proyectoId={proyectoId}
-          epica={editingEpica}
-          onSaved={async () => {
-            await reloadEpicas();
-            router.refresh();
-          }}
-        />
+          <EpicaFormModal
+            open={epicaModalOpen}
+            onClose={() => setEpicaModalOpen(false)}
+            session={session}
+            proyectoId={proyectoId}
+            epica={editingEpica}
+            onSaved={async () => {
+              await reloadEpicas();
+              router.refresh();
+            }}
+          />
 
-        <TareaFormModal
-          open={tareaModalOpen}
-          onClose={() => setTareaModalOpen(false)}
-          session={session}
-          proyectoId={proyectoId}
-          miembros={miembros}
-          epicas={epicas}
-          tarea={editingTarea}
-          presetEpicaId={presetEpicaId}
-          onSaved={async () => {
-            await reloadEpicas();
-            router.refresh();
-          }}
-        />
+          <TareaFormModal
+            open={tareaModalOpen}
+            onClose={() => setTareaModalOpen(false)}
+            session={session}
+            proyectoId={proyectoId}
+            miembros={miembros}
+            epicas={epicas}
+            tarea={editingTarea}
+            presetEpicaId={presetEpicaId}
+            onSaved={async () => {
+              await reloadEpicas();
+              router.refresh();
+            }}
+          />
 
-        <SubtareaFormModal
-          open={subModalOpen}
-          onClose={() => setSubModalOpen(false)}
-          session={session}
-          tarea={subTareaParent}
-          miembros={miembros}
-          subtarea={editingSub}
-          onSaved={() => router.refresh()}
-        />
+          <SubtareaFormModal
+            open={subModalOpen}
+            onClose={() => setSubModalOpen(false)}
+            session={session}
+            tarea={subTareaParent}
+            miembros={miembros}
+            subtarea={editingSub}
+            onSaved={() => router.refresh()}
+          />
 
-        {/* MODALES (tu legacy) */}
-        <AddTareaModal
-          open={modalOpen}
-          onClose={() => setModalOpen(false)}
-          proyectoId={proyectoId}
-          miembros={miembros}
-          tarea={editingTarea}
-          onSaved={handleSaved}
-        />
+          <EvidencePreviewModal
+            open={!!evidenceItem}
+            onClose={closeEvidenceModal}
+            item={evidenceItem}
+          />
 
-        <AssignEpicToTaskModal
-          open={assignEpicOpen}
-          onClose={() => setAssignEpicOpen(false)}
-          session={session}
-          epicas={epicas}
-          tarea={assignEpicTarea}
-          onSaved={async () => {
-            await reloadEpicas();
-            router.refresh();
-          }}
-        />
+          {/* MODALES (tu legacy) */}
+          <AddTareaModal
+            open={modalOpen}
+            onClose={() => setModalOpen(false)}
+            proyectoId={proyectoId}
+            miembros={miembros}
+            tarea={editingTarea}
+            onSaved={handleSaved}
+          />
 
-        <WizardEpicaTareasSubtareasModal
-          open={wizardOpen}
-          onClose={() => setWizardOpen(false)}
-          session={session}
-          proyectoId={proyectoId}
-          epicas={epicas}
-          miembros={miembros}
-          epicaPreselectId={wizardEpicaPreselectId}
-          onSaved={async () => {
-            await reloadEpicas();
-            router.refresh();
-          }}
-        />
-      </Card>
+          <AssignEpicToTaskModal
+            open={assignEpicOpen}
+            onClose={() => setAssignEpicOpen(false)}
+            session={session}
+            epicas={epicas}
+            tarea={assignEpicTarea}
+            onSaved={async () => {
+              await reloadEpicas();
+              router.refresh();
+            }}
+          />
+
+          <WizardEpicaTareasSubtareasModal
+            open={wizardOpen}
+            onClose={() => setWizardOpen(false)}
+            session={session}
+            proyectoId={proyectoId}
+            epicas={epicas}
+            miembros={miembros}
+            epicaPreselectId={wizardEpicaPreselectId}
+            onSaved={async () => {
+              await reloadEpicas();
+              router.refresh();
+            }}
+          />
+        </Collapse>
+      </div>
 
       {/* CONFIRM MODAL SUBTAREA */}
       <Modal

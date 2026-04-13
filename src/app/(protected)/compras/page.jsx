@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 
-import RendicionModal from "@/components/compras/RendicionModal";
+
 
 import ComprasKpis from "@/components/compras/ComprasKpis";
 import ImportRcvPanel from "@/components/compras/ImportRcvPanel";
@@ -205,14 +205,7 @@ export default function ComprasPage() {
   const [savingVinc, setSavingVinc] = useState(false);
   const [savingErr, setSavingErr] = useState("");
 
-  // ===== Rendición =====
-  const [openRendicion, setOpenRendicion] = useState(false);
-  const [compraR, setCompraR] = useState(null);
 
-  function openRendicionModal(compra) {
-    setCompraR(compra);
-    setOpenRendicion(true);
-  }
 
   /* =========================
      Loaders
@@ -887,7 +880,7 @@ export default function ComprasPage() {
             }}
             uploadingId={uploadingId}
             onOpenVincular={openVincularModal}
-            onOpenRendicion={openRendicionModal}
+            onOpenRendicion={() => {}} // Dis habilitar vinculación desde aquí
             onUploadPdfClick={(c) => openFilePicker(c.id)}
             fmtDateDMY={fmtDateDMY}
             toCLP={toCLP}
@@ -995,19 +988,7 @@ export default function ComprasPage() {
         sumAsignado={sumAsignado}
       />
 
-      {/* MODAL RENDICIÓN (TU COMPONENTE EXISTENTE) */}
-      <RendicionModal
-        open={openRendicion}
-        onClose={() => {
-          setOpenRendicion(false);
-          setCompraR(null);
-        }}
-        session={session}
-        apiBase={API}
-        compra={compraR}
-        makeHeadersJson={makeHeadersJson}
-        onSaved={() => loadCompras({ page, pageSize })}
-      />
     </div>
+
   );
 }

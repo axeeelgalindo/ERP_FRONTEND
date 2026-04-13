@@ -32,6 +32,7 @@ import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 
 import CotizacionPDFButton from "./CotizacionPDFButton";
+import NuevoPagoDialog from "./NuevoPagoDialog";
 import { fechaCL, formatCLP, nextEstados } from "@/components/cotizaciones/utils/utils";
 
 function Badge({ children }) {
@@ -75,7 +76,7 @@ export default function CotizacionDrawerLight({
 
     useEffect(() => {
       if (!url) return;
-      
+
       const isDocx = url.toLowerCase().endsWith(".docx");
       const isXlsx = url.toLowerCase().endsWith(".xlsx");
       const isPdf = url.toLowerCase().endsWith(".pdf");
@@ -145,7 +146,7 @@ export default function CotizacionDrawerLight({
             <p className="text-sm font-medium text-slate-500">Procesando vista previa...</p>
           </div>
         )}
-        
+
         {error && (
           <div className="flex flex-col items-center justify-center h-full p-8 text-center text-red-500">
             <p>{error}</p>
@@ -156,12 +157,12 @@ export default function CotizacionDrawerLight({
         )}
 
         <div ref={containerRef} className="docx-preview-container" />
-        
+
         {xlsxData && (
-          <div 
+          <div
             className="excel-preview-container overflow-auto"
             dangerouslySetInnerHTML={{ __html: xlsxData }}
-            style={{ 
+            style={{
               maxWidth: "100%",
               fontSize: "12px",
               fontFamily: "Inter, system-ui, sans-serif"
@@ -299,6 +300,10 @@ export default function CotizacionDrawerLight({
     const iva = round0(c?.iva ?? 0);
     const total = round0(c?.total ?? (subtotalNeto + iva));
 
+    const totalPagado = Array.isArray(c?.pagos) ? c.pagos.reduce((a, p) => a + Number(p.monto || 0), 0) : 0;
+    const restanteAPagar = Math.max(0, total - totalPagado);
+    const porcentajePagado = total > 0 ? (totalPagado / total) * 100 : 0;
+
     return {
       subtotalBruto,
       descGlosasMonto,
@@ -308,6 +313,9 @@ export default function CotizacionDrawerLight({
       subtotalNeto,
       iva,
       total,
+      totalPagado,
+      restanteAPagar,
+      porcentajePagado,
     };
   }, [items, c]);
 
@@ -366,6 +374,8 @@ export default function CotizacionDrawerLight({
 
   // Modal Rechazar
   const [openRechazar, setOpenRechazar] = useState(false);
+  const [openNuevoPago, setOpenNuevoPago] = useState(false);
+
   const [motivo, setMotivo] = useState("");
   const [errRechazo, setErrRechazo] = useState("");
   const puedeRechazar = estado === "COTIZACION";
@@ -566,7 +576,7 @@ export default function CotizacionDrawerLight({
                     <th className="px-4 py-3 font-semibold text-slate-600 text-center">
                       Tipo
                     </th>
-                    
+
                     <th className="px-4 py-3 font-semibold text-slate-600 text-right">
                       Descuento
                     </th>
@@ -597,7 +607,7 @@ export default function CotizacionDrawerLight({
                           </span>
                         </td>
 
-                        
+
 
                         <td className="px-4 py-4 text-right font-medium">
                           {formatCLP(desc)} {pct > 0 ? <span className="text-xs text-slate-400">({pct}%)</span> : null}
@@ -623,7 +633,7 @@ export default function CotizacionDrawerLight({
                   <tfoot className="bg-slate-100/50 font-semibold border-t border-slate-200">
                     <tr>
                       <td className="px-4 py-3 text-left text-slate-500" colSpan={4}>
-                        Subtotal 
+                        Subtotal
                       </td>
                       <td className="px-4 py-3 text-right">{formatCLP(totals.subtotalBruto)}</td>
                     </tr>
@@ -655,6 +665,93 @@ export default function CotizacionDrawerLight({
                 ) : null}
               </table>
             </div>
+          </div>
+
+          {/* Historial de Pagos */}
+          <div>
+            <div className="flex items-center justify-between mb-4 mt-8">
+              <h4 className="text-sm font-bold uppercase tracking-wider text-slate-500">
+                Historial de Pagos
+              </h4>
+              <button
+                onClick={() => setOpenNuevoPago(true)}
+                className="text-xs font-semibold px-3 py-1.5 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors"
+              >
+                + Agregar pago
+              </button>
+            </div>
+
+            {Array.isArray(c?.pagos) && c.pagos.length > 0 ? (
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold text-slate-600">Fecha</th>
+                      <th className="px-4 py-3 font-semibold text-slate-600">Comprobante</th>
+                      <th className="px-4 py-3 font-semibold text-slate-600 text-right">Monto Pagado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {c.pagos.map((pago) => (
+                      <tr key={pago.id}>
+                        <td className="px-4 py-3 font-medium text-slate-700">
+                          {fechaCL(pago.fecha)}
+                        </td>
+                        <td className="px-4 py-3">
+                          {pago.comprobante_url ? (
+                            <button
+                              onClick={() => setViewUrl(`${API_URL?.replace("/api", "")}/api${pago.comprobante_url}`)}
+                              className="text-blue-600 hover:text-blue-800 text-xs font-semibold flex items-center gap-1 hover:cursor-pointer"
+                            >
+                              <VisibilityOutlinedIcon fontSize="small" /> Ver
+                            </button>
+                          ) : (
+                            <span className="text-xs text-slate-400">Sin comprobante</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="font-bold text-green-600">{formatCLP(pago.monto)}</div>
+                          {totals.total > 0 && (
+                            <div className="text-[10px] text-slate-400 font-bold mt-0.5">
+                              {((pago.monto / totals.total) * 100).toFixed(1)}%
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-slate-100/50 font-semibold border-t border-slate-200">
+                    <tr>
+                      <td className="px-4 py-3 text-right text-slate-500" colSpan={2}>
+                        Total Pagado
+                        <span className="text-[10px] uppercase block mt-0.5 text-slate-400 font-bold">
+                          {totals.porcentajePagado.toFixed(1)}% de la cotización
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right text-green-700 text-base">
+                        {formatCLP(totals.totalPagado)}
+                      </td>
+                    </tr>
+                    <tr className="border-t border-slate-200 bg-white">
+                      <td className="px-4 py-3 text-right text-slate-500" colSpan={2}>
+                        Restante a Pagar
+                        <span className="text-[10px] uppercase block mt-0.5 text-slate-400 font-bold">
+                          del total de {formatCLP(totals.total)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right text-rose-600 text-base">
+                        {formatCLP(totals.restanteAPagar)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            ) : (
+              <div className="p-6 bg-slate-50 border border-slate-200 border-dashed rounded-xl text-center flex flex-col items-center gap-2">
+                <span className="text-slate-500 text-sm">No hay pagos registrados para esta cotización.</span>
+                <span className="font-semibold text-rose-600 text-sm">Restante a pagar: {formatCLP(totals.total)}</span>
+              </div>
+            )}
           </div>
 
           {/* Documentos Adjuntos */}
@@ -866,7 +963,7 @@ export default function CotizacionDrawerLight({
         </DialogTitle>
         <DialogContent>
           <p className="text-sm text-slate-500">
-            Esta acción marcará la cotización #{c?.numero} como eliminada. 
+            Esta acción marcará la cotización #{c?.numero} como eliminada.
             Esta acción no se puede deshacer fácilmente desde la interfaz.
           </p>
         </DialogContent>
@@ -896,6 +993,21 @@ export default function CotizacionDrawerLight({
           {viewUrl && <FilePreviewer url={viewUrl} />}
         </DialogContent>
       </Dialog>
+
+      {/* Modal Registrar Pago */}
+      <NuevoPagoDialog
+        open={openNuevoPago}
+        onClose={() => setOpenNuevoPago(false)}
+        session={session}
+        cotizacionId={c?.id}
+        restanteAPagar={totals.restanteAPagar}
+        totalCotizacion={totals.total}
+        onCreated={() => {
+          setOpenNuevoPago(false);
+          onRefresh?.();
+        }}
+        showSnack={showSnack}
+      />
     </>
   );
 }

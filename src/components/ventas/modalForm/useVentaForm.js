@@ -616,12 +616,11 @@ export default function useVentaForm({
                const hh = findHHForEmpleado(merged.empleadoId);
                costoUnit = (hh?.costoHH || 0);
                const cif = getHHCIFValue(hh);
-               // Nota: CIF se suma directo al costoBase de la línea: (costoHH * cant + cif) * alpha
-               // VentaLine = (CU * Cant + CIF) * factor
-               // Cant = (VentaLine / factor - CIF) / CU
+               const targetU = (utilidadPctObjetivo === "" || utilidadPctObjetivo == null) ? 0 : Number(utilidadPctObjetivo) / 100;
                if (costoUnit > 0) {
                  const requestedCant = Number(patch.cantidad) || 0;
-                 const maxCant = (maxVentaForThisLine / factor - cif) / costoUnit;
+                 const denom = costoUnit * alphaMult * (1 + targetU);
+                 const maxCant = denom > 0 ? (maxVentaForThisLine / (descIMult * descGMult) - cif) / denom : 0;
                  if (requestedCant > maxCant) {
                    merged.cantidad = Math.max(1, Math.floor(maxCant * 100) / 100);
                  }
@@ -702,11 +701,13 @@ export default function useVentaForm({
 
       let costoSinAlpha = 0;
 
+      let cifLine = 0;
       if (d?.modo === "HH") {
         const hh = findHHForEmpleado(d?.empleadoId);
         const costoHH = hh?.costoHH != null ? Number(hh.costoHH) : 0;
         const cif = getHHCIFValue(hh);
-        costoSinAlpha = cantidad > 0 ? costoHH * cantidad + cif : 0;
+        cifLine = cantidad > 0 ? cif : 0;
+        costoSinAlpha = cantidad > 0 ? costoHH * cantidad : 0;
       } else {
         const manualPU = getManualPUNumber(d);
         const costoUnit = Number.isFinite(manualPU) ? manualPU : 0;
@@ -719,18 +720,7 @@ export default function useVentaForm({
       const descI = normalizeDescPctUI(d?.descuentoPct);
       const descIMult = 1 - descI / 100;
 
-      // ✅ NUEVO: Guardamos el costo sin CIF para la utilidad
-      let costoSinAlphaNeto = 0;
-      if (d?.modo === "HH") {
-        const hh = findHHForEmpleado(d?.empleadoId);
-        const costoHH = hh?.costoHH != null ? Number(hh.costoHH) : 0;
-        costoSinAlphaNeto = cantidad > 0 ? costoHH * cantidad : 0;
-      } else {
-        costoSinAlphaNeto = costoSinAlpha; // COMPRA no tiene CIF
-      }
-      const costoLineNeto = costoSinAlphaNeto * alphaMult;
-
-      return { costoBase, ventaBaseActual, descI, descIMult, costoLineNeto };
+      return { costoBase, ventaBaseActual, descI, descIMult, cifLine };
     });
 
     const totalCostoBase = linesBase.reduce((acc, x) => acc + (Number(x.costoBase) || 0), 0);
@@ -742,11 +732,9 @@ export default function useVentaForm({
     const uPct = utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo);
     const targetU = uPct != null && Number.isFinite(uPct) && uPct >= 0 ? uPct / 100 : 0;
 
-    // ✅ NUEVO: Cálculo de Venta basado en Markup sobre Costo Neto (sin CIF)
-    // totalVentaTarget = Sum(CostoTotalLine + CostoNetoLine * targetU)
     const totalCostoFinalBase = linesBase.reduce((acc, x) => acc + (Number(x.costoBase) || 0), 0);
-    const totalProfitTarget = linesBase.reduce((acc, x) => acc + (Number(x.costoLineNeto || 0) * targetU), 0);
-    const totalVentaTarget = totalCostoFinalBase + totalProfitTarget;
+    const totalCIF = linesBase.reduce((acc, x) => acc + (Number(x.cifLine) || 0), 0);
+    const totalVentaTarget = totalCostoFinalBase * (1 + targetU) + totalCIF;
 
     let k = 1;
     if (totalCostoFinalBase > 0) {
@@ -758,9 +746,7 @@ export default function useVentaForm({
     const lines = linesBase.map((x) => {
       const costoTotal = Number(x.costoBase) || 0;
 
-      // ✅ NUEVO: Aplicamos Markup sobre Neto de forma precisa por línea
-      // VentaBrutaLine = CostoTotalLine + (CostoNetoLine * targetU)
-      const bruto = costoTotal + (x.costoLineNeto * targetU);
+      const bruto = (costoTotal * (1 + targetU)) + (x.cifLine || 0);
 
       // descuentos: item + general
       const neto = bruto * (x.descIMult ?? 1) * descGMult;

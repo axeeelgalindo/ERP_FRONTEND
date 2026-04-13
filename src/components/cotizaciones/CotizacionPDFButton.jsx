@@ -438,12 +438,12 @@ export default function CotizacionPDFButton({ cotizacion }) {
           valign: "top",
         },
         columnStyles: {
-          0: { cellWidth: 78 }, // descripción
-          1: { cellWidth: 16, halign: "right" }, // cantidad
+          0: { cellWidth: 74 }, // descripción
+          1: { cellWidth: 20, halign: "right" }, // cantidad
           2: { cellWidth: 30, halign: "right" }, // unitario
           3: { cellWidth: 20, halign: "right" }, // % desc
           4: { cellWidth: 30, halign: "right" }, // impuestos
-          5: { cellWidth: tableW - (78 + 16 + 30 + 20 + 30), halign: "right" }, // importe
+          5: { cellWidth: tableW - (74 + 20 + 30 + 20 + 30), halign: "right" }, // importe
         },
         didParseCell: (data) => {
           data.cell.styles.lineWidth = data.section === "head" ? 0.25 : 0.18;

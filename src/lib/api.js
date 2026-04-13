@@ -70,12 +70,12 @@ export async function serverApi(
 /**
  * Útil para CLIENT COMPONENTS (fetch desde el browser) con useSession()
  */
-export function makeHeaders(session, empresaIdOverride) {
+export function makeHeaders(session, { empresaIdOverride, skipContentType = false } = {}) {
   const token = session?.user?.accessToken || "";
   const empresaId = empresaIdOverride ?? session?.user?.empresaId ?? null;
 
   return {
-    "Content-Type": "application/json",
+    ...(skipContentType ? {} : { "Content-Type": "application/json" }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(empresaId ? { "x-empresa-id": String(empresaId) } : {}),
   };

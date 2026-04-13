@@ -12,6 +12,8 @@ import {
   Alert,
   Box,
   MenuItem,
+  FormControlLabel,
+  Switch,
 } from "@mui/material";
 import { makeHeaders } from "@/lib/api";
 
@@ -36,8 +38,29 @@ export default function EpicaFormModal({
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [estado, setEstado] = useState("pendiente");
+  const [esPlanificado, setEsPlanificado] = useState(true);
+
+  // Reales
+  const [fechaInicioReal, setFechaInicioReal] = useState("");
+  const [fechaFinReal, setFechaFinReal] = useState("");
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  // Helper local (igual q en tarea)
+  function toISODateInput(d) {
+    if (!d) return "";
+    try {
+      const dt = new Date(d);
+      if (Number.isNaN(dt.getTime())) return "";
+      const yyyy = dt.getFullYear();
+      const mm = String(dt.getMonth() + 1).padStart(2, "0");
+      const dd = String(dt.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    } catch {
+      return "";
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -46,6 +69,10 @@ export default function EpicaFormModal({
     setNombre(epica?.nombre || "");
     setDescripcion(epica?.descripcion || "");
     setEstado(epica?.estado || "pendiente");
+    setEsPlanificado(epica?.es_planificado ?? true);
+
+    setFechaInicioReal(toISODateInput(epica?.fecha_inicio_real));
+    setFechaFinReal(toISODateInput(epica?.fecha_fin_real));
   }, [open, epica]);
 
   const canSave = useMemo(() => nombre.trim().length >= 2 && !!proyectoId, [nombre, proyectoId]);
@@ -70,6 +97,7 @@ export default function EpicaFormModal({
           nombre: nombre.trim(),
           descripcion: descripcion.trim() || null,
           estado,
+          es_planificado: esPlanificado,
         };
 
         const res = await fetch(`${API}/epicas/add`, {
@@ -90,6 +118,9 @@ export default function EpicaFormModal({
         nombre: nombre.trim(),
         descripcion: descripcion.trim() || null,
         estado,
+        es_planificado: esPlanificado,
+        ...(isEdit && fechaInicioReal ? { fecha_inicio_real: new Date(fechaInicioReal).toISOString() } : {}),
+        ...(isEdit && fechaFinReal ? { fecha_fin_real: new Date(fechaFinReal).toISOString() } : {}),
       };
 
       const res = await fetch(`${API}/epicas/update/${epica.id}`, {
@@ -140,6 +171,32 @@ export default function EpicaFormModal({
               </MenuItem>
             ))}
           </TextField>
+
+          <FormControlLabel
+            control={<Switch checked={esPlanificado} onChange={(e) => setEsPlanificado(e.target.checked)} color="primary" />}
+            label="Definido en Planificación Inicial"
+          />
+
+          {isEdit && (
+            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+              <TextField
+                label="Inicio real (manual)"
+                type="date"
+                value={fechaInicioReal}
+                onChange={(e) => setFechaInicioReal(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+              />
+              <TextField
+                label="Fin real (manual)"
+                type="date"
+                value={fechaFinReal}
+                onChange={(e) => setFechaFinReal(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+              />
+            </Box>
+          )}
 
           <TextField
             label="Descripción (opcional)"

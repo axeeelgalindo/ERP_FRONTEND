@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { makeHeaders } from "@/lib/api";
 
 function toCLP(v) {
@@ -37,36 +37,42 @@ export default function RendicionDetailDrawer({
   const [searchingCompras, setSearchingCompras] = useState(false);
   const [availableCompras, setAvailableCompras] = useState([]);
   const [loadingCompras, setLoadingCompras] = useState(false);
-
-  if (!open || !rendicion) return null;
-
-  const fetchAvailableCompras = async () => {
+  const [compraSearch, setCompraSearch] = useState("");
+  const fetchAvailableCompras = async (query = "") => {
     setLoadingCompras(true);
     try {
-      const params = new URLSearchParams({
-        sinRendicion: "true",
-        pageSize: "100",
-      });
-      if (rendicion.proyecto_id) params.append("proyectoId", rendicion.proyecto_id);
+      const params = new URLSearchParams();
+      params.append("page", "1");
+      params.append("pageSize", "100");
+      params.append("sinRendicion", "true");
+      if (query.trim()) params.append("q", query);
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/compras?${params.toString()}`, {
         headers: makeHeaders(session),
       });
       const data = await res.json();
-      
-      // Filtrado extra por destino/centro para asegurar compatibilidad total si no es proyecto
-      const compatible = (data.data || []).filter(c => {
-        if (rendicion.proyecto_id) return c.proyecto_id === rendicion.proyecto_id;
-        return c.destino === rendicion.destino && c.centro_costo === rendicion.centro_costo;
-      });
-
-      setAvailableCompras(compatible);
+      setAvailableCompras(data.data || []);
     } catch (e) {
       console.error(e);
     } finally {
       setLoadingCompras(false);
     }
   };
+
+  // Debouncing de búsqueda
+  useEffect(() => {
+    if (!open || !rendicion || !searchingCompras) return;
+    
+    const delayDebounceFn = setTimeout(() => {
+      fetchAvailableCompras(compraSearch);
+    }, 400);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [compraSearch, searchingCompras, open, rendicion]);
+
+  if (!open || !rendicion) return null;
+
+
 
   const handleLinkCompra = async (compraId) => {
     try {
@@ -78,7 +84,7 @@ export default function RendicionDetailDrawer({
         body: JSON.stringify({ rendicion_id: rendicion.id }),
       });
       if (!res.ok) throw new Error("Error al vincular compra");
-      
+
       setSearchingCompras(false);
       onRefresh?.();
     } catch (e) {
@@ -97,7 +103,7 @@ export default function RendicionDetailDrawer({
         body: JSON.stringify({ rendicion_id: null }),
       });
       if (!res.ok) throw new Error("Error al desvincular compra");
-      
+
       onRefresh?.();
     } catch (e) {
       alert(e.message);
@@ -105,14 +111,15 @@ export default function RendicionDetailDrawer({
   };
 
   const items = rendicion.items || [];
-  const saldo = (rendicion.monto_total || 0) - (rendicion.monto_entregado || 0);
+  const saldo = (rendicion.monto_entregado || 0) - (rendicion.monto_total || 0);
 
   const handleSavePaid = () => {
     const val = Number(newPaidAmount);
     if (isNaN(val) || val < 0) return alert("Monto inválido");
-    
+
+    // El máximo a liquidar es el valor absoluto del saldo
     const max = Math.abs(saldo);
-    if (val > max) {
+    if (val > max + 0.01) { // Pequeño margen para redondeo
       alert(`El monto no puede superar el saldo pendiente de ${toCLP(max)}`);
       setNewPaidAmount(max);
       return;
@@ -132,7 +139,7 @@ export default function RendicionDetailDrawer({
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rendiciones/${rendicion.id}/documento?type=${type}`, {
         method: "POST",
         headers: {
-          ...makeHeaders(session),
+          ...makeHeaders(session, { skipContentType: true }),
         },
         body: fd,
       });
@@ -148,316 +155,378 @@ export default function RendicionDetailDrawer({
   };
 
   return (
-    <div className="fixed inset-y-0 right-0 z-[100] w-full max-w-xl bg-white shadow-2xl flex flex-col transition-transform duration-300 transform translate-x-0">
-      {/* Header */}
-      <div className="p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50/50 sticky top-0 z-10 transition-colors">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-             <span className="bg-slate-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest">
-              Rendición
-            </span>
-            <h2 className="text-xl font-black text-slate-900 tracking-tight">
-              RD-{String(rendicion.id).slice(-6).toUpperCase()}
-            </h2>
-          </div>
-          <p className="text-xs text-slate-500 font-medium">
-            Creada el {fmtDateDMY(rendicion.creado_en)} por {rendicion.empleado?.nombre || "Empleado"}
-          </p>
-        </div>
-        <button
-          onClick={onClose}
-          className="p-2 hover:bg-slate-200 rounded-full transition-colors font-bold text-slate-400 hover:text-slate-900"
-        >
-          ✕
-        </button>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-8 space-y-8">
-        {/* Info Grid (Look Financiero) */}
-        <div className="grid grid-cols-2 gap-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Monto Entregado</label>
-            <p className="text-sm font-black text-slate-900">{toCLP(rendicion.monto_entregado)}</p>
-            {rendicion.doc_entrega_url ? (
-              <a href={`${process.env.NEXT_PUBLIC_API_URL}${rendicion.doc_entrega_url}`} target="_blank" className="text-[9px] text-blue-600 font-bold uppercase underline">Ver Comprobante</a>
-            ) : (
-              <label className="text-[9px] text-slate-400 font-bold uppercase cursor-pointer hover:text-slate-900">
-                + Subir
-                <input type="file" className="hidden" onChange={(e) => handleMainDocUpload("entrega", e.target.files?.[0])} />
-              </label>
-            )}
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Monto Rendido</label>
-            <p className="text-sm font-black text-slate-900">{toCLP(rendicion.monto_total)}</p>
-          </div>
-
-          <div className="space-y-1 border-t border-slate-200 pt-3">
-             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
-                {saldo >= 0 ? "A Reembolsar" : "A Devolver"}
-             </label>
-             <p className={`text-lg font-black ${saldo >= 0 ? "text-blue-600" : "text-rose-600"}`}>
-                {toCLP(Math.abs(saldo))}
-             </p>
-          </div>
-
-          <div className="space-y-1 border-t border-slate-200 pt-3">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Liquidado (Pagado)</label>
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-black text-emerald-600">{toCLP(rendicion.monto_pagado)}</p>
-              <button 
-                onClick={() => {
-                  setNewPaidAmount(rendicion.monto_pagado || 0);
-                  setEditPaid(!editPaid);
-                }}
-                className="text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-400 hover:text-slate-900 transition-colors uppercase font-bold"
-              >
-                {editPaid ? "✕" : "Modificar"}
-              </button>
-            </div>
-            {rendicion.doc_reembolso_url ? (
-              <a href={`${process.env.NEXT_PUBLIC_API_URL}${rendicion.doc_reembolso_url}`} target="_blank" className="text-[9px] text-blue-600 font-bold uppercase underline">Ver Comprobante Final</a>
-            ) : (
-               <label className="text-[9px] text-slate-400 font-bold uppercase cursor-pointer hover:text-slate-900">
-                + Comprobante Pago/Dev
-                <input type="file" className="hidden" onChange={(e) => handleMainDocUpload("reembolso", e.target.files?.[0])} />
-              </label>
-            )}
-
-            {editPaid && (
-              <div className="mt-2 flex gap-2">
-                <input 
-                  type="number"
-                  value={newPaidAmount}
-                  onChange={(e) => setNewPaidAmount(e.target.value)}
-                  className="w-full text-xs p-1 border rounded outline-none focus:ring-1 focus:ring-slate-900"
-                  placeholder="Monto..."
-                />
-                <button 
-                  onClick={handleSavePaid}
-                  className="bg-slate-900 text-white text-[10px] px-2 py-1 rounded"
-                >
-                  OK
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Info Grid 2 */}
-        <div className="grid grid-cols-2 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
-           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Estado</label>
-            <p className="text-sm font-black text-slate-900 uppercase">{rendicion.estado}</p>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Proyecto / Centro</label>
-            <p className="text-sm font-bold text-slate-700">{rendicion.proyecto?.nombre || rendicion.centro_costo || "-"}</p>
-          </div>
-        </div>
-
-        {/* Items */}
-        <div className="space-y-4">
-          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">
-            Ítems de la Rendición
-          </h3>
-          <div className="space-y-3">
-            {items.map((it, idx) => (
-              <div key={idx} className="p-4 bg-white border border-slate-100 rounded-xl hover:border-slate-300 transition-all flex justify-between items-center group">
-                <div className="space-y-0.5">
-                  <p className="text-xs text-slate-400 font-bold">{fmtDateDMY(it.fecha)} · {it.categoria || "Gasto"}</p>
-                  <p className="text-sm font-bold text-slate-800">{it.descripcion}</p>
-                </div>
-                <div className="text-right flex flex-col items-end gap-1">
-                  <p className="text-sm font-black text-slate-900">{toCLP(it.monto)}</p>
-                  {it.comprobante_url && (
-                    <a
-                      href={`${process.env.NEXT_PUBLIC_API_URL}${it.comprobante_url}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] font-bold text-blue-600 hover:text-blue-800 uppercase tracking-tighter"
-                    >
-                      Ver Comprobante ↗
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Related Compras */}
-        <div className="space-y-4 pt-4 border-t border-slate-100">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-            <div>
-              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest">
-                Documentos ERP Vinculados
-              </h3>
-              <p className="text-[10px] text-slate-400 font-medium mt-0.5">Vínculo con facturas oficiales en el sistema.</p>
-            </div>
-            <button 
-              onClick={() => {
-                setSearchingCompras(!searchingCompras);
-                if (!searchingCompras) fetchAvailableCompras();
-              }}
-              className={`text-[10px] font-bold px-3 py-1 rounded-full transition-all uppercase tracking-tighter ${
-                searchingCompras ? "bg-slate-100 text-slate-500" : "bg-blue-50 text-blue-600 hover:bg-blue-100"
-              }`}
-            >
-              {searchingCompras ? "Cerrar" : "+ Vincular Factura"}
-            </button>
-          </div>
-
-          {searchingCompras && (
-            <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-              <p className="text-[10px] font-bold text-blue-400 uppercase tracking-tight">Seleccionar Factura para vincular</p>
-              {loadingCompras ? (
-                <div className="py-4 flex justify-center">
-                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                </div>
-              ) : availableCompras.length === 0 ? (
-                <p className="text-xs text-slate-500 italic text-center py-2 bg-white/50 rounded-lg">No hay facturas compatibles sin rendición.</p>
-              ) : (
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-                  {availableCompras.map(c => (
-                    <div key={c.id} className="flex justify-between items-center bg-white p-2.5 rounded-lg border border-blue-100/50 shadow-sm hover:border-blue-300 transition-colors group">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold text-slate-900">Folio {c.folio || c.numero}</span>
-                        <span className="text-[10px] text-slate-500 font-medium">{c.proveedor?.nombre || "Sin Proveedor"}</span>
-                        <span className="text-[9px] text-slate-400 font-bold uppercase">{toCLP(c.total)}</span>
-                      </div>
-                      <button 
-                        onClick={() => handleLinkCompra(c.id)}
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black rounded-lg transition-all active:scale-95 shadow-sm"
-                      >
-                        Vincular
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-3">
-            {rendicion.compras?.length > 0 ? (
-              <>
-                <div className="space-y-2">
-                  {rendicion.compras.map((c) => (
-                    <div key={c.id} className="flex justify-between items-center text-sm p-4 bg-white border border-slate-100 rounded-xl hover:border-slate-200 transition-all shadow-sm group">
-                      <div className="flex items-center gap-3">
-                         <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 font-black text-[10px]">
-                           DOC
-                         </div>
-                         <div className="flex flex-col">
-                            <span className="font-bold text-slate-900 text-xs">#{c.numero} {c.proveedor?.nombre && `· ${c.proveedor.nombre}`}</span>
-                            <span className="text-[10px] text-slate-400 font-medium">Documento Vinculado</span>
-                         </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="font-black text-slate-900 text-xs">{toCLP(c.total)}</span>
-                        <button 
-                          onClick={() => handleUnlinkCompra(c.id)}
-                          className="text-[9px] text-rose-500 hover:text-rose-700 font-bold uppercase opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          Quitar Vínculo
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Comparación de Totales */}
-                <div className="mt-4 p-4 bg-slate-900 rounded-2xl text-white space-y-2 shadow-xl">
-                  <div className="flex justify-between items-center opacity-60">
-                    <span className="text-[10px] font-bold uppercase tracking-widest">Total Rendido</span>
-                    <span className="text-xs font-bold">{toCLP(rendicion.monto_total)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Total Documentado (ERP)</span>
-                    <span className="text-xs font-black text-emerald-400">
-                      {toCLP(rendicion.compras.reduce((acc, c) => acc + (c.total || 0), 0))}
-                    </span>
-                  </div>
-                  <div className="pt-2 border-t border-white/10 flex justify-between items-center">
-                    <span className="text-[10px] font-bold uppercase tracking-widest">Calce de Gastos</span>
-                    <span className={`text-sm font-black ${
-                      Math.abs(rendicion.monto_total - rendicion.compras.reduce((acc, c) => acc + (c.total || 0), 0)) < 10 
-                        ? "text-emerald-400" 
-                        : "text-amber-400"
-                    }`}>
-                      {rendicion.monto_total - rendicion.compras.reduce((acc, c) => acc + (c.total || 0), 0) === 0 
-                        ? "MATCH TOTAL" 
-                        : `Diferencia: ${toCLP(rendicion.monto_total - rendicion.compras.reduce((acc, c) => acc + (c.total || 0), 0))}`}
-                    </span>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="py-6 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
-                 <p className="text-xs text-slate-400 font-bold uppercase tracking-tighter">Sin facturas vinculadas</p>
-                 <button 
-                  onClick={() => {
-                    setSearchingCompras(true);
-                    fetchAvailableCompras();
-                  }}
-                  className="mt-2 text-[10px] font-black text-blue-600 hover:underline uppercase"
-                 >
-                   Vincular ahora
-                 </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Footer Actions */}
-      <div className="p-8 border-t border-slate-100 bg-white sticky bottom-0 z-10 flex flex-wrap gap-3">
-        {rendicion.estado?.toUpperCase() === "PENDIENTE" && (
-          <button
-            onClick={() => onUpdateStatus(rendicion.id, "aprobada")}
-            disabled={loading}
-            className="flex-1 min-w-[120px] py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-sm uppercase tracking-widest rounded-2xl shadow-lg shadow-blue-100 transition-all active:scale-95 disabled:opacity-50"
-          >
-            Aprobar
-          </button>
-        )}
-        {(rendicion.estado?.toUpperCase() === "PENDIENTE" || rendicion.estado?.toUpperCase() === "APROBADA") && (
-          <button
-            onClick={() => onUpdateStatus(rendicion.id, "rechazada")}
-            disabled={loading}
-            className="flex-1 min-w-[120px] py-3 bg-rose-600 hover:bg-rose-700 text-white font-black text-sm uppercase tracking-widest rounded-2xl shadow-lg shadow-rose-100 transition-all active:scale-95 disabled:opacity-50"
-          >
-            Rechazar
-          </button>
-        )}
-        {(rendicion.estado?.toUpperCase() === "PENDIENTE" || rendicion.estado?.toUpperCase() === "APROBADA" || rendicion.estado?.toUpperCase() === "PAGADA_PARCIAL") && (
-          <button
-            onClick={() => {
-              setNewPaidAmount(Math.abs(saldo));
-              setEditPaid(true);
-            }}
-            disabled={loading}
-            className="flex-1 min-w-[120px] py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm uppercase tracking-widest rounded-2xl shadow-lg shadow-emerald-100 transition-all active:scale-95 disabled:opacity-50"
-          >
-            Saldar Balance
-          </button>
-        )}
-        <button
-          onClick={onClose}
-          className="px-6 py-3 border border-slate-200 text-slate-500 font-bold text-sm uppercase tracking-widest rounded-2xl hover:bg-slate-50 transition-all"
-        >
-          Cerrar
-        </button>
-      </div>
-
-      {/* Overlay to close when clicking outside */}
+    <>
+      {/* Backdrop */}
       <div
-        className="fixed inset-0 -z-10 bg-black/20 backdrop-blur-sm"
+        className={`fixed inset-0 bg-on-surface/40 backdrop-blur-sm z-[90] transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
         onClick={onClose}
       />
-    </div>
+
+      <aside className={`fixed inset-y-0 right-0 w-full max-w-[540px] bg-white shadow-2xl z-[100] flex flex-col transition-transform duration-500 ease-out transform ${open ? "translate-x-0" : "translate-x-full"}`}>
+        {/* Header */}
+        <header className="px-8 py-6 flex items-center justify-between bg-white border-b border-outline-variant/10">
+          <div>
+            <h1 className="text-on-surface font-bold text-xl tracking-tight leading-none mb-1">
+              Rendición RD-{String(rendicion.id).slice(-6).toUpperCase()}
+            </h1>
+            <p className="text-on-surface-variant text-xs font-medium tracking-wide flex items-center gap-2 uppercase">
+              <span className="material-symbols-outlined text-[16px]">account_tree</span>
+              {rendicion.proyecto?.nombre || rendicion.centro_costo || rendicion.destino || "Sin Destino"}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-surface-container-low transition-colors outline-none"
+          >
+            <span className="material-symbols-outlined text-on-surface-variant">close</span>
+          </button>
+        </header>
+
+        <div className="flex-1 overflow-y-auto px-8 py-6 space-y-8 pb-32 scrollbar-none">
+          {/* Financial Summary: Bento Style */}
+          <section className="grid grid-cols-3 gap-3">
+            {/* Anticipo */}
+            <div className="p-4 bg-white rounded-xl shadow-sm border-l-4 border-primary/40 flex flex-col justify-between min-h-[90px]">
+              <div>
+                <p className="text-[10px] font-bold text-on-surface-variant tracking-widest uppercase mb-1 whitespace-nowrap overflow-hidden text-ellipsis">Fondo por rendir</p>
+                <p className="text-lg font-bold text-on-surface tracking-tight">{toCLP(rendicion.monto_entregado)}</p>
+              </div>
+              {rendicion.doc_entrega_url ? (
+                <a href={`${process.env.NEXT_PUBLIC_API_URL}${rendicion.doc_entrega_url}`} target="_blank" className="text-[9px] text-primary font-bold uppercase underline">Ver</a>
+              ) : (
+                <label className="text-[9px] text-outline font-bold uppercase cursor-pointer hover:text-on-surface">
+                  + Subir
+                  <input type="file" className="hidden" onChange={(e) => handleMainDocUpload("entrega", e.target.files?.[0])} />
+                </label>
+              )}
+            </div>
+
+            {/* Rendido */}
+            <div className="p-4 bg-white rounded-xl shadow-sm border-l-4 border-secondary/60 flex flex-col justify-between min-h-[90px]">
+              <div>
+                <p className="text-[10px] font-bold text-on-surface-variant tracking-widest uppercase mb-1 whitespace-nowrap overflow-hidden text-ellipsis">Rendido</p>
+                <p className="text-lg font-bold text-on-surface tracking-tight">{toCLP(rendicion.monto_total)}</p>
+              </div>
+              <p className="text-[9px] text-on-surface-variant font-bold uppercase">{items.length} Items</p>
+            </div>
+
+            {/* Balance */}
+            <div className={`p-4 bg-white rounded-xl shadow-sm border-l-4 ${saldo < 0 ? "border-error" : "border-secondary"} flex flex-col justify-between min-h-[90px]`}>
+              <div>
+                <p className="text-[10px] font-bold text-on-surface-variant tracking-widest uppercase mb-1 whitespace-nowrap overflow-hidden text-ellipsis">
+                  {saldo < 0 ? "Reembolsar" : "Devolver"}
+                </p>
+                <p className={`text-lg font-bold tracking-tight ${saldo < 0 ? "text-error" : "text-primary"}`}>
+                  {saldo > 0 ? "+" : ""}{toCLP(saldo)}
+                </p>
+              </div>
+              <span className={`text-[9px] font-bold uppercase ${saldo < 0 ? "text-error/70" : "text-primary/70"}`}>
+                {saldo < 0 ? "Empresa →" : "→ Empresa"}
+              </span>
+            </div>
+          </section>
+
+          {/* Settled / Remaining section */}
+          <section className="bg-surface-container-low/50 p-5 rounded-2xl border border-outline-variant/10 flex items-center justify-between">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-outline uppercase tracking-widest leading-none">
+                {saldo <= 0 ? "Reembolsado" : "Devuelto"}
+              </label>
+              <div className="flex items-center gap-2">
+                {editPaid ? (
+                  <div className="flex items-center gap-1">
+                    <input
+                      autoFocus
+                      type="number"
+                      className="w-24 h-7 text-xs border-primary rounded px-2 outline-none focus:ring-1 focus:ring-primary/30"
+                      value={newPaidAmount}
+                      onChange={(e) => setNewPaidAmount(e.target.value)}
+                    />
+                    <button onClick={handleSavePaid} className="bg-primary text-white text-[10px] px-2 py-1 rounded font-bold">OK</button>
+                    <button onClick={() => setEditPaid(false)} className="text-outline text-[14px] p-1 font-bold">✕</button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <p className={`text-sm font-black ${saldo <= 0 ? "text-error" : "text-secondary"}`}>{toCLP(rendicion.monto_pagado)}</p>
+                    {rendicion.estado?.toUpperCase() !== "PAGADA" && (
+                      <button
+                        onClick={() => {
+                          setNewPaidAmount(rendicion.monto_pagado || 0);
+                          setEditPaid(true);
+                        }}
+                        className="text-[10px] bg-white border border-outline-variant/20 px-1.5 py-0.5 rounded text-outline hover:text-on-surface transition-all uppercase font-bold"
+                      >
+                        Saldar
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="text-right space-y-1">
+              <label className="text-[10px] font-bold text-outline uppercase tracking-widest leading-none">Restante</label>
+              <p className={`text-sm font-black ${Math.abs(Math.abs(saldo) - (rendicion.monto_pagado || 0)) < 1 ? "text-secondary" : "text-on-surface"}`}>
+                {toCLP(Math.abs(Math.abs(saldo) - (rendicion.monto_pagado || 0)))}
+              </p>
+            </div>
+          </section>
+
+          {/* Documentos de Respaldo */}
+          <section className="space-y-4">
+            <h3 className="text-sm font-bold text-on-surface tracking-tight uppercase tracking-wider">Documentos de Respaldo</h3>
+
+            <div className="space-y-3">
+              {/* Documento 1: Anticipo */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest leading-none">Vale de Anticipo / Entrega</p>
+                  {rendicion.doc_entrega_url && <span className="text-primary font-bold text-[9px] uppercase">Cargado ✓</span>}
+                </div>
+                {rendicion.doc_entrega_url ? (
+                  <div className="p-3 bg-surface-container-low rounded-xl flex items-center justify-between border border-outline-variant/10 group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                        <span className="material-symbols-outlined text-primary text-lg">payments</span>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-on-surface">Comprobante de Entrega</p>
+                        <p className="text-[9px] text-on-surface-variant font-medium">Respaldo del monto entregado</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <a href={`${process.env.NEXT_PUBLIC_API_URL}${rendicion.doc_entrega_url}`} target="_blank" className="p-1.5 hover:bg-surface-container-high rounded-lg text-primary transition-colors">
+                        <span className="material-symbols-outlined text-[20px]">visibility</span>
+                      </a>
+                      <label className="p-1.5 hover:bg-surface-container-high rounded-lg text-outline-variant transition-colors cursor-pointer">
+                        <span className="material-symbols-outlined text-[20px]">edit</span>
+                        <input type="file" className="hidden" onChange={(e) => handleMainDocUpload("entrega", e.target.files?.[0])} />
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-16 border-2 border-dashed border-outline-variant/20 bg-surface-container-low/30 rounded-xl flex items-center justify-center gap-3 group cursor-pointer hover:border-primary/30 transition-all relative">
+                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleMainDocUpload("entrega", e.target.files?.[0])} />
+                    <span className="material-symbols-outlined text-primary opacity-40 group-hover:scale-110 transition-transform">cloud_upload</span>
+                    <span className="text-[10px] font-bold text-on-surface-variant uppercase">Subir vale de anticipo</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Documento 2: Liquidación */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest leading-none">Comprobante de Liquidación Final</p>
+                  {rendicion.doc_reembolso_url && <span className="text-secondary font-bold text-[9px] uppercase">Cargado ✓</span>}
+                </div>
+                {rendicion.doc_reembolso_url ? (
+                  <div className="p-3 bg-surface-container-low rounded-xl flex items-center justify-between border border-outline-variant/10 group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                        <span className="material-symbols-outlined text-secondary text-lg">receipt_long</span>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-on-surface">Voucher de Cierre</p>
+                        <p className="text-[9px] text-on-surface-variant font-medium">Respaldo del saldo final</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <a href={`${process.env.NEXT_PUBLIC_API_URL}${rendicion.doc_reembolso_url}`} target="_blank" className="p-1.5 hover:bg-surface-container-high rounded-lg text-primary transition-colors">
+                        <span className="material-symbols-outlined text-[20px]">visibility</span>
+                      </a>
+                      <label className="p-1.5 hover:bg-surface-container-high rounded-lg text-outline-variant transition-colors cursor-pointer">
+                        <span className="material-symbols-outlined text-[20px]">edit</span>
+                        <input type="file" className="hidden" onChange={(e) => handleMainDocUpload("reembolso", e.target.files?.[0])} />
+                      </label>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-16 border-2 border-dashed border-outline-variant/20 bg-surface-container-low/30 rounded-xl flex items-center justify-center gap-3 group cursor-pointer hover:border-primary/30 transition-all relative">
+                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleMainDocUpload("reembolso", e.target.files?.[0])} />
+                    <span className="material-symbols-outlined text-secondary opacity-40 group-hover:scale-110 transition-transform">cloud_upload</span>
+                    <span className="text-[10px] font-bold text-on-surface-variant uppercase">Subir voucher de liquidación</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* Vincular Factura ERP */}
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-on-surface tracking-tight uppercase tracking-wider">Facturas ERP</h3>
+              <button
+                onClick={() => {
+                  setSearchingCompras(!searchingCompras);
+                  if (!searchingCompras) fetchAvailableCompras();
+                }}
+                className={`text-[10px] font-black px-4 py-1.5 rounded-full transition-all ${searchingCompras ? "bg-primary text-white shadow-lg shadow-primary/20" : "bg-primary/5 text-primary border border-primary/20 hover:bg-primary/10"}`}
+              >
+                {searchingCompras ? "CERRAR" : "+ VINCULAR ERP"}
+              </button>
+            </div>
+
+            {searchingCompras ? (
+              <div className="bg-surface-container-low rounded-xl p-4 space-y-3 border border-primary/10 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex flex-col gap-2 mb-2">
+                  <p className="text-[10px] font-bold text-on-surface-variant uppercase">Facturas disponibles en contexto</p>
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-xs text-outline">search</span>
+                    <input
+                      type="text"
+                      placeholder="Buscar por folio o proveedor..."
+                      className="w-full pl-7 pr-3 py-1.5 bg-white border border-outline-variant/20 rounded-lg text-[11px] focus:ring-1 focus:ring-primary outline-none transition-all"
+                      value={compraSearch}
+                      onChange={(e) => setCompraSearch(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {loadingCompras ? (
+                  <div className="h-12 animate-pulse bg-surface-container-high rounded-xl" />
+                ) : availableCompras.length > 0 ? (
+                  <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 scrollbar-none">
+                    {availableCompras.map(c => (
+                      <div key={c.id} className="p-3 bg-white rounded-xl border border-outline-variant/10 flex items-center justify-between hover:border-primary/30 transition-all group shadow-sm">
+                        <div className="flex flex-col min-w-0 pr-2">
+                          <span className="text-xs font-bold text-on-surface truncate">
+                            {c.descripcion || (c.tipo_doc === 33 ? "Factura Electrónica" : "Documento")}
+                          </span>
+                          <span className="text-[10px] text-on-surface-variant font-medium uppercase tracking-tight truncate">
+                            #{c.numero || c.folio} • {c.proveedor?.nombre?.slice(0, 25)}
+                          </span>
+                          <span className="text-[10px] text-primary font-black mt-0.5">{toCLP(c.monto_total || c.total)}</span>
+                        </div>
+                        <button
+                          onClick={() => handleLinkCompra(c.id)}
+                          className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all shadow-sm bg-surface-container-low"
+                          title="Vincular a esta rendición"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">link</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-center text-on-surface-variant py-8 opacity-60">
+                    {compraSearch ? "No se encontraron facturas que coincidan." : "No se encontraron facturas pendientes."}
+                  </p>
+                )}
+              </div>
+            ) : rendicion.compras?.length > 0 ? (
+              <div className="space-y-2">
+                {rendicion.compras.map(c => (
+                  <div key={c.id} className="p-4 bg-surface-container-low border border-outline-variant/10 rounded-xl flex items-center gap-4 group">
+                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                      <span className="material-symbols-outlined text-on-surface-variant">receipt_long</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-on-surface truncate uppercase tracking-tight">{c.descripcion || `Doc #${c.numero || c.folio}`}</p>
+                      <p className="text-[10px] text-on-surface-variant font-medium uppercase">{c.proveedor?.nombre}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-bold text-on-surface">{toCLP(c.monto_total || c.total)}</p>
+                      <button
+                        onClick={() => handleUnlinkCompra(c.id)}
+                        className="text-[10px] text-error hover:underline font-bold uppercase tracking-tight opacity-40 group-hover:opacity-100 transition-opacity"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 bg-surface-container-low/50 rounded-xl flex flex-col items-center justify-center text-center">
+                <span className="material-symbols-outlined text-outline-variant text-[40px] mb-3 opacity-30">receipt_long</span>
+                <p className="text-xs font-bold text-on-surface-variant uppercase tracking-tighter">Sin facturas vinculadas</p>
+                <p className="text-[11px] text-on-surface-variant/60 mt-1 max-w-[200px]">Conecte con el módulo de compras para asociar comprobantes fiscales.</p>
+              </div>
+            )}
+          </section>
+
+          {/* Detalle de Gastos */}
+          <section className="space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-bold text-on-surface tracking-tight uppercase tracking-wider">Detalle del Gasto</h3>
+              <span className="text-[11px] px-2.5 py-0.5 bg-surface-container-high text-on-surface-variant font-black rounded-full uppercase">{items.length} Items</span>
+            </div>
+            <div className="bg-surface-container-low/30 rounded-2xl overflow-hidden border border-outline-variant/5">
+              {items.map((it, idx) => (
+                <div key={idx} className={`flex items-center p-4 hover:bg-surface-container-low/60 transition-colors group ${idx !== items.length - 1 ? 'border-b border-outline-variant/5' : ''}`}>
+                  <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm mr-4 border border-outline-variant/5 flex-shrink-0">
+                    <span className="material-symbols-outlined text-on-surface-variant">
+                      {it.descripcion?.toLowerCase().includes("almuerzo") || it.descripcion?.toLowerCase().includes("comida") || it.descripcion?.toLowerCase().includes("alimenta") ? "restaurant" :
+                        it.descripcion?.toLowerCase().includes("bencina") || it.descripcion?.toLowerCase().includes("peaje") || it.descripcion?.toLowerCase().includes("transpo") ? "directions_car" :
+                          it.descripcion?.toLowerCase().includes("material") || it.descripcion?.toLowerCase().includes("insumo") ? "construction" : "receipt"}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-on-surface leading-tight truncate uppercase tracking-tight">{it.descripcion}</p>
+                    <p className="text-[11px] text-on-surface-variant font-medium mt-0.5 uppercase tracking-tighter">
+                      {it.categoria || "Gasto General"} • {fmtDateDMY(it.fecha)}
+                    </p>
+                  </div>
+                  <div className="text-right ml-4">
+                    <p className="text-sm font-black text-on-surface">{toCLP(it.monto)}</p>
+                    <p className={`text-[10px] font-bold uppercase tracking-tighter ${rendicion.estado === 'pagada' ? 'text-secondary' : 'text-on-surface-variant/40'}`}>
+                      {rendicion.estado === 'pagada' ? 'VERIFICADO' : 'PENDIENTE'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        {/* Footer Actions */}
+        <footer className="p-8 bg-white flex flex-col gap-3 shadow-[0_-8px_32px_rgba(0,0,0,0.06)] border-t border-outline-variant/10">
+          {rendicion.estado?.toUpperCase() === "PENDIENTE" ? (
+            <button
+              onClick={() => onUpdateStatus(rendicion.id, "aprobada")}
+              className="w-full h-12 bg-primary text-white font-black rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-all uppercase tracking-widest text-sm"
+            >
+              <span className="material-symbols-outlined text-xl">check_circle</span>
+              Aprobar Rendición
+            </button>
+          ) : (rendicion.estado?.toUpperCase() === "APROBADA" || rendicion.estado?.toUpperCase() === "PAGADA_PARCIAL") ? (
+            <button
+              onClick={() => {
+                setNewPaidAmount(Math.abs(saldo));
+                setEditPaid(true);
+              }}
+              className="w-full h-12 bg-secondary text-white font-black rounded-xl shadow-lg shadow-secondary/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-all uppercase tracking-widest text-sm"
+            >
+              <span className="material-symbols-outlined text-xl">payments</span>
+              {saldo < 0 ? "Saldar Reembolso" : "Saldar Devolución"}
+            </button>
+          ) : rendicion.estado?.toUpperCase() === "PAGADA" ? (
+            <div className="w-full h-12 bg-surface-container-low rounded-xl flex items-center justify-center gap-3 text-secondary font-black uppercase tracking-widest text-sm border-2 border-dashed border-secondary/30">
+              <span className="material-symbols-outlined text-xl">verified_user</span>
+              Liquidación Finalizada
+            </div>
+          ) : null}
+
+          {rendicion.estado?.toUpperCase() !== "PAGADA" && (
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => onUpdateStatus(rendicion.id, "pendiente")}
+                className="h-11 border border-outline-variant/60 text-on-surface font-bold rounded-xl hover:bg-surface-container-low transition-colors flex items-center justify-center gap-2 uppercase tracking-tighter text-[11px]"
+              >
+                <span className="material-symbols-outlined text-xs">visibility</span>
+                Observar
+              </button>
+              <button
+                onClick={() => onUpdateStatus(rendicion.id, "rechazada")}
+                className="h-11 border border-error/30 text-error font-bold rounded-xl hover:bg-error-container/10 transition-colors flex items-center justify-center gap-2 uppercase tracking-tighter text-[11px]"
+              >
+                <span className="material-symbols-outlined text-xs">cancel</span>
+                Rechazar
+              </button>
+            </div>
+          )}
+        </footer>
+      </aside>
+    </>
   );
 }

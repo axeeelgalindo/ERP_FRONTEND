@@ -319,14 +319,7 @@ export default function ComprasTable({
                           🔗
                         </button>
 
-                        <button
-                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50  rounded-lg transition-all"
-                          title="Ver Rendición"
-                          type="button"
-                          onClick={() => onOpenRendicion?.(c)}
-                        >
-                          🧾
-                        </button>
+
 
                         <button
                           className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50  rounded-lg transition-all disabled:opacity-60"
