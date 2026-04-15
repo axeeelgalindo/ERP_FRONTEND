@@ -619,8 +619,9 @@ export default function useVentaForm({
                const targetU = (utilidadPctObjetivo === "" || utilidadPctObjetivo == null) ? 0 : Number(utilidadPctObjetivo) / 100;
                if (costoUnit > 0) {
                  const requestedCant = Number(patch.cantidad) || 0;
-                 const denom = costoUnit * alphaMult * (1 + targetU);
-                 const maxCant = denom > 0 ? (maxVentaForThisLine / (descIMult * descGMult) - cif) / denom : 0;
+                  const marginMult = (1 - targetU);
+                  const maxVentaNetoValue = maxVentaForThisLine / (descIMult * descGMult);
+                  const maxCant = (maxVentaNetoValue - cif) * marginMult / (costoUnit * alphaMult);
                  if (requestedCant > maxCant) {
                    merged.cantidad = Math.max(1, Math.floor(maxCant * 100) / 100);
                  }
@@ -641,7 +642,12 @@ export default function useVentaForm({
           if (patch.costoUnitarioManual !== undefined && merged.modo === "COMPRA") {
             const requestedPU = getManualPUNumber({ costoUnitarioManual: patch.costoUnitarioManual });
             const cant = (merged.cantidad !== null && merged.cantidad !== undefined && merged.cantidad !== "") ? Number(merged.cantidad) : 1;
-            const maxPU = maxVentaForThisLine / (cant * factor);
+            const targetU = (utilidadPctObjetivo === "" || utilidadPctObjetivo == null) ? 0 : Number(utilidadPctObjetivo) / 100;
+            const marginDivisor = (1 - targetU);
+            
+            // maxPU = (maxVentaLine/desc) * (1 - Margin) / (Cant * Alpha * k)
+            const maxVentaNeto = maxVentaForThisLine / (descIMult * descGMult);
+            const maxPU = (maxVentaNeto * marginDivisor) / (cant * alphaMult * k);
             
             if (requestedPU > maxPU) {
               const cappedPU = Math.max(0, Math.floor(maxPU));
@@ -694,6 +700,8 @@ export default function useVentaForm({
     const descG = normalizeDescPctUI(descuentoPct);
     const descGMult = 1 - descG / 100;
 
+    const uniqueProcessedEmployees = new Set();
+
     const linesBase = (detalles || []).map((d) => {
       const cantidad = (d?.cantidad !== null && d?.cantidad !== undefined && d?.cantidad !== "") ? Number(d.cantidad) : 1;
       const alphaPct = normalizeAlphaPctUI(d?.alphaPct);
@@ -705,8 +713,16 @@ export default function useVentaForm({
       if (d?.modo === "HH") {
         const hh = findHHForEmpleado(d?.empleadoId);
         const costoHH = hh?.costoHH != null ? Number(hh.costoHH) : 0;
-        const cif = getHHCIFValue(hh);
-        cifLine = cantidad > 0 ? cif : 0;
+        const cifValue = getHHCIFValue(hh);
+        
+        const empId = d.empleadoId;
+        if (empId && !uniqueProcessedEmployees.has(empId)) {
+          uniqueProcessedEmployees.add(empId);
+          cifLine = cifValue;
+        } else {
+          cifLine = 0;
+        }
+
         costoSinAlpha = cantidad > 0 ? costoHH * cantidad : 0;
       } else {
         const manualPU = getManualPUNumber(d);
@@ -731,10 +747,13 @@ export default function useVentaForm({
 
     const uPct = utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo);
     const targetU = uPct != null && Number.isFinite(uPct) && uPct >= 0 ? uPct / 100 : 0;
+    const marginDivisor = (1 - targetU) || 1;
 
     const totalCostoFinalBase = linesBase.reduce((acc, x) => acc + (Number(x.costoBase) || 0), 0);
-    const totalCIF = linesBase.reduce((acc, x) => acc + (Number(x.cifLine) || 0), 0);
-    const totalVentaTarget = totalCostoFinalBase * (1 + targetU) + totalCIF;
+    const totalCIFUnique = linesBase.reduce((acc, x) => acc + (Number(x.cifLine) || 0), 0);
+    
+    // VentaTarget = (CostTotal / (1 - Margin)) + CIFUnique
+    const totalVentaTarget = (totalCostoFinalBase / marginDivisor) + totalCIFUnique;
 
     let k = 1;
     if (totalCostoFinalBase > 0) {
@@ -746,7 +765,7 @@ export default function useVentaForm({
     const lines = linesBase.map((x) => {
       const costoTotal = Number(x.costoBase) || 0;
 
-      const bruto = (costoTotal * (1 + targetU)) + (x.cifLine || 0);
+      const bruto = (costoTotal / marginDivisor) + (x.cifLine || 0);
 
       // descuentos: item + general
       const neto = bruto * (x.descIMult ?? 1) * descGMult;
