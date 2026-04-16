@@ -67,6 +67,16 @@ export default function CotizacionDrawerLight({
   const [viewUrl, setViewUrl] = useState(null);
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+  const getFullUrl = (url) => {
+    if (!url) return "";
+    if (url.startsWith("http")) return url;
+    // Evitar duplicar /api si el backend ya lo incluye
+    const cleanUrl = url.startsWith("/api") ? url.slice(4) : url;
+    const base = API_URL?.endsWith("/") ? API_URL.slice(0, -1) : API_URL;
+    const path = cleanUrl.startsWith("/") ? cleanUrl : `/${cleanUrl}`;
+    return `${base}${path}`;
+  };
+
   // Componente interno para previsualizar archivos
   const FilePreviewer = ({ url }) => {
     const containerRef = useRef(null);
@@ -234,7 +244,7 @@ export default function CotizacionDrawerLight({
         <div className="flex items-center gap-2">
           {url ? (
             <button
-              onClick={() => setViewUrl(`${API_URL?.replace("/api", "")}/api${url}`)}
+              onClick={() => setViewUrl(getFullUrl(url))}
               className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold"
               title="Ver documento"
             >
@@ -700,7 +710,7 @@ export default function CotizacionDrawerLight({
                         <td className="px-4 py-3">
                           {pago.comprobante_url ? (
                             <button
-                              onClick={() => setViewUrl(`${API_URL?.replace("/api", "")}/api${pago.comprobante_url}`)}
+                              onClick={() => setViewUrl(getFullUrl(pago.comprobante_url))}
                               className="text-blue-600 hover:text-blue-800 text-xs font-semibold flex items-center gap-1 hover:cursor-pointer"
                             >
                               <VisibilityOutlinedIcon fontSize="small" /> Ver
