@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { makeHeaders } from "@/lib/api";
+import FilePreviewModal from "@/components/ui/FilePreviewModal";
 
 function toCLP(v) {
   const n = Number(v ?? 0);
@@ -34,6 +35,27 @@ export default function RendicionDetailDrawer({
   const [editPaid, setEditPaid] = useState(false);
   const [newPaidAmount, setNewPaidAmount] = useState("");
   const [uploadingDoc, setUploadingDoc] = useState(null); // 'entrega' | 'reembolso'
+  const [viewUrl, setViewUrl] = useState(null);
+
+  // Estados para agregar ítems
+  const [isAddingItem, setIsAddingItem] = useState(false);
+  const [newItem, setNewItem] = useState({ descripcion: "", monto: "", fecha: new Date().toISOString().split("T")[0], categoria: "Gasto General" });
+  const [savingItem, setSavingItem] = useState(false);
+
+  // Estados para agregar anticipos
+  const [isAddingAnticipo, setIsAddingAnticipo] = useState(false);
+  const [newAnticipo, setNewAnticipo] = useState({ monto: "", file: null });
+  const [savingAnticipo, setSavingAnticipo] = useState(false);
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+  const getFullUrl = (url) => {
+    if (!url) return "";
+    if (url.startsWith("http")) return url;
+    const base = API_URL?.endsWith("/") ? API_URL.slice(0, -1) : API_URL;
+    const path = url.startsWith("/") ? url : `/${url}`;
+    return `${base}${path}`;
+  };
   const [searchingCompras, setSearchingCompras] = useState(false);
   const [availableCompras, setAvailableCompras] = useState([]);
   const [loadingCompras, setLoadingCompras] = useState(false);
@@ -145,12 +167,118 @@ export default function RendicionDetailDrawer({
       });
 
       if (!res.ok) throw new Error("Error al subir documento");
-      alert("Documento subido con éxito");
       onRefresh?.();
     } catch (e) {
       alert(e.message);
     } finally {
       setUploadingDoc(null);
+    }
+  };
+
+  const handleItemDocUpload = async (itemId, file) => {
+    if (!file) return;
+    setUploadingDoc(`item-${itemId}`);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rendiciones/${rendicion.id}/items/${itemId}/comprobante`, {
+        method: "POST",
+        headers: {
+          ...makeHeaders(session, { skipContentType: true }),
+        },
+        body: fd,
+      });
+
+      if (!res.ok) throw new Error("Error al subir comprobante");
+      onRefresh?.();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setUploadingDoc(null);
+    }
+  };
+
+  const handleAddItem = async () => {
+    if (!newItem.descripcion || !newItem.monto) return alert("Complete los campos requeridos");
+    setSavingItem(true);
+    try {
+      // Tomamos los items actuales y agregamos el nuevo
+      const currentItems = (rendicion.items || []).map(it => ({
+        linea: it.linea,
+        fecha: it.fecha,
+        descripcion: it.descripcion,
+        monto: it.monto,
+        categoria: it.categoria,
+        comprobante_url: it.comprobante_url
+      }));
+
+      const payload = {
+        items: [
+          ...currentItems,
+          {
+            ...newItem,
+            monto: Number(newItem.monto),
+            linea: currentItems.length + 1
+          }
+        ]
+      };
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rendiciones/${rendicion.id}`, {
+        method: "PATCH",
+        headers: makeHeaders(session),
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error("Error al agregar ítem");
+      
+      setIsAddingItem(false);
+      setNewItem({ descripcion: "", monto: "", fecha: new Date().toISOString().split("T")[0], categoria: "Gasto General" });
+      onRefresh?.();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setSavingItem(false);
+    }
+  };
+
+  const handleAddAnticipo = async () => {
+    if (!newAnticipo.monto) return alert("Indique el monto");
+    setSavingAnticipo(true);
+    try {
+      const fd = new FormData();
+      fd.append("monto", newAnticipo.monto);
+      if (newAnticipo.file) fd.append("file", newAnticipo.file);
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rendiciones/${rendicion.id}/anticipos`, {
+        method: "POST",
+        headers: makeHeaders(session, { skipContentType: true }),
+        body: fd
+      });
+
+      if (!res.ok) throw new Error("Error al agregar anticipo");
+
+      setIsAddingAnticipo(false);
+      setNewAnticipo({ monto: "", file: null });
+      onRefresh?.();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setSavingAnticipo(false);
+    }
+  };
+
+  const handleDeleteAnticipo = async (anticipoId) => {
+    if (!confirm("¿Eliminar este anticipo?")) return;
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/rendiciones/${rendicion.id}/anticipos/${anticipoId}`, {
+        method: "DELETE",
+        headers: makeHeaders(session)
+      });
+      if (!res.ok) throw new Error("Error al eliminar anticipo");
+      onRefresh?.();
+    } catch (e) {
+      alert(e.message);
     }
   };
 
@@ -189,16 +317,12 @@ export default function RendicionDetailDrawer({
             <div className="p-4 bg-white rounded-xl shadow-sm border-l-4 border-primary/40 flex flex-col justify-between min-h-[90px]">
               <div>
                 <p className="text-[10px] font-bold text-on-surface-variant tracking-widest uppercase mb-1 whitespace-nowrap overflow-hidden text-ellipsis">Fondo por rendir</p>
-                <p className="text-lg font-bold text-on-surface tracking-tight">{toCLP(rendicion.monto_entregado)}</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-lg font-bold text-on-surface tracking-tight">{toCLP(rendicion.monto_entregado)}</p>
+                  <button onClick={() => setIsAddingAnticipo(true)} className="text-primary hover:bg-primary/5 p-1 rounded-full"><span className="material-symbols-outlined text-[16px]">add_circle</span></button>
+                </div>
               </div>
-              {rendicion.doc_entrega_url ? (
-                <a href={`${process.env.NEXT_PUBLIC_API_URL}${rendicion.doc_entrega_url}`} target="_blank" className="text-[9px] text-primary font-bold uppercase underline">Ver</a>
-              ) : (
-                <label className="text-[9px] text-outline font-bold uppercase cursor-pointer hover:text-on-surface">
-                  + Subir
-                  <input type="file" className="hidden" onChange={(e) => handleMainDocUpload("entrega", e.target.files?.[0])} />
-                </label>
-              )}
+              <p className="text-[9px] text-on-surface-variant font-bold uppercase">{rendicion.anticipos?.length || 0} Anticipos</p>
             </div>
 
             {/* Rendido */}
@@ -274,80 +398,101 @@ export default function RendicionDetailDrawer({
 
           {/* Documentos de Respaldo */}
           <section className="space-y-4">
-            <h3 className="text-sm font-bold text-on-surface tracking-tight uppercase tracking-wider">Documentos de Respaldo</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-on-surface tracking-tight uppercase tracking-wider">Anticipos y Transferencias</h3>
+              <button 
+                onClick={() => setIsAddingAnticipo(true)}
+                className="text-[10px] font-black bg-primary text-white px-3 py-1 rounded-full shadow-sm hover:scale-105 transition-transform"
+              >
+                + AGREGAR
+              </button>
+            </div>
+
+            {/* Formulario para nuevo anticipo */}
+            {isAddingAnticipo && (
+              <div className="p-4 bg-slate-50 border border-primary/20 rounded-xl space-y-3 animate-in fade-in zoom-in-95 duration-200">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Monto transferido</label>
+                    <input 
+                      type="number" 
+                      placeholder="Monto"
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-primary"
+                      value={newAnticipo.monto}
+                      onChange={e => setNewAnticipo({...newAnticipo, monto: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-slate-500 uppercase ml-1">Comprobante (opcional)</label>
+                    <label className="flex items-center gap-2 w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs cursor-pointer hover:bg-slate-50 transition-colors">
+                      <span className="material-symbols-outlined text-xs text-primary">{newAnticipo.file ? 'check_circle' : 'attach_file'}</span>
+                      <span className="truncate">{newAnticipo.file ? newAnticipo.file.name : 'Subir archivo'}</span>
+                      <input type="file" className="hidden" onChange={e => setNewAnticipo({...newAnticipo, file: e.target.files[0]})} />
+                    </label>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-1 border-t border-slate-200">
+                  <button 
+                    onClick={() => { setIsAddingAnticipo(false); setNewAnticipo({ monto: "", file: null }); }}
+                    className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase hover:text-slate-600"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    disabled={savingAnticipo}
+                    onClick={handleAddAnticipo}
+                    className="px-4 py-1.5 bg-primary text-white text-[10px] font-bold rounded-lg uppercase shadow-sm active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {savingAnticipo && <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                    Guardar Anticipo
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-3">
-              {/* Documento 1: Anticipo */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest leading-none">Vale de Anticipo / Entrega</p>
-                  {rendicion.doc_entrega_url && <span className="text-primary font-bold text-[9px] uppercase">Cargado ✓</span>}
-                </div>
-                {rendicion.doc_entrega_url ? (
-                  <div className="p-3 bg-surface-container-low rounded-xl flex items-center justify-between border border-outline-variant/10 group">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                        <span className="material-symbols-outlined text-primary text-lg">payments</span>
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-on-surface">Comprobante de Entrega</p>
-                        <p className="text-[9px] text-on-surface-variant font-medium">Respaldo del monto entregado</p>
-                      </div>
+              {/* Lista de Anticipos */}
+              {(rendicion.anticipos || []).map((ant, index) => (
+                <div key={ant.id} className="p-3 bg-surface-container-low rounded-xl flex items-center justify-between border border-outline-variant/10 group">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                      <span className="material-symbols-outlined text-primary text-lg">payments</span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <a href={`${process.env.NEXT_PUBLIC_API_URL}${rendicion.doc_entrega_url}`} target="_blank" className="p-1.5 hover:bg-surface-container-high rounded-lg text-primary transition-colors">
+                    <div>
+                      <p className="text-xs font-bold text-on-surface">Transferencia #{index + 1}</p>
+                      <p className="text-[10px] text-on-surface-variant font-medium">Monto: {toCLP(ant.monto)} • {fmtDateDMY(ant.fecha)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {ant.doc_url && (
+                      <button 
+                        onClick={() => setViewUrl(getFullUrl(ant.doc_url))} 
+                        className="p-1.5 hover:bg-surface-container-high rounded-lg text-primary transition-colors cursor-pointer"
+                        title="Ver comprobante"
+                      >
                         <span className="material-symbols-outlined text-[20px]">visibility</span>
-                      </a>
-                      <label className="p-1.5 hover:bg-surface-container-high rounded-lg text-outline-variant transition-colors cursor-pointer">
-                        <span className="material-symbols-outlined text-[20px]">edit</span>
-                        <input type="file" className="hidden" onChange={(e) => handleMainDocUpload("entrega", e.target.files?.[0])} />
-                      </label>
-                    </div>
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => handleDeleteAnticipo(ant.id)}
+                      className="p-1.5 hover:bg-error/5 rounded-lg text-error/40 hover:text-error transition-colors cursor-pointer"
+                      title="Eliminar registro"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">delete</span>
+                    </button>
                   </div>
-                ) : (
-                  <div className="h-16 border-2 border-dashed border-outline-variant/20 bg-surface-container-low/30 rounded-xl flex items-center justify-center gap-3 group cursor-pointer hover:border-primary/30 transition-all relative">
-                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleMainDocUpload("entrega", e.target.files?.[0])} />
-                    <span className="material-symbols-outlined text-primary opacity-40 group-hover:scale-110 transition-transform">cloud_upload</span>
-                    <span className="text-[10px] font-bold text-on-surface-variant uppercase">Subir vale de anticipo</span>
-                  </div>
-                )}
-              </div>
+                </div>
+              ))}
 
-              {/* Documento 2: Liquidación */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest leading-none">Comprobante de Liquidación Final</p>
-                  {rendicion.doc_reembolso_url && <span className="text-secondary font-bold text-[9px] uppercase">Cargado ✓</span>}
+              {(!rendicion.anticipos || rendicion.anticipos.length === 0) && !isAddingAnticipo && (
+                <div 
+                  onClick={() => setIsAddingAnticipo(true)}
+                  className="h-16 border-2 border-dashed border-outline-variant/20 bg-surface-container-low/30 rounded-xl flex items-center justify-center gap-3 group cursor-pointer hover:border-primary/30 transition-all"
+                >
+                  <span className="material-symbols-outlined text-primary opacity-40 group-hover:scale-110 transition-transform">cloud_upload</span>
+                  <span className="text-[10px] font-bold text-on-surface-variant uppercase">Agregar primer anticipo</span>
                 </div>
-                {rendicion.doc_reembolso_url ? (
-                  <div className="p-3 bg-surface-container-low rounded-xl flex items-center justify-between border border-outline-variant/10 group">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                        <span className="material-symbols-outlined text-secondary text-lg">receipt_long</span>
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-on-surface">Voucher de Cierre</p>
-                        <p className="text-[9px] text-on-surface-variant font-medium">Respaldo del saldo final</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <a href={`${process.env.NEXT_PUBLIC_API_URL}${rendicion.doc_reembolso_url}`} target="_blank" className="p-1.5 hover:bg-surface-container-high rounded-lg text-primary transition-colors">
-                        <span className="material-symbols-outlined text-[20px]">visibility</span>
-                      </a>
-                      <label className="p-1.5 hover:bg-surface-container-high rounded-lg text-outline-variant transition-colors cursor-pointer">
-                        <span className="material-symbols-outlined text-[20px]">edit</span>
-                        <input type="file" className="hidden" onChange={(e) => handleMainDocUpload("reembolso", e.target.files?.[0])} />
-                      </label>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="h-16 border-2 border-dashed border-outline-variant/20 bg-surface-container-low/30 rounded-xl flex items-center justify-center gap-3 group cursor-pointer hover:border-primary/30 transition-all relative">
-                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleMainDocUpload("reembolso", e.target.files?.[0])} />
-                    <span className="material-symbols-outlined text-secondary opacity-40 group-hover:scale-110 transition-transform">cloud_upload</span>
-                    <span className="text-[10px] font-bold text-on-surface-variant uppercase">Subir voucher de liquidación</span>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           </section>
 
@@ -449,8 +594,85 @@ export default function RendicionDetailDrawer({
           <section className="space-y-4">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-bold text-on-surface tracking-tight uppercase tracking-wider">Detalle del Gasto</h3>
-              <span className="text-[11px] px-2.5 py-0.5 bg-surface-container-high text-on-surface-variant font-black rounded-full uppercase">{items.length} Items</span>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setIsAddingItem(!isAddingItem)}
+                  className="text-[10px] font-black px-3 py-1 bg-secondary text-white rounded-full transition-all hover:scale-105"
+                >
+                  {isAddingItem ? "CERRAR" : "+ AGREGAR GASTO"}
+                </button>
+                <span className="text-[11px] px-2.5 py-0.5 bg-surface-container-high text-on-surface-variant font-black rounded-full uppercase">{items.length} Items</span>
+              </div>
             </div>
+
+            {isAddingItem && (
+              <div className="bg-slate-50 border border-secondary/20 rounded-2xl p-5 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Descripción</label>
+                    <input 
+                      type="text" 
+                      placeholder="Ej: Combustible, Peaje..."
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-1 focus:ring-secondary outline-none shadow-sm"
+                      value={newItem.descripcion}
+                      onChange={e => setNewItem({...newItem, descripcion: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Monto ($)</label>
+                    <input 
+                      type="number" 
+                      placeholder="0"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-1 focus:ring-secondary outline-none shadow-sm"
+                      value={newItem.monto}
+                      onChange={e => setNewItem({...newItem, monto: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Fecha</label>
+                    <input 
+                      type="date" 
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-1 focus:ring-secondary outline-none shadow-sm"
+                      value={newItem.fecha}
+                      onChange={e => setNewItem({...newItem, fecha: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Categoría</label>
+                    <select 
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-1 focus:ring-secondary outline-none shadow-sm"
+                      value={newItem.categoria}
+                      onChange={e => setNewItem({...newItem, categoria: e.target.value})}
+                    >
+                      <option value="Combustible">Combustible</option>
+                      <option value="Peaje">Peaje</option>
+                      <option value="Alimentación">Alimentación</option>
+                      <option value="Materiales">Materiales</option>
+                      <option value="Transporte">Transporte</option>
+                      <option value="Otros">Otros</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 pt-2">
+                  <button 
+                    onClick={() => setIsAddingItem(false)}
+                    className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-slate-600 uppercase"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    disabled={savingItem}
+                    onClick={handleAddItem}
+                    className="px-6 py-2 bg-secondary text-white text-xs font-black rounded-xl shadow-md hover:bg-secondary/90 transition-all flex items-center gap-2"
+                  >
+                    {savingItem && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                    Añadir Ítem
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="bg-surface-container-low/30 rounded-2xl overflow-hidden border border-outline-variant/5">
               {items.map((it, idx) => (
                 <div key={idx} className={`flex items-center p-4 hover:bg-surface-container-low/60 transition-colors group ${idx !== items.length - 1 ? 'border-b border-outline-variant/5' : ''}`}>
@@ -467,11 +689,37 @@ export default function RendicionDetailDrawer({
                       {it.categoria || "Gasto General"} • {fmtDateDMY(it.fecha)}
                     </p>
                   </div>
-                  <div className="text-right ml-4">
-                    <p className="text-sm font-black text-on-surface">{toCLP(it.monto)}</p>
-                    <p className={`text-[10px] font-bold uppercase tracking-tighter ${rendicion.estado === 'pagada' ? 'text-secondary' : 'text-on-surface-variant/40'}`}>
-                      {rendicion.estado === 'pagada' ? 'VERIFICADO' : 'PENDIENTE'}
-                    </p>
+                  <div className="text-right ml-4 flex items-center gap-4">
+                    <div className="flex flex-col items-end">
+                      <p className="text-sm font-black text-on-surface">{toCLP(it.monto)}</p>
+                      <p className={`text-[10px] font-bold uppercase tracking-tighter ${it.comprobante_url ? 'text-secondary' : 'text-on-surface-variant/40'}`}>
+                        {it.comprobante_url ? 'COMPROBANTE OK' : 'SIN COMPROBANTE'}
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center gap-1">
+                      {it.comprobante_url && (
+                        <button 
+                          onClick={() => setViewUrl(getFullUrl(it.comprobante_url))} 
+                          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container-high text-primary transition-colors cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[20px]">visibility</span>
+                        </button>
+                      )}
+                      <label className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container-high text-outline-variant transition-colors cursor-pointer relative">
+                        {uploadingDoc === `item-${it.id}` ? (
+                          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <span className="material-symbols-outlined text-[20px]">{it.comprobante_url ? 'edit' : 'add_a_photo'}</span>
+                        )}
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          onChange={(e) => handleItemDocUpload(it.id, e.target.files?.[0])} 
+                          disabled={uploadingDoc === `item-${it.id}`}
+                        />
+                      </label>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -527,6 +775,13 @@ export default function RendicionDetailDrawer({
           )}
         </footer>
       </aside>
+
+      <FilePreviewModal 
+        open={!!viewUrl} 
+        url={viewUrl} 
+        onClose={() => setViewUrl(null)} 
+        title="Visor de Rendición"
+      />
     </>
   );
 }

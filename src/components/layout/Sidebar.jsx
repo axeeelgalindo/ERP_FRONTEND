@@ -78,6 +78,12 @@ export default function Sidebar() {
         roles: ["superadmin", "admin"],
       },
       {
+        href: "/kanban",
+        label: "Kanban",
+        icon: "view_kanban",
+        roles: ["superadmin", "admin", "user", "empleado"],
+      },
+      {
         href: "/empleados",
         label: "Empleados",
         icon: "badge",

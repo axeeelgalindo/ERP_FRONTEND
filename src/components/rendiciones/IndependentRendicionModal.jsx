@@ -51,6 +51,8 @@ export default function IndependentRendicionModal({
   const [empleadoId, setEmpleadoId] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [montoEntregado, setMontoEntregado] = useState("");
+  const [docEntregaFile, setDocEntregaFile] = useState(null);
+  const [docEntregaName, setDocEntregaName] = useState("");
   const [items, setItems] = useState([
     { fecha: "", descripcion: "", monto: "", categoria: "", comprobante_file: null, comprobante_name: "" }
   ]);
@@ -168,6 +170,42 @@ export default function IndependentRendicionModal({
 
       const payload = await jsonOrNull(res);
       if (!res.ok) throw new Error(payload?.error || "Error al crear");
+
+      const rendId = payload.id;
+
+      // 2) Subir comprobante de anticipo si existe
+      if (docEntregaFile) {
+        const fd = new FormData();
+        fd.append("file", docEntregaFile);
+        await fetch(`${apiBase}/rendiciones/${rendId}/documento?type=entrega`, {
+          method: "POST",
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(empresaId ? { "x-empresa-id": String(empresaId) } : {}),
+          },
+          body: fd
+        });
+      }
+
+      // 3) Subir comprobantes por ítem
+      // El payload.items viene con los IDs creados. Macheamos por orden.
+      const createdItems = payload.items || [];
+      for (let i = 0; i < validItems.length; i++) {
+        const file = validItems[i].comprobante_file;
+        if (file && createdItems[i]) {
+          const itemId = createdItems[i].id;
+          const fd = new FormData();
+          fd.append("file", file);
+          await fetch(`${apiBase}/rendiciones/${rendId}/items/${itemId}/comprobante`, {
+            method: "POST",
+            headers: {
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              ...(empresaId ? { "x-empresa-id": String(empresaId) } : {}),
+            },
+            body: fd
+          });
+        }
+      }
 
       onSaved?.();
       onClose();
@@ -361,6 +399,37 @@ export default function IndependentRendicionModal({
                     placeholder="Contexto de la rendición..."
                   />
                 </div>
+
+                {/* NUEVO: Comprobante de anticipo */}
+                <div className="space-y-4 md:col-span-2">
+                  <label className="text-[10px] uppercase tracking-[0.05em] text-on-surface-variant font-black">Comprobante de Anticipo (Opcional)</label>
+                  <div className="flex items-center gap-4 p-4 bg-surface-container-low rounded-2xl border border-outline-variant/10">
+                    <label className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-outline-variant text-[11px] font-bold cursor-pointer hover:bg-surface-container-lowest transition-colors">
+                      <span className="material-symbols-outlined text-lg">upload</span>
+                      SELECCIONAR ARCHIVO
+                      <input
+                        type="file"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) {
+                            setDocEntregaFile(f);
+                            setDocEntregaName(f.name);
+                          }
+                        }}
+                      />
+                    </label>
+                    <span className="text-xs text-on-surface-variant truncate font-medium">
+                      {docEntregaName || "Ningún archivo seleccionado"}
+                    </span>
+                    {docEntregaFile && (
+                      <button onClick={() => { setDocEntregaFile(null); setDocEntregaName(""); }} className="text-error">
+                        <span className="material-symbols-outlined text-lg">close</span>
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-on-surface-variant/60">Sube el comprobante de la transferencia o depósito entregado por la empresa.</p>
+                </div>
               </div>
 
             </div>
@@ -406,6 +475,31 @@ export default function IndependentRendicionModal({
                           <select className="w-full rounded-lg border-none bg-surface-container-lowest text-on-surface font-bold text-sm focus:ring-2 focus:ring-primary/20 h-10 px-3 cursor-pointer" value={it.categoria} onChange={e => updateItem(idx, "categoria", e.target.value)}>
                             {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                           </select>
+                        </div>
+                        <div className="md:col-span-4 flex items-center gap-4 mt-2 p-3 bg-surface-container-lowest/50 rounded-xl border border-outline-variant/5">
+                          <label className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-outline-variant/30 text-[10px] font-bold cursor-pointer hover:bg-white transition-all shadow-sm">
+                            <span className="material-symbols-outlined text-[16px]">attach_file</span>
+                            {it.comprobante_file ? "CAMBIAR BOLETA" : "ADJUNTAR BOLETA"}
+                            <input
+                              type="file"
+                              className="hidden"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) {
+                                  updateItem(idx, "comprobante_file", f);
+                                  updateItem(idx, "comprobante_name", f.name);
+                                }
+                              }}
+                            />
+                          </label>
+                          <span className="text-[10px] text-on-surface-variant truncate font-medium flex-1">
+                            {it.comprobante_name || "Sin comprobante adjunto"}
+                          </span>
+                          {it.comprobante_file && (
+                            <button onClick={() => { updateItem(idx, "comprobante_file", null); updateItem(idx, "comprobante_name", ""); }} className="text-error/70 hover:text-error transition-colors">
+                              <span className="material-symbols-outlined text-[18px]">close</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

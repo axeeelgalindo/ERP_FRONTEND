@@ -14,7 +14,6 @@ import CotizacionesSummary from "@/components/cotizaciones/CotizacionesSummary";
 
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
 
@@ -22,6 +21,24 @@ import 'dayjs/locale/es';
 import CotizacionesTableLight from "@/components/cotizaciones/CotizacionesTableLight";
 import CotizacionDrawerLight from "@/components/cotizaciones/CotizacionDrawerLight";
 import ImportRcvPanel from "@/components/compras/ImportRcvPanel";
+
+const MESES = [
+  { val: 1, label: "Enero" },
+  { val: 2, label: "Febrero" },
+  { val: 3, label: "Marzo" },
+  { val: 4, label: "Abril" },
+  { val: 5, label: "Mayo" },
+  { val: 6, label: "Junio" },
+  { val: 7, label: "Julio" },
+  { val: 8, label: "Agosto" },
+  { val: 9, label: "Septiembre" },
+  { val: 10, label: "Octubre" },
+  { val: 11, label: "Noviembre" },
+  { val: 12, label: "Diciembre" },
+];
+
+const currentY = dayjs().year();
+const YEARS = [currentY - 1, currentY, currentY + 1];
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -69,7 +86,8 @@ export default function CotizacionesPage() {
   const [fAsunto, setFAsunto] = useState("");
   const [fCliente, setFCliente] = useState("");
   const [fNumero, setFNumero] = useState("");
-  const [filterDate, setFilterDate] = useState(null);
+  const [filterMonth, setFilterMonth] = useState(dayjs().month() + 1);
+  const [filterYear, setFilterYear] = useState(dayjs().year());
   const [filterEstado, setFilterEstado] = useState("");
 
   // Dialogs
@@ -252,11 +270,11 @@ export default function CotizacionesPage() {
   const filtered = useMemo(() => {
     return (cotizaciones || []).filter((c) => {
       // Filtro mes/año
-      if (filterDate && filterDate.isValid()) {
+      if (filterMonth !== "" || filterYear !== "") {
         const d = c.creada_en ? new Date(c.creada_en) : null;
         if (!d) return false;
-        if (filterDate.month() + 1 !== d.getMonth() + 1) return false;
-        if (filterDate.year() !== d.getFullYear()) return false;
+        if (filterMonth !== "" && Number(filterMonth) !== d.getMonth() + 1) return false;
+        if (filterYear !== "" && Number(filterYear) !== d.getFullYear()) return false;
       }
       // Estado
       if (filterEstado && c?.estado !== filterEstado) return false;
@@ -276,10 +294,17 @@ export default function CotizacionesPage() {
       }
       return true;
     });
-  }, [cotizaciones, filterDate, filterEstado, fNumero, fAsunto, fCliente]);
+  }, [cotizaciones, filterMonth, filterYear, filterEstado, fNumero, fAsunto, fCliente]);
 
-  const hasFilters = filterDate || filterEstado || fNumero || fAsunto || fCliente;
-  const clearFilters = () => { setFAsunto(""); setFCliente(""); setFNumero(""); setFilterEstado(""); setFilterDate(null); };
+  const hasFilters = filterMonth !== "" || filterYear !== "" || filterEstado || fNumero || fAsunto || fCliente;
+  const clearFilters = () => {
+    setFAsunto("");
+    setFCliente("");
+    setFNumero("");
+    setFilterEstado("");
+    setFilterMonth(dayjs().month() + 1);
+    setFilterYear(dayjs().year());
+  };
 
   const stateUI = (
     <CotizacionesState status={status} loading={loading} err={err} />
@@ -320,7 +345,7 @@ export default function CotizacionesPage() {
         <CotizacionesSummary cotizaciones={filtered} />
 
         {/* Filtros */}
-        <div className="mb-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="mb-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
 
           {/* Nº COT */}
           <div className="relative">
@@ -372,30 +397,39 @@ export default function CotizacionesPage() {
             <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">▾</span>
           </div>
 
-          {/* Mes/Año */}
-          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
-            <DatePicker
-              views={['year', 'month']}
-              label="Mes y Año"
-              format="MM/YYYY"
-              value={filterDate}
-              onChange={(newValue) => setFilterDate(newValue)}
-              slotProps={{
-                textField: {
-                  size: "small",
-                  fullWidth: true,
-                  sx: {
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '0.75rem',
-                      backgroundColor: '#fff',
-                      height: '46px',
-                    }
-                  }
-                },
-                field: { clearable: true, onClear: () => setFilterDate(null) }
-              }}
-            />
-          </LocalizationProvider>
+          {/* Mes */}
+          <div className="relative">
+            <select
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+              className="w-full h-[46px] px-3 pr-9 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all appearance-none cursor-pointer"
+            >
+              <option value="">Todos los meses</option>
+              {MESES.map((m) => (
+                <option key={m.val} value={m.val}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs text-[10px] font-bold uppercase">Mes</span>
+          </div>
+
+          {/* Año */}
+          <div className="relative">
+            <select
+              value={filterYear}
+              onChange={(e) => setFilterYear(e.target.value)}
+              className="w-full h-[46px] px-3 pr-9 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all appearance-none cursor-pointer"
+            >
+              <option value="">Todos los años</option>
+              {YEARS.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs text-[10px] font-bold uppercase">Año</span>
+          </div>
         </div>
 
         {/* Conteo + limpiar */}

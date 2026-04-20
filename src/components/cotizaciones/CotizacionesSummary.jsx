@@ -76,45 +76,11 @@ export default function CotizacionesSummary({ cotizaciones }) {
 
   const cards = [
     {
-      title: "Cotizaciones totales",
-      subtitle: "(mostradas)",
-      value: totals.count,
-      iconBg: "bg-blue-50",
-      iconText: "text-blue-600",
-      icon: "📋",
-    },
-    {
       title: "Venta Cotizada",
       subtitle: "Total emitido",
       value: shortCLP(totals.totalCotizado),
       iconBg: "bg-slate-50",
       iconText: "text-slate-600",
-      icon: "💵",
-    },
-    {
-      title: "Total Pagado",
-      subtitle: `${totals.pctPagado.toFixed(1)}% del coti.`,
-      value: shortCLP(totals.totalPagado),
-      valueClass: "text-indigo-600",
-      iconBg: "bg-indigo-50",
-      iconText: "text-indigo-600",
-      icon: "💰",
-    },
-    {
-      title: "Costo Real",
-      subtitle: "De ventas vinculadas",
-      value: shortCLP(totals.totalCostoReal),
-      iconBg: "bg-amber-50",
-      iconText: "text-amber-600",
-      icon: "💼",
-    },
-    {
-      title: "Venta Real",
-      subtitle: "De ventas vinculadas",
-      value: shortCLP(totals.totalVentaReal),
-      valueClass: "text-green-600",
-      iconBg: "bg-green-50",
-      iconText: "text-green-600",
       icon: "💵",
     },
     {
@@ -126,32 +92,65 @@ export default function CotizacionesSummary({ cotizaciones }) {
       iconText: "text-purple-600",
       icon: "📈",
     },
+    {
+      title: "Total Pagado",
+      subtitle: `${totals.pctPagado.toFixed(1)}% del coti.`,
+      value: shortCLP(totals.totalPagado),
+      valueClass: "text-indigo-600",
+      iconBg: "bg-indigo-50",
+      iconText: "text-indigo-600",
+      icon: "💰",
+    },
+    {
+      title: "Venta Real",
+      subtitle: "De ventas vinculadas",
+      value: shortCLP(totals.totalVentaReal),
+      valueClass: "text-green-600",
+      iconBg: "bg-green-50",
+      iconText: "text-green-600",
+      icon: "💵",
+    },
+    {
+      title: "Costo Real",
+      subtitle: "De ventas vinculadas",
+      value: shortCLP(totals.totalCostoReal),
+      iconBg: "bg-amber-50",
+      iconText: "text-amber-600",
+      icon: "💼",
+    },
+    {
+      title: "Cotizaciones totales",
+      subtitle: "(mostradas)",
+      value: totals.count,
+      iconBg: "bg-blue-50",
+      iconText: "text-blue-600",
+      icon: "📋",
+    },
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
       {cards.map((c) => (
         <div
           key={c.title}
-          className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between"
+          className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow"
         >
-          <div className="flex items-start justify-between mb-2">
-            <div className={`p-2 rounded-lg ${c.iconBg} ${c.iconText}`}>
-              <span className="text-[18px]">{c.icon}</span>
+          <div className="flex items-center gap-3 mb-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${c.iconBg} ${c.iconText}`}>
+              <span className="text-[20px]">{c.icon}</span>
             </div>
-          </div>
-
-          <div>
-            <p className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">
+            <p className="text-[10px] uppercase font-extrabold text-slate-400 tracking-wider leading-tight">
               {c.title}
               {c.subtitle ? (
-                <span className="text-[10px] font-medium block opacity-70">
+                <span className="text-[9px] font-medium block opacity-70 mt-0.5 normal-case tracking-normal">
                   {c.subtitle}
                 </span>
               ) : null}
             </p>
+          </div>
 
-            <h3 className={`text-xl font-bold mt-1 ${c.valueClass || ""}`}>
+          <div>
+            <h3 className={`text-2xl font-black tracking-tight ${c.valueClass || ""}`}>
               {c.value}
             </h3>
           </div>
