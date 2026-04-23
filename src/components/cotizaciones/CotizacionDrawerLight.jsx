@@ -65,8 +65,70 @@ export default function CotizacionDrawerLight({
   const c = cotizacion;
 
   const [uploadingDoc, setUploadingDoc] = useState(null);
+  const [facPrompt, setFacPrompt] = useState(null); // { file, docType }
+  const [facPorcentaje, setFacPorcentaje] = useState(100);
   const [viewUrl, setViewUrl] = useState(null);
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+  // Proyecto asociado
+  const [proyectos, setProyectos] = useState([]);
+  const [selectedProyectoId, setSelectedProyectoId] = useState("");
+  const [savingProyecto, setSavingProyecto] = useState(false);
+
+  // Cargar proyectos y sincronizar con la cotizacion actual
+  useEffect(() => {
+    if (!open || !session) return;
+    setSelectedProyectoId(c?.proyecto_id || "");
+    const token = session?.user?.accessToken || session?.accessToken || "";
+    const empresaId = session?.user?.empresaId ?? session?.user?.empresa_id ?? session?.user?.empresa?.id ?? null;
+    const headers = {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(empresaId ? { "x-empresa-id": String(empresaId) } : {}),
+    };
+    fetch(`${API_URL}/proyectos`, { headers })
+      .then(r => r.json())
+      .then(data => setProyectos(Array.isArray(data) ? data : (data?.items || data?.data || [])))
+      .catch(() => setProyectos([]));
+  }, [open, c?.id, c?.proyecto_id, session]);
+
+  const handleSaveProyecto = async (nuevoId) => {
+    if (!c?.id) return;
+    setSavingProyecto(true);
+    try {
+      const token = session?.user?.accessToken || session?.accessToken || "";
+      const empresaId = session?.user?.empresaId ?? session?.user?.empresa_id ?? session?.user?.empresa?.id ?? null;
+      const res = await fetch(`${API_URL}/cotizaciones/update/${c.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(empresaId ? { "x-empresa-id": String(empresaId) } : {}),
+        },
+        body: JSON.stringify({
+          proyecto_id: nuevoId || null,
+          // Preserve existing values so the backend doesn't recalculate or fail validations
+          cliente_id: c.cliente_id || c.cliente?.id,
+          ventaIds: (c.ventas || []).map(v => v.id),
+          glosas: (c.glosas || []).map(g => ({
+            descripcion: g.descripcion,
+            monto: g.monto,
+            manual: g.manual ?? true,
+            orden: g.orden ?? 0,
+          })),
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d?.error || "Error al actualizar proyecto");
+      }
+      showSnack?.("success", nuevoId ? "Proyecto vinculado" : "Proyecto desvinculado");
+      onRefresh?.();
+    } catch (err) {
+      showSnack?.("error", err.message);
+    } finally {
+      setSavingProyecto(false);
+    }
+  };
 
   const getFullUrl = (url) => {
     if (!url) return "";
@@ -79,14 +141,25 @@ export default function CotizacionDrawerLight({
   };
 
 
-  const handleDocUpload = async (e, docType) => {
-    const file = e.target.files?.[0];
+  const handleDocUpload = async (e, docType, metadata = {}) => {
+    const file = e?.target?.files?.[0] || metadata.file;
     if (!file || !c?.id) return;
+
+    // Si es FAC y no tenemos porcentaje aún, pedimos prompt
+    if (docType === "fac" && metadata.porcentaje === undefined) {
+      setFacPrompt({ file, docType });
+      setFacPorcentaje(100);
+      if (e?.target) e.target.value = "";
+      return;
+    }
 
     try {
       setUploadingDoc(docType);
       const fd = new FormData();
       fd.append("file", file);
+      if (metadata.porcentaje !== undefined) {
+        fd.append("porcentaje", metadata.porcentaje);
+      }
 
       const token = session?.user?.accessToken || session?.accessToken || "";
       const empresaId = session?.user?.empresaId ?? session?.user?.empresa_id ?? session?.user?.empresa?.id ?? null;
@@ -113,31 +186,90 @@ export default function CotizacionDrawerLight({
       showSnack("error", err.message);
     } finally {
       setUploadingDoc(null);
-      e.target.value = "";
+      setFacPrompt(null);
+      if (e?.target) e.target.value = "";
     }
   };
 
-  const DocButton = ({ docType, label, url }) => {
-    const isUploading = uploadingDoc === docType;
-    return (
-      <div className="flex items-center justify-between p-3 border border-slate-200 rounded-xl bg-white shadow-sm">
-        <span className="text-sm font-semibold text-slate-700">{label}</span>
-        <div className="flex items-center gap-2">
-          {url ? (
-            <button
-              onClick={() => setViewUrl(getFullUrl(url))}
-              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold"
-              title="Ver documento"
-            >
-              <VisibilityOutlinedIcon fontSize="small" /> Ver
-            </button>
-          ) : (
-            <span className="text-xs text-slate-400 font-medium px-2">Sin doc</span>
-          )}
+  const handleDeleteAdjunto = async (adjuntoId) => {
+    if (!confirm("¿Estás seguro de eliminar este documento?")) return;
+    try {
+      const token = session?.user?.accessToken || session?.accessToken || "";
+      const empresaId = session?.user?.empresaId ?? session?.user?.empresa_id ?? session?.user?.empresa?.id ?? null;
 
-          <label className={`relative p-1.5 rounded-lg transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer ${isUploading ? "text-slate-400" : "text-slate-600 hover:bg-slate-100"}`}>
-            {isUploading ? <CircularProgress size={16} color="inherit" /> : <FileUploadOutlinedIcon fontSize="small" />}
-            {isUploading ? "Subiendo" : "Subir"}
+      const headers = {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(empresaId ? { "x-empresa-id": String(empresaId) } : {}),
+      };
+
+      const res = await fetch(`${API_URL}/cotizaciones/adjuntos/${adjuntoId}`, {
+        method: "DELETE",
+        headers
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Error al eliminar adjunto");
+      }
+
+      showSnack("success", "Adjunto eliminado");
+      onRefresh?.();
+    } catch (err) {
+      showSnack("error", err.message);
+    }
+  };
+
+  const [uploadingPagoId, setUploadingPagoId] = useState(null);
+
+  const handlePagoUpload = async (e, pagoId) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingPagoId(pagoId);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+
+      const token = session?.user?.accessToken || session?.accessToken || "";
+      const empresaId = session?.user?.empresaId ?? session?.user?.empresa_id ?? session?.user?.empresa?.id ?? null;
+
+      const headers = {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(empresaId ? { "x-empresa-id": String(empresaId) } : {}),
+      };
+
+      const res = await fetch(`${API_URL}/cotizaciones/pagos/${pagoId}/upload/comprobante`, {
+        method: "POST",
+        headers,
+        body: fd
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Error al subir comprobante");
+      }
+
+      showSnack("success", "Comprobante subido");
+      onRefresh?.();
+    } catch (err) {
+      showSnack("error", err.message);
+    } finally {
+      setUploadingPagoId(null);
+      if (e.target) e.target.value = "";
+    }
+  };
+
+  const DocButton = ({ docType, label, url, multiple = false, adjuntos = [] }) => {
+    const isUploading = uploadingDoc === docType;
+    const items = multiple ? adjuntos.filter(a => a.tipo === docType) : (url ? [{ url, id: 'main', nombre: label }] : []);
+
+    return (
+      <div className="p-3 border border-slate-200 rounded-xl bg-white shadow-sm space-y-2">
+        <div className="flex items-center justify-between border-b border-slate-50 pb-2">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
+          <label className={`relative flex items-center gap-1 text-[10px] font-bold cursor-pointer px-2 py-1 rounded-md transition-colors ${isUploading ? "text-slate-400" : "text-blue-600 bg-blue-50 hover:bg-blue-100"}`}>
+            {isUploading ? <CircularProgress size={12} color="inherit" /> : <FileUploadOutlinedIcon sx={{ fontSize: 14 }} />}
+            {isUploading ? "Subiendo" : multiple ? "Agregar" : "Subir"}
             <input
               type="file"
               className="hidden"
@@ -146,6 +278,47 @@ export default function CotizacionDrawerLight({
               disabled={isUploading}
             />
           </label>
+        </div>
+
+        <div className="space-y-1">
+          {items.length > 0 ? (
+            items.map((item, idx) => (
+              <div key={item.id || idx} className="flex items-center justify-between gap-2 p-1.5 hover:bg-slate-50 rounded-lg group transition-colors">
+                <div className="flex flex-col flex-1 min-w-0">
+                  <span className="text-xs text-slate-600 truncate font-medium" title={item.nombre || label}>
+                    {multiple ? (item.nombre || `Doc ${idx + 1}`) : "Documento único"}
+                  </span>
+                  {multiple && item.tipo === "fac" && item.porcentaje > 0 && (
+                    <span className="text-[10px] text-blue-600 font-bold">
+                      Facturado: {item.porcentaje}%
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setViewUrl(getFullUrl(item.url))}
+                    className="p-1 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                    title="Ver"
+                  >
+                    <VisibilityOutlinedIcon sx={{ fontSize: 16 }} />
+                  </button>
+                  {multiple && (
+                    <button
+                      onClick={() => handleDeleteAdjunto(item.id)}
+                      className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                      title="Eliminar"
+                    >
+                      <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="py-2 text-center">
+              <span className="text-[10px] text-slate-400 font-medium italic">Sin archivos adjuntos</span>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -186,7 +359,6 @@ export default function CotizacionDrawerLight({
 
     const descuentoTotal = round0(descGlosasMonto + descGeneralMonto);
 
-    // subtotal neto real (lo que guardas)
     const subtotalNeto = round0(c?.subtotal ?? (subtotalTrasGlosas - descGeneralMonto));
     const iva = round0(c?.iva ?? 0);
     const total = round0(c?.total ?? (subtotalNeto + iva));
@@ -195,20 +367,26 @@ export default function CotizacionDrawerLight({
     const restanteAPagar = Math.max(0, total - totalPagado);
     const porcentajePagado = total > 0 ? (totalPagado / total) * 100 : 0;
 
+    const porcentajeFacturado = Array.isArray(c?.adjuntos) 
+      ? c.adjuntos.filter(a => a.tipo === "fac").reduce((acc, a) => acc + (a.porcentaje || 0), 0)
+      : 0;
+
     return {
       subtotalBruto,
       descGlosasMonto,
+      subtotalTrasGlosas,
       descGeneralPct,
       descGeneralMonto,
-      descuentoTotal,
       subtotalNeto,
       iva,
       total,
       totalPagado,
       restanteAPagar,
       porcentajePagado,
+      porcentajeFacturado,
+      descuentoTotal,
     };
-  }, [items, c]);
+  }, [c, items]);
 
   const estado = (c?.estado || "COTIZACION").toUpperCase();
   const siguiente = nextEstados(estado)?.[0] || null;
@@ -446,6 +624,34 @@ export default function CotizacionDrawerLight({
                 <p className="text-sm text-slate-600 leading-relaxed">{c.asunto}</p>
               </div>
             ) : null}
+
+            {/* Proyecto asociado — selector inline opcional */}
+            <div className="col-span-2">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                Proyecto Asociado <span className="text-slate-300 normal-case font-normal">(opcional)</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedProyectoId}
+                  onChange={(e) => {
+                    setSelectedProyectoId(e.target.value);
+                    handleSaveProyecto(e.target.value);
+                  }}
+                  disabled={savingProyecto}
+                  className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-wait"
+                >
+                  <option value="">— Sin proyecto asociado —</option>
+                  {proyectos.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre || p.id}
+                    </option>
+                  ))}
+                </select>
+                {savingProyecto && (
+                  <CircularProgress size={16} />
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Items */}
@@ -572,8 +778,23 @@ export default function CotizacionDrawerLight({
               </button>
             </div>
 
-            {Array.isArray(c?.pagos) && c.pagos.length > 0 ? (
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <div className="border border-slate-200 rounded-xl overflow-hidden">
+              <div className="flex flex-col md:flex-row md:items-center gap-4 px-4 py-3 bg-slate-50 border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Total Facturado:</span>
+                  <span className={`text-xs font-bold ${totals.porcentajeFacturado >= 100 ? "text-green-600" : "text-blue-600"}`}>
+                    {totals.porcentajeFacturado.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Total Pagado:</span>
+                  <span className={`text-xs font-bold ${totals.porcentajePagado >= 100 ? "text-green-600" : "text-orange-600"}`}>
+                    {totals.porcentajePagado.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+
+              {Array.isArray(c?.pagos) && c.pagos.length > 0 ? (
                 <table className="w-full text-left text-sm whitespace-nowrap">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
@@ -593,11 +814,26 @@ export default function CotizacionDrawerLight({
                             <button
                               onClick={() => setViewUrl(getFullUrl(pago.comprobante_url))}
                               className="text-blue-600 hover:text-blue-800 text-xs font-semibold flex items-center gap-1 hover:cursor-pointer"
+                              title={pago.comprobante_nombre || "Ver comprobante"}
                             >
-                              <VisibilityOutlinedIcon fontSize="small" /> Ver
+                              <VisibilityOutlinedIcon sx={{ fontSize: 16 }} /> Ver
                             </button>
                           ) : (
-                            <span className="text-xs text-slate-400">Sin comprobante</span>
+                            <label className={`flex items-center gap-1 text-[11px] font-bold cursor-pointer transition-colors ${uploadingPagoId === pago.id ? "text-slate-400" : "text-slate-500 hover:text-blue-600"}`}>
+                              {uploadingPagoId === pago.id ? (
+                                <CircularProgress size={12} color="inherit" />
+                              ) : (
+                                <FileUploadOutlinedIcon sx={{ fontSize: 16 }} />
+                              )}
+                              {uploadingPagoId === pago.id ? "Subiendo..." : "Subir comprobante"}
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept=".pdf,.png,.jpg,.jpeg"
+                                onChange={(e) => handlePagoUpload(e, pago.id)}
+                                disabled={uploadingPagoId === pago.id}
+                              />
+                            </label>
                           )}
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -636,7 +872,6 @@ export default function CotizacionDrawerLight({
                     </tr>
                   </tfoot>
                 </table>
-              </div>
             ) : (
               <div className="p-6 bg-slate-50 border border-slate-200 border-dashed rounded-xl text-center flex flex-col items-center gap-2">
                 <span className="text-slate-500 text-sm">No hay pagos registrados para esta cotización.</span>
@@ -644,6 +879,7 @@ export default function CotizacionDrawerLight({
               </div>
             )}
           </div>
+        </div>
 
           {/* Documentos Adjuntos */}
           <div>
@@ -652,12 +888,12 @@ export default function CotizacionDrawerLight({
                 Documentos Adjuntos
               </h4>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <DocButton docType="oc" label="Orden de Compra (OC)" url={c?.doc_oc_url} />
-              <DocButton docType="hes" label="Hoja de Ejecución (HES)" url={c?.doc_hes_url} />
-              <DocButton docType="fac" label="Factura (FAC)" url={c?.doc_fac_url} />
-              <DocButton docType="comprobante" label="Comprobante de Pago" url={c?.doc_comprobante_url} />
-              <DocButton docType="gd" label="Guía de Despacho (GD)" url={c?.doc_gd_url} />
+              <DocButton docType="hes" label="Hoj. Ejecución (HES)" multiple adjuntos={c?.adjuntos} />
+              <DocButton docType="fac" label="Facturas (FAC)" multiple adjuntos={c?.adjuntos} />
+              <DocButton docType="comprobante" label="Comprobantes Pago" multiple adjuntos={c?.adjuntos} />
+              <DocButton docType="gd" label="Guías de Despacho" multiple adjuntos={c?.adjuntos} />
             </div>
           </div>
         </div>
@@ -862,6 +1098,38 @@ export default function CotizacionDrawerLight({
           <Button onClick={() => setOpenDelete(false)}>Cancelar</Button>
           <Button variant="contained" color="error" onClick={confirmDelete}>
             Sí, eliminar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal Prompt % Facturado */}
+      <Dialog open={!!facPrompt} onClose={() => setFacPrompt(null)} maxWidth="xs" fullWidth sx={{ zIndex: (t) => t.zIndex.modal + 20 }}>
+        <DialogTitle sx={{ fontSize: 16, fontWeight: "bold" }}>% Facturado</DialogTitle>
+        <DialogContent>
+          <p className="text-xs text-slate-500 mb-4">
+            Indica qué porcentaje de la cotización representa esta factura.
+          </p>
+          <TextField
+            fullWidth
+            type="number"
+            label="Porcentaje (%)"
+            value={facPorcentaje}
+            onChange={(e) => setFacPorcentaje(e.target.value)}
+            inputProps={{ min: 0, max: 100 }}
+            autoFocus
+            variant="outlined"
+            size="small"
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setFacPrompt(null)} color="inherit">Cancelar</Button>
+          <Button 
+            onClick={() => handleDocUpload(null, facPrompt.docType, { file: facPrompt.file, porcentaje: facPorcentaje })}
+            variant="contained" 
+            disabled={!facPorcentaje || facPorcentaje <= 0}
+          >
+            Confirmar y Subir
           </Button>
         </DialogActions>
       </Dialog>

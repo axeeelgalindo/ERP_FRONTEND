@@ -33,6 +33,8 @@ export default function HomePage() {
 
   const [bundle, setBundle] = useState(null);
   const [err, setErr] = useState("");
+  const [periodo, setPeriodo] = useState('mensual'); // 👈 nuevo estado
+  const [refDate, setRefDate] = useState(new Date());
 
   // 👇 redirección si NO hay sesión
   useEffect(() => {
@@ -71,7 +73,7 @@ export default function HomePage() {
 
         const candidates = [
           { key: "me", path: "/me" },
-          { key: "dashboard", path: "/dashboard" }
+          { key: "dashboard", path: `/dashboard?periodo=${periodo}&refDate=${refDate.toISOString()}` }
         ];
 
         const results = await Promise.allSettled(
@@ -117,7 +119,7 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [session, status]);
+  }, [session, status, periodo, refDate]);
 
   // Mientras NextAuth resuelve la sesión (o justo antes de redirigir)
   if (status === "loading" || status === "unauthenticated") {
@@ -166,6 +168,31 @@ export default function HomePage() {
   // --- METRICS DESDE EL BACKEND ---
   const dbData = bundle.dashboard || {};
   
+  // Helpers de navegación con Selects
+  const handleScaleSelect = (scale) => {
+    setPeriodo(scale);
+    setRefDate(new Date()); // Reseteamos al presente al cambiar de escala
+  };
+
+  const handleWeekSelect = (e) => {
+    const offset = Number(e.target.value);
+    const nd = new Date(); // base actual
+    nd.setDate(nd.getDate() + (offset * 7));
+    setRefDate(nd);
+  };
+
+  const handleMonthSelect = (e) => {
+    const nd = new Date(refDate);
+    nd.setMonth(Number(e.target.value));
+    setRefDate(nd);
+  };
+
+  const handleYearSelect = (e) => {
+    const nd = new Date(refDate);
+    nd.setFullYear(Number(e.target.value));
+    setRefDate(nd);
+  };
+
   // KPIs
   const {
     ventasMes = 0,
@@ -173,6 +200,7 @@ export default function HomePage() {
     cotizadoMes = 0,
     comprasSemana = 0,
     devengadoSemana = 0,
+    ingresosMes = 0,
     flujoCajaMes = 0
   } = dbData.kpis || {};
 
@@ -190,25 +218,81 @@ export default function HomePage() {
   // Render principal
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-8 bg-slate-50 min-h-screen">
-      <header className="flex flex-col gap-1 pb-4 border-b border-slate-200">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-          Executive Dashboard, {userName.split(' ')[0]}
-        </h1>
-        <p className="text-slate-500 text-sm">
-          Vista general y resúmenes financieros. Rol: <span className="font-medium text-slate-700">{rolNombre || rolCodigo}</span>
-          {empresa?.nombre ? (
-            <>
-              {" "}· Empresa: <span className="font-medium text-slate-700">{empresa.nombre}</span>
-            </>
-          ) : null}
-        </p>
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Executive Dashboard, {userName.split(' ')[0]}
+          </h1>
+          <p className="text-slate-500 text-sm">
+            Vista general y resúmenes financieros. Rol: <span className="font-medium text-slate-700">{rolNombre || rolCodigo}</span>
+            {empresa?.nombre ? (
+              <>
+                {" "}· Empresa: <span className="font-medium text-slate-700">{empresa.nombre}</span>
+              </>
+            ) : null}
+          </p>
+        </div>
+        
+        {/* Componente de Filtros Avanzado */}
+        <div className="flex flex-col sm:flex-row items-center gap-4 self-start md:self-auto bg-white border border-slate-200 p-1.5 rounded-lg shadow-sm">
+          {/* Tipo de Periodo (Escala) */}
+          <div className="flex bg-slate-100 p-1 rounded-md">
+            <button onClick={() => handleScaleSelect('semanal')} className={`px-3 py-1 text-sm font-bold rounded flex-1 transition-colors ${periodo === 'semanal' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Semana</button>
+            <button onClick={() => handleScaleSelect('mensual')} className={`px-3 py-1 text-sm font-bold rounded flex-1 transition-colors ${periodo === 'mensual' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Mes</button>
+            <button onClick={() => handleScaleSelect('anual')} className={`px-3 py-1 text-sm font-bold rounded flex-1 transition-colors ${periodo === 'anual' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Año</button>
+          </div>
+
+          <div className="flex items-center gap-2 pr-2">
+            {periodo === 'semanal' && (
+              <select 
+                key="week-select"
+                className="text-sm font-bold bg-transparent border-none text-slate-700 focus:ring-0 cursor-pointer outline-none w-full sm:w-auto min-w-[140px]"
+                defaultValue={0} 
+                onChange={handleWeekSelect}
+              >
+                <option value={0}>Esta semana</option>
+                <option value={-1}>Semana pasada</option>
+                <option value={-2}>Hace 2 semanas</option>
+                <option value={-3}>Hace 3 semanas</option>
+                <option value={-4}>Hace 4 semanas</option>
+              </select>
+            )}
+
+            {periodo === 'mensual' && (
+              <>
+                <select 
+                  className="text-sm font-bold bg-transparent border-none text-slate-700 focus:ring-0 cursor-pointer outline-none"
+                  value={refDate.getMonth()} 
+                  onChange={handleMonthSelect}
+                >
+                  {["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"].map((m, i) => (
+                    <option key={i} value={i}>{m}</option>
+                  ))}
+                </select>
+                <span className="text-slate-300">/</span>
+              </>
+            )}
+
+            {(periodo === 'mensual' || periodo === 'anual') && (
+              <select 
+                className="text-sm font-bold bg-transparent border-none text-slate-700 focus:ring-0 cursor-pointer outline-none"
+                value={refDate.getFullYear()} 
+                onChange={handleYearSelect}
+              >
+                {(dbData.availableYears || [new Date().getFullYear()]).map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
       </header>
 
       {/* 5 KPIs Clave Solicitados */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 xl:gap-6">
         <div className="rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm hover:shadow-md transition-shadow relative flex flex-col justify-between">
           <div>
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Ventas Mes</div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Ventas</div>
             <div className="text-3xl font-extrabold text-slate-900 tracking-tight">{money(ventasMes)}</div>
             <div className="mt-2 text-[11px] text-emerald-600 font-bold bg-emerald-50 inline-block px-2 py-0.5 rounded">Órdenes de Venta</div>
           </div>
@@ -222,7 +306,7 @@ export default function HomePage() {
 
         <div className="rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
           <div>
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Facturado Mes</div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Facturado</div>
             <div className="text-3xl font-extrabold text-slate-900 tracking-tight">{money(facturadoMes)}</div>
             <div className="mt-2 text-[11px] text-indigo-600 font-bold bg-indigo-50 inline-block px-2 py-0.5 rounded">Facturación Real</div>
           </div>
@@ -230,7 +314,7 @@ export default function HomePage() {
 
         <div className="rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
           <div>
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Generado Semana (EV)</div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Generado (EV)</div>
             <div className="text-3xl font-extrabold text-blue-600 tracking-tight">{money(devengadoSemana)}</div>
             <div className="mt-2 text-[11px] text-blue-600 font-bold bg-blue-50 inline-block px-2 py-0.5 rounded">Devengado de Proyectos</div>
           </div>
@@ -238,7 +322,7 @@ export default function HomePage() {
 
         <div className="rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
           <div>
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Compras Semana</div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Compras</div>
             <div className="text-3xl font-extrabold text-slate-900 tracking-tight">{money(comprasSemana)}</div>
             <div className="mt-2 text-[11px] text-amber-600 font-bold bg-amber-50 inline-block px-2 py-0.5 rounded">Gasto proyectado OC</div>
           </div>
@@ -246,12 +330,12 @@ export default function HomePage() {
 
         <div className="rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
           <div>
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Flujo Caja Mes</div>
-            <div className={`text-3xl font-extrabold tracking-tight ${flujoCajaMes < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-              {money(flujoCajaMes)}
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Ingresos Mes</div>
+            <div className={`text-3xl font-extrabold tracking-tight text-emerald-600`}>
+              {money(ingresosMes)}
             </div>
-            <div className={`mt-2 text-[11px] font-bold inline-block px-2 py-0.5 rounded ${flujoCajaMes < 0 ? 'text-rose-600 bg-rose-50' : 'text-emerald-600 bg-emerald-50'}`}>
-              Entradas - Salidas
+            <div className={`mt-2 text-[11px] font-bold inline-block px-2 py-0.5 rounded text-emerald-600 bg-emerald-50`}>
+              Cobros realizados
             </div>
           </div>
         </div>
@@ -260,7 +344,7 @@ export default function HomePage() {
       {/* Gráficos */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm flex flex-col items-center">
-          <h3 className="w-full text-left font-bold text-slate-800 mb-4">Trabajos Mes</h3>
+          <h3 className="w-full text-left font-bold text-slate-800 mb-4">Trabajos</h3>
           <div className="flex-1 w-full min-h-[250px] flex items-center justify-center">
             {/* Render pie chart if data is present otherwise placeholder */}
             {proyectosMesActivo ? (
@@ -268,18 +352,18 @@ export default function HomePage() {
               <div style={{ width: '100%', height: '100%', minHeight: '250px', position: 'relative' }}>
                 <PieChartFallback data={pieTrabajos} />
               </div>
-            ) : (<span className="text-xs text-slate-400">Sin datos este mes</span>)}
+            ) : (<span className="text-xs text-slate-400">Sin datos en el periodo</span>)}
           </div>
         </div>
 
         <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm flex flex-col items-center">
-          <h3 className="w-full text-left font-bold text-slate-800 mb-4">Cotizaciones Mes</h3>
+          <h3 className="w-full text-left font-bold text-slate-800 mb-4">Cotizaciones</h3>
           <div className="flex-1 w-full min-h-[250px] flex items-center justify-center">
             {cotizacionesMesDataActivo ? (
               <div style={{ width: '100%', height: '100%', minHeight: '250px', position: 'relative' }}>
                 <PieChartFallback data={pieCotizaciones} />
               </div>
-            ) : (<span className="text-xs text-slate-400">Sin datos este mes</span>)}
+            ) : (<span className="text-xs text-slate-400">Sin datos en el periodo</span>)}
           </div>
         </div>
 

@@ -142,6 +142,10 @@ export default function CotizacionFromVentasDialog({
 
   const [ventaIds, setVentaIds] = useState([]);
 
+  // Proyecto opcional
+  const [proyectoId, setProyectoId] = useState("");
+  const [proyectos, setProyectos] = useState([]);
+
   // ✅ descuento general cotización
   const [descuentoPct, setDescuentoPct] = useState("");
 
@@ -171,6 +175,7 @@ export default function CotizacionFromVentasDialog({
 
     setVentaIds(preselectedVentaIds?.length ? preselectedVentaIds : []);
     setDescuentoPct("");
+    setProyectoId("");
 
     setGlosas([emptyGlosa()]);
     setGlosaErr("");
@@ -376,6 +381,18 @@ export default function CotizacionFromVentasDialog({
   }, [open, session, empresaIdFromToken]);
 
   // =========================
+  // cargar proyectos
+  // =========================
+  useEffect(() => {
+    if (!open) return;
+    const { headers } = buildAuthHeaders(session, empresaIdFromToken);
+    fetch(`${API_URL}/proyectos`, { headers })
+      .then(r => r.json())
+      .then(data => setProyectos(Array.isArray(data) ? data : (data?.items || data?.data || [])))
+      .catch(() => setProyectos([]));
+  }, [open, session, empresaIdFromToken]);
+
+  // =========================
   // cargar responsables
   // =========================
   useEffect(() => {
@@ -495,6 +512,7 @@ export default function CotizacionFromVentasDialog({
       const payload = {
         cliente_id: clienteId,
         cliente_responsable_id: responsableId || null,
+        proyecto_id: proyectoId || null,
 
         asunto: asunto || null,
         vigencia_dias: normalizeVigenciaDias(vigenciaDias),
@@ -592,11 +610,13 @@ export default function CotizacionFromVentasDialog({
             setVigenciaDias={setVigenciaDias}
             descuentoPct={descuentoPct}
             setDescuentoPct={setDescuentoPct}
+            proyectos={proyectos}
+            proyectoId={proyectoId}
+            setProyectoId={setProyectoId}
             ventasDisponibles={ventasDisponibles}
             ventaIds={ventaIds}
             setVentaIds={setVentaIds}
             preselectedVentaIds={preselectedVentaIds}
-            // ✅ flags para bloquear/alertar
             hasGlosaDiscount={hasGlosaDiscount}
             conflict={conflict}
             conflictMsg={conflictMsg}

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { makeHeaders } from "@/lib/api";
+import { CircularProgress } from "@mui/material";
 
 /**
  * Kanban Page - Global View
@@ -17,12 +18,111 @@ export default function KanbanPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [dropTransition, setDropTransition] = useState(null);
+  const [reviewComment, setReviewComment] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   const [filters, setFilters] = useState({
     proyecto_id: "",
     responsable_id: "",
     periodo: "semanal",
   });
+
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [addingItem, setAddingItem] = useState(false);
+  const [formType, setFormType] = useState("TAREA"); // EPICA, TAREA, SUBTAREA
+  const [formData, setFormData] = useState({
+    nombre: "",
+    descripcion: "",
+    proyecto_id: "",
+    epica_id: "",
+    tarea_id: "",
+    responsable_id: "",
+    fecha_inicio_plan: new Date().toISOString().split('T')[0],
+    dias_plan: 1,
+    prioridad: 2,
+  });
+
+  const [parentOptions, setParentOptions] = useState([]); // Epicas or Tareas
+  const [loadingParents, setLoadingParents] = useState(false);
+  
+  const [projectMembers, setProjectMembers] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [showQuickAddMember, setShowQuickAddMember] = useState(false);
+
+  // Sincronizar proyecto del form con proyecto del filtro
+  useEffect(() => {
+    if (isAddModalOpen && !formData.proyecto_id && filters.proyecto_id) {
+      setFormData(prev => ({ ...prev, proyecto_id: filters.proyecto_id }));
+    }
+  }, [isAddModalOpen, filters.proyecto_id]);
+
+  // Cargar padres (Epicas o Tareas) según el proyecto y tipo seleccionado
+  useEffect(() => {
+    if (!isAddModalOpen || !formData.proyecto_id || formType === "EPICA") {
+      setParentOptions([]);
+      return;
+    }
+
+    const fetchParents = async () => {
+      setLoadingParents(true);
+      try {
+        const headers = makeHeaders(session);
+        let url = "";
+        if (formType === "TAREA") {
+          url = `${process.env.NEXT_PUBLIC_API_URL}/epicas?proyecto_id=${formData.proyecto_id}`;
+        } else if (formType === "SUBTAREA") {
+          url = `${process.env.NEXT_PUBLIC_API_URL}/tareas?proyectoId=${formData.proyecto_id}&pageSize=200`;
+        }
+
+        const res = await fetch(url, { headers });
+        const json = await res.json();
+        if (json.ok) {
+          const list = json.rows || json.items || [];
+          setParentOptions(list.map(item => ({
+            id: item.id,
+            nombre: item.nombre || item.titulo || "Sin nombre"
+          })));
+        }
+      } catch (err) {
+        console.error("Error fetching parents:", err);
+      } finally {
+        setLoadingParents(false);
+      }
+    };
+
+    fetchParents();
+  }, [isAddModalOpen, formData.proyecto_id, formType, session]);
+
+  // Cargar miembros del proyecto
+  useEffect(() => {
+    if (!isAddModalOpen || !formData.proyecto_id) {
+      setProjectMembers([]);
+      return;
+    }
+
+    const fetchMembers = async () => {
+      setLoadingMembers(true);
+      try {
+        const headers = makeHeaders(session);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/proyectos/${formData.proyecto_id}`, { headers });
+        const json = await res.json();
+        if (json.ok && json.row) {
+          const members = (json.row.miembros || []).map(m => ({
+            id: m.empleado_id,
+            nombre: m.empleado?.usuario?.nombre || "Sin nombre"
+          }));
+          setProjectMembers(members);
+        }
+      } catch (err) {
+        console.error("Error fetching project members:", err);
+      } finally {
+        setLoadingMembers(false);
+      }
+    };
+
+    fetchMembers();
+  }, [isAddModalOpen, formData.proyecto_id, session]);
 
   const fetchData = useCallback(async (q = "") => {
     if (!session) return;
@@ -81,6 +181,25 @@ export default function KanbanPage() {
 
     const newStatus = statusMap[targetStatus];
 
+    // DETERMINAR SI REQUIERE MODAL
+    const itemEnColumna = Object.values(columns).flat().find(t => t.id === taskId && t.tipo === tipo);
+    if (!itemEnColumna) {
+      console.error("No se encontró el item arrastrado:", taskId, tipo);
+      return;
+    }
+
+    const currentStatus = itemEnColumna.estado;
+
+    // Caso 1: A "EN CURSO" (si viene de pendiente)
+    const requiresStartDate = newStatus === "en_progreso" && (currentStatus === "pendiente" || !itemEnColumna.fecha_inicio_real);
+    // Caso 2: A "EN REVISIÓN" o "COMPLETADO"
+    const requiresEvidence = (newStatus === "en_revision" || newStatus === "completada");
+
+    if (requiresStartDate || requiresEvidence) {
+      setDropTransition({ item: itemEnColumna, targetStatus });
+      return;
+    }
+
     // Optimistic Update
     setData(prev => {
       if (!prev) return prev;
@@ -127,6 +246,42 @@ export default function KanbanPage() {
       fetchData(searchTerm);
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleReviewAction = async (item, action) => {
+    if (!session) return;
+    setSubmittingReview(true);
+    try {
+      const isSubtarea = item.tipo === "SUBTAREA";
+      const estadoParams = action === "approve" ? "completada" : "en_progreso";
+      const body = {
+        estado: estadoParams,
+        comentario_revision: reviewComment,
+        ...(action === "approve" ? { 
+          avance: 100,
+          fecha_fin_real: new Date().toISOString()
+        } : {})
+      };
+      
+      const endpoint = isSubtarea ? `tareas-detalle/update/${item.id}` : `tareas/update/${item.id}`;
+      const headers = makeHeaders(session);
+      
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/${endpoint}`, {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) throw new Error("Error al guardar revisión");
+
+      setSelectedItem(null);
+      setReviewComment("");
+      fetchData(searchTerm);
+    } catch (err) {
+      alert("Error en revisión: " + err.message);
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
@@ -208,7 +363,7 @@ export default function KanbanPage() {
                 <div 
                   key={opt.id}
                   className={`px-3 py-2 text-xs rounded-lg cursor-pointer mb-1 transition-colors ${value === opt.id ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}
-                  onClick={(e) => { e.stopPropagation(); onChange(opt.id); setIsOpen(false); setSearch(""); }}
+                  onClick={(e) => { e.stopPropagation(); onChange(value === opt.id ? "" : opt.id); setIsOpen(false); setSearch(""); }}
                 >
                   {opt.nombre}
                 </div>
@@ -328,6 +483,190 @@ export default function KanbanPage() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    );
+  };
+
+  // --- Modal de Transición de Estado ---
+  const StatusTransitionModal = () => {
+    if (!dropTransition) return null;
+    const { item, targetStatus } = dropTransition;
+    const isStart = targetStatus === "EN CURSO";
+    const isFinish = targetStatus === "COMPLETADO" || targetStatus === "COMPLETADA";
+    
+    // Buscar evidencia previa si ya estaba en revisión o tiene evidencias
+    const existingEvidence = item.evidencias && item.evidencias.length > 0 ? item.evidencias[0] : null;
+
+    const [comentario, setComentario] = useState("");
+    const [files, setFiles] = useState([]);
+    const [fechaInicio, setFechaInicio] = useState(new Date().toISOString().split('T')[0]);
+    const [submitting, setSubmitting] = useState(false);
+
+    const handleConfirm = async () => {
+      setSubmitting(true);
+      try {
+        const formData = new FormData();
+        formData.append("tipo", item.tipo);
+        formData.append("targetStatus", targetStatus);
+        
+        if (isStart) {
+          formData.append("fecha_inicio_real", fechaInicio);
+        } else {
+          formData.append("comentario", comentario);
+          // Mandar cada archivo
+          files.forEach(f => {
+            formData.append("archivo", f);
+          });
+        }
+
+        const headers = makeHeaders(session);
+        // Important: delete Content-Type to let browser set it automatically with boundary
+        delete headers["Content-Type"];
+
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tareas/${item.id}/transition`, {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}));
+          throw new Error(json.message || "Error al procesar transición");
+        }
+
+        setDropTransition(null);
+        fetchData(searchTerm);
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        setSubmitting(false);
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 z-[400] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setDropTransition(null)}></div>
+        <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden flex flex-col relative shadow-2xl animate-in zoom-in-95 duration-200">
+          <header className="px-8 py-6 border-b border-gray-100 flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-black text-gray-900">
+                {isStart ? "Iniciar Trabajo" : "Confirmar Evidencia"}
+              </h2>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
+                {item.nombre}
+              </p>
+            </div>
+            <button onClick={() => setDropTransition(null)} className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400">
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          </header>
+
+          <div className="p-8 space-y-6">
+            {isStart ? (
+              <div className="space-y-2">
+                <label className="text-[11px] font-extrabold text-blue-600 uppercase tracking-widest">Fecha de Inicio Real</label>
+                <input 
+                  type="date" 
+                  value={fechaInicio}
+                  onChange={(e) => setFechaInicio(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
+                <p className="text-[10px] text-gray-400 italic">Indica cuándo comenzaste realmente esta actividad.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {existingEvidence && (
+                  <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 space-y-3">
+                    <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-1">
+                      <span className="material-symbols-outlined text-sm">visibility</span>
+                      Evidencia previa (Cargada en revisión)
+                    </p>
+                    <div className="aspect-video relative rounded-xl overflow-hidden bg-white border border-blue-200">
+                       <img 
+                        src={existingEvidence.archivo_url.startsWith('http') ? existingEvidence.archivo_url : `${process.env.NEXT_PUBLIC_API_URL}${existingEvidence.archivo_url.replace('/api', '')}`} 
+                        className="w-full h-full object-cover" 
+                        alt="Evidencia previa"
+                      />
+                    </div>
+                    {existingEvidence.comentario && (
+                      <p className="text-[11px] text-blue-800 italic">"{existingEvidence.comentario}"</p>
+                    )}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label className="text-[11px] font-extrabold text-blue-600 uppercase tracking-widest">
+                    {existingEvidence ? "Añadir Nueva Evidencia (Opcional)" : "Evidencia Fotográfica"}
+                  </label>
+                  <div className="relative group">
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files)])}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    />
+                    <div className={`w-full border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center transition-all ${files.length > 0 ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-gray-50 group-hover:border-blue-300 group-hover:bg-blue-50/30'}`}>
+                      <span className={`material-symbols-outlined text-3xl mb-2 ${files.length > 0 ? 'text-green-500' : 'text-gray-400'}`}>
+                        {files.length > 0 ? 'library_add' : 'add_a_photo'}
+                      </span>
+                      <p className={`text-[10px] font-bold uppercase tracking-wider ${files.length > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                        {files.length > 0 ? `${files.length} archivos seleccionados` : (existingEvidence ? "Añadir más fotos..." : "Subir Fotos de Evidencia")}
+                      </p>
+                    </div>
+                  </div>
+
+                  {files.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2 max-h-32 overflow-y-auto p-1">
+                      {files.map((f, i) => (
+                        <div key={i} className="bg-gray-100 rounded-lg px-2 py-1 flex items-center gap-2 group/item">
+                          <span className="text-[10px] text-gray-600 font-medium truncate max-w-[120px]">{f.name}</span>
+                          <button 
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              setFiles(prev => prev.filter((_, idx) => idx !== i));
+                            }}
+                            className="text-gray-400 hover:text-red-500 flex items-center"
+                          >
+                            <span className="material-symbols-outlined text-sm">cancel</span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] font-extrabold text-blue-600 uppercase tracking-widest">Comentario de Cierre</label>
+                  <textarea 
+                    value={comentario}
+                    onChange={(e) => setComentario(e.target.value)}
+                    placeholder={existingEvidence ? "Añadir más detalles..." : "Describe lo realizado..."}
+                    rows={3}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-medium text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <footer className="px-8 py-6 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+            <button 
+              onClick={() => setDropTransition(null)}
+              className="px-6 py-2.5 text-gray-400 text-sm font-bold hover:text-gray-600"
+            >
+              Cancelar
+            </button>
+            <button 
+              onClick={handleConfirm}
+              disabled={submitting || (!isStart && files.length === 0 && !existingEvidence)}
+              className="px-8 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold shadow-lg shadow-gray-900/10 hover:shadow-gray-900/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {submitting && <CircularProgress size={16} color="inherit" />}
+              {isStart ? "Comenzar Trabajo" : (isFinish ? "Finalizar Tarea" : "Enviar a Revisión")}
+            </button>
+          </footer>
         </div>
       </div>
     );
@@ -510,6 +849,51 @@ export default function KanbanPage() {
                 </div>
               )}
             </div>
+
+            {/* Panel de Revisión (Approve/Reject) */}
+            {item.estado === "en_revision" && (
+              <div className="mt-8 pt-8 border-t border-amber-100 bg-amber-50/50 -mx-8 px-8 pb-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600">
+                    <span className="material-symbols-outlined text-lg">fact_check</span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-gray-900">Control de Calidad</h4>
+                    <p className="text-[10px] text-amber-600 font-bold uppercase tracking-widest">Revisar entrega del trabajador</p>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-amber-200 p-5 space-y-4 shadow-sm">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Comentario al Trabajador</label>
+                    <textarea 
+                      value={reviewComment}
+                      onChange={(e) => setReviewComment(e.target.value)}
+                      placeholder="Indica qué pareció el trabajo o por qué lo rechazas..."
+                      rows={3}
+                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 outline-none focus:ring-2 focus:ring-amber-500 transition-all resize-none"
+                    />
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => handleReviewAction(item, "reject")}
+                      disabled={submittingReview}
+                      className="flex-1 px-4 py-3 bg-white border border-red-200 text-red-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-50 transition-all flex items-center justify-center gap-2"
+                    >
+                      {submittingReview ? <CircularProgress size={14} color="inherit" /> : <><span className="material-symbols-outlined text-sm">thumb_down</span> Rechazar</>}
+                    </button>
+                    <button 
+                      onClick={() => handleReviewAction(item, "approve")}
+                      disabled={submittingReview}
+                      className="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2"
+                    >
+                      {submittingReview ? <CircularProgress size={14} color="inherit" /> : <><span className="material-symbols-outlined text-sm">check_circle</span> Aprobar y Finalizar</>}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <footer className="px-8 py-6 border-t border-gray-100 bg-gray-50/50 flex justify-end">
@@ -562,7 +946,7 @@ export default function KanbanPage() {
             {["semanal", "mensual", "anual"].map((p) => (
               <button
                 key={p}
-                onClick={() => setFilters(prev => ({ ...prev, periodo: p }))}
+                onClick={() => setFilters(prev => ({ ...prev, periodo: prev.periodo === p ? "" : p }))}
                 className={`px-4 py-1.5 text-[11px] font-bold rounded-lg transition-all uppercase tracking-wider ${filters.periodo === p ? "bg-white text-blue-600 shadow-sm ring-1 ring-gray-100" : "text-gray-400 hover:text-gray-600"
                   }`}
               >
@@ -578,7 +962,7 @@ export default function KanbanPage() {
             placeholder="Todos"
             options={filterOptions.employees}
             value={filters.responsable_id}
-            onChange={(val) => setFilters(prev => ({ ...prev, responsable_id: val }))}
+            onChange={(val) => setFilters(prev => ({ ...prev, responsable_id: val, periodo: val ? "" : prev.periodo }))}
           />
 
           <SearchableSelect
@@ -586,8 +970,30 @@ export default function KanbanPage() {
             placeholder="Todos"
             options={filterOptions.projects}
             value={filters.proyecto_id}
-            onChange={(val) => setFilters(prev => ({ ...prev, proyecto_id: val }))}
+            onChange={(val) => setFilters(prev => ({ ...prev, proyecto_id: val, periodo: val ? "" : prev.periodo }))}
           />
+
+          <button
+            onClick={() => {
+              setFormType("TAREA");
+              setFormData({
+                nombre: "",
+                descripcion: "",
+                proyecto_id: filters.proyecto_id || "",
+                epica_id: "",
+                tarea_id: "",
+                responsable_id: "",
+                fecha_inicio_plan: new Date().toISOString().split('T')[0],
+                dias_plan: 1,
+                prioridad: 2,
+              });
+              setIsAddModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-[11px] font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 active:scale-95"
+          >
+            <span className="material-symbols-outlined text-sm">add</span>
+            NUEVO
+          </button>
 
           <button
             onClick={() => fetchData(searchTerm)}
@@ -673,6 +1079,239 @@ export default function KanbanPage() {
 
       {/* Renderizar Modal */}
       {renderDetailModal()}
+      
+      {/* Modal Transición */}
+      <StatusTransitionModal />
+
+      {/* Modal Agregar Item */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsAddModalOpen(false)}></div>
+          <div className="bg-white rounded-3xl w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col relative shadow-2xl animate-in zoom-in-95 duration-200">
+            <header className="px-8 py-6 border-b border-gray-100 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-black text-gray-900">Nuevo Item</h2>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Añadir al flujo de trabajo</p>
+              </div>
+              <button onClick={() => setIsAddModalOpen(false)} className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400"><span className="material-symbols-outlined">close</span></button>
+            </header>
+
+            <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
+              {/* Type selector */}
+              <div className="bg-gray-50 p-1 rounded-2xl border border-gray-100 flex gap-1">
+                {["EPICA", "TAREA", "SUBTAREA"].map(t => (
+                  <button
+                    key={t}
+                    onClick={() => { setFormType(t); setFormData(p => ({ ...p, epica_id: "", tarea_id: "" })); }}
+                    className={`flex-1 py-2 text-[10px] font-black rounded-xl transition-all uppercase tracking-widest ${formType === t ? 'bg-white text-blue-600 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nombre / Título</label>
+                  <input
+                    type="text"
+                    className="w-full bg-gray-50 border-none ring-1 ring-gray-100 rounded-xl px-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-blue-600 outline-none"
+                    placeholder={`Nombre de la ${formType.toLowerCase()}...`}
+                    value={formData.nombre}
+                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Proyecto</label>
+                  <SearchableSelect
+                    label="P"
+                    placeholder="Seleccionar..."
+                    options={filterOptions.projects}
+                    value={formData.proyecto_id}
+                    onChange={(val) => setFormData({ ...formData, proyecto_id: val, epica_id: "", tarea_id: "" })}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Responsable</label>
+                    {formData.proyecto_id && (
+                      <button 
+                        onClick={() => setShowQuickAddMember(!showQuickAddMember)}
+                        className="text-[9px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-0.5"
+                        title="Agregar empleado al proyecto"
+                      >
+                        <span className="material-symbols-outlined text-[12px]">person_add</span>
+                        {showQuickAddMember ? "Cancelar" : "Asociar"}
+                      </button>
+                    )}
+                  </div>
+                  
+                  {showQuickAddMember ? (
+                    <div className="flex gap-2">
+                       <div className="flex-1">
+                          <SearchableSelect
+                            label="E"
+                            placeholder="Buscar empleado..."
+                            options={filterOptions.employees}
+                            value={formData.new_member_id || ""}
+                            onChange={(val) => setFormData({ ...formData, new_member_id: val })}
+                          />
+                       </div>
+                       <button 
+                         disabled={!formData.new_member_id || addingItem}
+                         onClick={async () => {
+                            if (!formData.new_member_id) return;
+                            setAddingItem(true);
+                            try {
+                              const headers = makeHeaders(session);
+                              const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/proyectos/${formData.proyecto_id}/miembros/add`, {
+                                method: "POST",
+                                headers,
+                                body: JSON.stringify({ empleado_id: formData.new_member_id })
+                              });
+                              const json = await res.json();
+                              if (!json.ok) throw new Error(json.message || "Error al agregar");
+                              
+                              // Refresh members
+                              const resP = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/proyectos/${formData.proyecto_id}`, { headers: makeHeaders(session) });
+                              const jsonP = await resP.json();
+                              if (jsonP.ok) {
+                                setProjectMembers((jsonP.row.miembros || []).map(m => ({
+                                  id: m.empleado_id,
+                                  nombre: m.empleado?.usuario?.nombre || "Sin nombre"
+                                })));
+                              }
+                              
+                              setShowQuickAddMember(false);
+                              setFormData(prev => ({ ...prev, new_member_id: "", responsable_id: formData.new_member_id }));
+                            } catch (err) {
+                              alert(err.message);
+                            } finally {
+                              setAddingItem(false);
+                            }
+                         }}
+                         className="bg-blue-600 text-white w-10 h-10 rounded-xl flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all shadow-sm"
+                       >
+                         <span className="material-symbols-outlined text-sm">check</span>
+                       </button>
+                    </div>
+                  ) : (
+                    <SearchableSelect
+                      label="R"
+                      placeholder={loadingMembers ? "Cargando..." : "Miembros..."}
+                      options={projectMembers}
+                      value={formData.responsable_id}
+                      onChange={(val) => setFormData({ ...formData, responsable_id: val })}
+                    />
+                  )}
+                </div>
+
+                {formType !== "EPICA" && (
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      {formType === "TAREA" ? "Vincular a Épica" : "Vincular a Tarea"}
+                    </label>
+                    <SearchableSelect
+                      label={formType === "TAREA" ? "E" : "T"}
+                      placeholder={loadingParents ? "Cargando..." : "Seleccionar..."}
+                      options={parentOptions}
+                      value={formType === "TAREA" ? formData.epica_id : formData.tarea_id}
+                      onChange={(val) => setFormData({ ...formData, [formType === "TAREA" ? "epica_id" : "tarea_id"]: val })}
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fecha Inicio</label>
+                  <input
+                    type="date"
+                    className="w-full bg-gray-50 border-none ring-1 ring-gray-100 rounded-xl px-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-blue-600 outline-none"
+                    value={formData.fecha_inicio_plan}
+                    onChange={(e) => setFormData({ ...formData, fecha_inicio_plan: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Duración (Días)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="w-full bg-gray-50 border-none ring-1 ring-gray-100 rounded-xl px-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-blue-600 outline-none"
+                    value={formData.dias_plan}
+                    onChange={(e) => setFormData({ ...formData, dias_plan: parseInt(e.target.value) || 1 })}
+                  />
+                </div>
+
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Descripción</label>
+                  <textarea
+                    rows="3"
+                    className="w-full bg-gray-50 border-none ring-1 ring-gray-100 rounded-xl px-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-blue-600 outline-none resize-none"
+                    placeholder="Detalles adicionales..."
+                    value={formData.descripcion}
+                    onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+
+            <footer className="px-8 py-6 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className="px-6 py-2.5 bg-white border border-gray-200 text-gray-500 rounded-xl text-xs font-bold hover:bg-gray-50 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                disabled={addingItem || !formData.nombre || !formData.proyecto_id || (formType === "TAREA" && !formData.epica_id) || (formType === "SUBTAREA" && !formData.tarea_id)}
+                onClick={async () => {
+                  setAddingItem(true);
+                  try {
+                    const headers = makeHeaders(session);
+                    let url = "";
+                    let body = {};
+
+                    if (formType === "EPICA") {
+                      url = `${process.env.NEXT_PUBLIC_API_URL}/epicas/add`;
+                      body = { ...formData };
+                    } else if (formType === "TAREA") {
+                      url = `${process.env.NEXT_PUBLIC_API_URL}/tareas/add`;
+                      body = { ...formData };
+                    } else if (formType === "SUBTAREA") {
+                      url = `${process.env.NEXT_PUBLIC_API_URL}/tareas-detalle/add`;
+                      body = { 
+                        ...formData, 
+                        titulo: formData.nombre // Subtareas usan titulo
+                      };
+                    }
+
+                    const res = await fetch(url, {
+                      method: "POST",
+                      headers,
+                      body: JSON.stringify(body)
+                    });
+                    const json = await res.json();
+                    if (!json.ok) throw new Error(json.message || "Error al crear");
+                    
+                    setIsAddModalOpen(false);
+                    fetchData(searchTerm);
+                  } catch (err) {
+                    alert(err.message);
+                  } finally {
+                    setAddingItem(false);
+                  }
+                }}
+                className="px-8 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-extrabold shadow-lg shadow-blue-600/20 hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed"
+              >
+                {addingItem ? "Creando..." : "Crear Ítem"}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

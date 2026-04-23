@@ -19,13 +19,18 @@ export default function StepClienteOferta({
   vigenciaDias,
   setVigenciaDias,
 
-  // ✅ descuento general
+  // Proyecto opcional
+  proyectos = [],
+  proyectoId = "",
+  setProyectoId,
+
+  // descuento general
   descuentoPct,
   setDescuentoPct,
 
-  // ✅ NUEVO: flags desde el padre
-  hasGlosaDiscount = false,     // true si alguna glosa tiene descuento > 0
-  conflict = false,            // true si hay general y glosas al mismo tiempo
+  // flags desde el padre
+  hasGlosaDiscount = false,
+  conflict = false,
   conflictMsg = "",
 
   ventasDisponibles,
@@ -138,6 +143,33 @@ export default function StepClienteOferta({
           value={asunto}
           onChange={(e) => setAsunto(e.target.value)}
         />
+      </Box>
+
+      {/* Proyecto opcional */}
+      <Box>
+        <Typography sx={{ fontSize: 14, fontWeight: 900, mb: 0.5 }}>
+          Proyecto asociado{" "}
+          <Typography component="span" sx={{ fontSize: 12, fontWeight: 400, color: "text.secondary" }}>
+            (opcional)
+          </Typography>
+        </Typography>
+        <Typography sx={{ fontSize: 11, color: "text.secondary", mb: 1 }}>
+          Si es un costeo adicional de un proyecto existente, seléccionalo. Si no, se creará el proyecto nuevamente al aceptar la cotización.
+        </Typography>
+        <TextField
+          select
+          size="small"
+          fullWidth
+          value={proyectoId}
+          onChange={(e) => setProyectoId?.(e.target.value)}
+        >
+          <MenuItem value="">— Sin proyecto (se creará al aceptar) —</MenuItem>
+          {(proyectos || []).map((p) => (
+            <MenuItem key={p.id} value={p.id}>
+              {p.nombre || p.id}
+            </MenuItem>
+          ))}
+        </TextField>
       </Box>
 
       {/* Condiciones comerciales */}

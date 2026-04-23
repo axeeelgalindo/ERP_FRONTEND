@@ -97,11 +97,13 @@ export default function EditCotizacionDialog({
   const [fechaDocumento, setFechaDocumento] = useState("");
   const [descuentoPct, setDescuentoPct] = useState("");
   const [usuarios, setUsuarios] = useState([]);
+  const [proyectoId, setProyectoId] = useState("");
+  const [proyectos, setProyectos] = useState([]);
 
   // ✅ para saber si el usuario tocó glosas manualmente
   const [glosasTouched, setGlosasTouched] = useState(false);
 
-  // ========= cargar usuarios =========
+  // ========= cargar usuarios y proyectos =========
   useEffect(() => {
     if (!open || !session) return;
     (async () => {
@@ -114,6 +116,19 @@ export default function EditCotizacionDialog({
         if (res.ok) setUsuarios(Array.isArray(data) ? data : data?.data || []);
       } catch (e) {
         setUsuarios([]);
+      }
+    })();
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/proyectos`, {
+          headers: makeHeaders(session),
+          cache: "no-store",
+        });
+        const data = await safeJson(res);
+        const list = Array.isArray(data) ? data : (data?.items || data?.data || []);
+        setProyectos(list);
+      } catch (e) {
+        setProyectos([]);
       }
     })();
   }, [open, session]);
@@ -158,6 +173,7 @@ export default function EditCotizacionDialog({
 
         setVendedorId(data?.vendedor_id ? String(data.vendedor_id) : "");
         setDescuentoPct(data?.descuento_pct ? String(data.descuento_pct) : "");
+        setProyectoId(data?.proyecto_id ? String(data.proyecto_id) : "");
         if (data?.fecha_documento) {
           setFechaDocumento(data.fecha_documento.split("T")[0]);
         } else {
@@ -411,6 +427,7 @@ export default function EditCotizacionDialog({
       }
 
       const payload = {
+        proyecto_id: proyectoId || null,
         cliente_id: clienteId,
         cliente_responsable_id: responsableId || null,
         vendedor_id: vendedorId || null,
@@ -535,6 +552,24 @@ export default function EditCotizacionDialog({
             ))}
           </TextField>
         </Box>
+
+        {/* Proyecto asociado */}
+        <TextField
+          select
+          size="small"
+          label="Asociar a Proyecto (Opcional)"
+          value={proyectoId}
+          onChange={(e) => setProyectoId(e.target.value)}
+          fullWidth
+          helperText={proyectoId ? "Este costeo quedará vinculado al proyecto seleccionado" : "Útil para fichar la cotización como costeo adicional de un proyecto existente"}
+        >
+          <MenuItem value="">Sin proyecto asociado</MenuItem>
+          {(proyectos || []).map((p) => (
+            <MenuItem key={p.id} value={p.id}>
+              {p.nombre || p.id}
+            </MenuItem>
+          ))}
+        </TextField>
 
         {/* Responsable */}
         <TextField

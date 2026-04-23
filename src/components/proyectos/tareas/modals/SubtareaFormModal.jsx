@@ -26,11 +26,14 @@ const API = process.env.NEXT_PUBLIC_API_URL;
 async function handleRevisionTask(id, action, comentario, session, isSubtarea) {
   try {
     const estadoParams = action === "approve" ? "completada" : "en_progreso";
-    const body = {
-      estado: estadoParams,
-      comentario_revision: comentario,
-      ...(action === "approve" ? { avance: 100 } : {})
-    };
+      const body = {
+        estado: estadoParams,
+        comentario_revision: comentario,
+        ...(action === "approve" ? { 
+          avance: 100,
+          fecha_fin_real: new Date().toISOString()
+        } : {})
+      };
     const endpoint = isSubtarea ? `tareas-detalle/update/${id}` : `tareas/update/${id}`;
     
     const res = await fetch(`${API}/${endpoint}`, {
