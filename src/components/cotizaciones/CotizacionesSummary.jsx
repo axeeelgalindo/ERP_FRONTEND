@@ -30,7 +30,7 @@ function shortCLP(v) {
   return clp(n).replace("CLP", "").trim();
 }
 
-export default function CotizacionesSummary({ cotizaciones }) {
+export default function CotizacionesSummary({ cotizaciones, filterEstado }) {
   const totals = useMemo(() => {
     const list = cotizaciones || [];
     let count = list.length || 0;
@@ -38,12 +38,17 @@ export default function CotizacionesSummary({ cotizaciones }) {
     let totalCostoReal = 0;
     let totalVentaReal = 0;
     let totalPagado = 0;
+    let totalPagadoReal = 0;
 
     for (const c of list) {
       totalCotizado += Number(c.total || 0);
 
       const pagado = c.total_pagado ?? (c.pagos?.reduce((a,p) => a + Number(p.monto||0), 0) || 0);
       totalPagado += pagado;
+
+      if (c.estado === "PAGADA") {
+        totalPagadoReal += Number(c.total || 0);
+      }
 
       const ventas = c.ventas || [];
       for (const v of ventas) {
@@ -70,6 +75,7 @@ export default function CotizacionesSummary({ cotizaciones }) {
       totalCostoReal,
       utilidadReal,
       totalPagado,
+      totalPagadoReal,
       pctPagado,
     };
   }, [cotizaciones]);
@@ -91,6 +97,15 @@ export default function CotizacionesSummary({ cotizaciones }) {
       iconBg: "bg-purple-50",
       iconText: "text-purple-600",
       icon: "📈",
+    },
+    {
+      title: "PAGADO REAL",
+      subtitle: "Total en est. PAGADA",
+      value: shortCLP(totals.totalPagadoReal),
+      valueClass: "text-emerald-600",
+      iconBg: "bg-emerald-50",
+      iconText: "text-emerald-600",
+      icon: "✅",
     },
     {
       title: "Total Pagado",
@@ -128,9 +143,22 @@ export default function CotizacionesSummary({ cotizaciones }) {
     },
   ];
 
+  // Logic: "cuando filtre en cualquier estados MENOS cotizacion, debe verse como utilidad real"
+  // Move "Utilidad Real" to the front if filter is active and not COTIZACION
+  const sortedCards = useMemo(() => {
+    if (filterEstado && filterEstado !== "COTIZACION") {
+      const utilIndex = cards.findIndex(c => c.title === "Utilidad Real");
+      if (utilIndex > -1) {
+        const [utilCard] = cards.splice(utilIndex, 1);
+        return [utilCard, ...cards];
+      }
+    }
+    return cards;
+  }, [cards, filterEstado]);
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-      {cards.map((c) => (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 mb-8">
+      {sortedCards.map((c) => (
         <div
           key={c.title}
           className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow"

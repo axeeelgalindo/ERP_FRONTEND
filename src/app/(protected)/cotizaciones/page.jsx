@@ -342,7 +342,7 @@ export default function CotizacionesPage() {
           Gestiona estados, revisa detalle y exporta a PDF de manera centralizada.
         </p>
 
-        <CotizacionesSummary cotizaciones={filtered} />
+        <CotizacionesSummary cotizaciones={filtered} filterEstado={filterEstado} />
 
         {/* Filtros */}
         <div className="mb-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
