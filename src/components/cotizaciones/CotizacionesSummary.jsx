@@ -34,48 +34,73 @@ export default function CotizacionesSummary({ cotizaciones, filterEstado }) {
   const totals = useMemo(() => {
     const list = cotizaciones || [];
     let count = list.length || 0;
-    let totalCotizado = 0;
-    let totalCostoReal = 0;
-    let totalVentaReal = 0;
-    let totalPagado = 0;
-    let totalPagadoReal = 0;
+    
+    let ventaCotizadaOnly = 0;
+    let utilidadRealFiltered = 0;
+    let pagadoRealOnly = 0;
+    
+    let totalVentaRealAll = 0;
+    let totalCostoRealAll = 0;
+    let totalPagadoAll = 0;
+    let totalCotizadoAll = 0;
+
+    const UTIL_STATES = ["ACEPTADA", "ORDEN_VENTA", "POR_FACTURAR", "FACTURADA"];
 
     for (const c of list) {
-      totalCotizado += Number(c.total || 0);
+      const cTotal = Number(c.total || 0);
+      totalCotizadoAll += cTotal;
 
-      const pagado = c.total_pagado ?? (c.pagos?.reduce((a,p) => a + Number(p.monto||0), 0) || 0);
-      totalPagado += pagado;
-
-      if (c.estado === "PAGADA") {
-        totalPagadoReal += Number(c.total || 0);
+      // 1. Venta Cotizada: Solo las en estado COTIZACION
+      if (c.estado === "COTIZACION") {
+        ventaCotizadaOnly += cTotal;
       }
 
+      // 3. Pagado Real: Solo las en estado PAGADA
+      if (c.estado === "PAGADA") {
+        pagadoRealOnly += cTotal;
+      }
+
+      // Cálculo de pagos (Total Pagado KPI)
+      const pagado = c.total_pagado ?? (c.pagos?.reduce((a,p) => a + Number(p.monto||0), 0) || 0);
+      totalPagadoAll += pagado;
+
+      // Cálculo de Ventas/Costos Reales (para Utilidad Real y otros cards)
       const ventas = c.ventas || [];
+      let cVentaReal = 0;
+      let cCostoReal = 0;
+
       for (const v of ventas) {
-        const ventaTotal = (v.detalles || []).reduce(
+        const vVenta = (v.detalles || []).reduce(
           (acc, d) => acc + (Number(d.ventaTotal ?? d.total) || 0),
           0
         );
-        const costoTotal = (v.detalles || []).reduce(
+        const vCosto = (v.detalles || []).reduce(
           (acc, d) => acc + (Number(d.costoTotal) || 0),
           0
         );
-        totalVentaReal += ventaTotal;
-        totalCostoReal += costoTotal;
+        cVentaReal += vVenta;
+        cCostoReal += vCosto;
+      }
+
+      totalVentaRealAll += cVentaReal;
+      totalCostoRealAll += cCostoReal;
+
+      // 2. Utilidad Real (según usuario): Suma de totales en estados "reales"
+      if (UTIL_STATES.includes(c.estado)) {
+        utilidadRealFiltered += cTotal;
       }
     }
 
-    const utilidadReal = totalVentaReal - totalCostoReal;
-    const pctPagado = totalCotizado > 0 ? (totalPagado / totalCotizado) * 100 : 0;
+    const pctPagado = totalCotizadoAll > 0 ? (totalPagadoAll / totalCotizadoAll) * 100 : 0;
 
     return {
       count,
-      totalCotizado,
-      totalVentaReal,
-      totalCostoReal,
-      utilidadReal,
-      totalPagado,
-      totalPagadoReal,
+      ventaCotizadaOnly,
+      utilidadRealFiltered,
+      pagadoRealOnly,
+      totalVentaRealAll,
+      totalCostoRealAll,
+      totalPagadoAll,
       pctPagado,
     };
   }, [cotizaciones]);
@@ -83,16 +108,16 @@ export default function CotizacionesSummary({ cotizaciones, filterEstado }) {
   const cards = [
     {
       title: "Venta Cotizada",
-      subtitle: "Total emitido",
-      value: shortCLP(totals.totalCotizado),
+      subtitle: "Solo est. COTIZACION",
+      value: shortCLP(totals.ventaCotizadaOnly),
       iconBg: "bg-slate-50",
       iconText: "text-slate-600",
       icon: "💵",
     },
     {
       title: "Utilidad Real",
-      subtitle: "Venta Real - Costo Real",
-      value: shortCLP(totals.utilidadReal),
+      subtitle: "Suma Totales Acep./Fact.",
+      value: shortCLP(totals.utilidadRealFiltered),
       valueClass: "text-purple-600",
       iconBg: "bg-purple-50",
       iconText: "text-purple-600",
@@ -101,7 +126,7 @@ export default function CotizacionesSummary({ cotizaciones, filterEstado }) {
     {
       title: "PAGADO REAL",
       subtitle: "Total en est. PAGADA",
-      value: shortCLP(totals.totalPagadoReal),
+      value: shortCLP(totals.pagadoRealOnly),
       valueClass: "text-emerald-600",
       iconBg: "bg-emerald-50",
       iconText: "text-emerald-600",
@@ -109,8 +134,8 @@ export default function CotizacionesSummary({ cotizaciones, filterEstado }) {
     },
     {
       title: "Total Pagado",
-      subtitle: `${totals.pctPagado.toFixed(1)}% del coti.`,
-      value: shortCLP(totals.totalPagado),
+      subtitle: `${totals.pctPagado.toFixed(1)}% de abonos`,
+      value: shortCLP(totals.totalPagadoAll),
       valueClass: "text-indigo-600",
       iconBg: "bg-indigo-50",
       iconText: "text-indigo-600",
@@ -119,7 +144,7 @@ export default function CotizacionesSummary({ cotizaciones, filterEstado }) {
     {
       title: "Venta Real",
       subtitle: "De ventas vinculadas",
-      value: shortCLP(totals.totalVentaReal),
+      value: shortCLP(totals.totalVentaRealAll),
       valueClass: "text-green-600",
       iconBg: "bg-green-50",
       iconText: "text-green-600",
@@ -128,7 +153,7 @@ export default function CotizacionesSummary({ cotizaciones, filterEstado }) {
     {
       title: "Costo Real",
       subtitle: "De ventas vinculadas",
-      value: shortCLP(totals.totalCostoReal),
+      value: shortCLP(totals.totalCostoRealAll),
       iconBg: "bg-amber-50",
       iconText: "text-amber-600",
       icon: "💼",
@@ -143,8 +168,7 @@ export default function CotizacionesSummary({ cotizaciones, filterEstado }) {
     },
   ];
 
-  // Logic: "cuando filtre en cualquier estados MENOS cotizacion, debe verse como utilidad real"
-  // Move "Utilidad Real" to the front if filter is active and not COTIZACION
+  // Logic: prioritize "Utilidad Real" if filtered by something else than COTIZACION
   const sortedCards = useMemo(() => {
     if (filterEstado && filterEstado !== "COTIZACION") {
       const utilIndex = cards.findIndex(c => c.title === "Utilidad Real");
