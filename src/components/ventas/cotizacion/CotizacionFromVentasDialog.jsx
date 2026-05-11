@@ -151,7 +151,9 @@ export default function CotizacionFromVentasDialog({
 
   const emptyGlosa = () => ({
     descripcion: "",
-    monto: 0, // BRUTO
+    cantidad: 1,
+    precio_unitario: "", // string vacio para UI
+    monto: 0, // BRUTO = cantidad * precio_unitario
     manual: false,
     orden: 0,
     descuento_pct: 0, // descuento por glosa
@@ -283,20 +285,44 @@ export default function CotizacionFromVentasDialog({
   const setGlosa = (idx, patch) => {
     setGlosas((prev) => {
       const next = [...prev];
-      next[idx] = { ...next[idx], ...patch, orden: idx };
+      const updated = { ...next[idx], ...patch, orden: idx };
 
-      // monto bruto => marca manual
-      if (patch.monto !== undefined) {
-        const raw = patch.monto;
+      // Si cambian cantidad
+      if (patch.cantidad !== undefined) {
+        const raw = patch.cantidad;
+        if (String(raw).trim() === "") {
+          updated.cantidad = "";
+        } else {
+          let c = parseInt(raw, 10);
+          if (!Number.isFinite(c) || c < 1) c = 1;
+          updated.cantidad = c;
+        }
+        if (updated.manual) {
+          const actualC = Number(updated.cantidad) || 1;
+          updated.monto = round0(actualC * (Number(updated.precio_unitario) || 0));
+        }
+      }
+
+      // Si cambian precio_unitario
+      if (patch.precio_unitario !== undefined) {
+        const raw = patch.precio_unitario;
         const hasValue = String(raw ?? "").trim() !== "";
-        next[idx].manual = hasValue;
-        next[idx].monto = hasValue ? round0(raw) : 0;
+        updated.manual = hasValue;
+        updated.precio_unitario = hasValue ? round0(raw) : "";
+        if (hasValue) {
+          const actualC = Number(updated.cantidad) || 1;
+          updated.monto = round0(actualC * updated.precio_unitario);
+        } else {
+          updated.monto = 0;
+        }
       }
 
       // descuento por glosa
       if (patch.descuento_pct !== undefined) {
-        next[idx].descuento_pct = clampPct(patch.descuento_pct);
+        updated.descuento_pct = clampPct(patch.descuento_pct);
       }
+
+      next[idx] = updated;
 
       const { glosas: dist, error } = distributeGlosasBrutas(next, subtotalBase);
       setGlosaErr(error);
@@ -524,13 +550,18 @@ export default function CotizacionFromVentasDialog({
         descuento_pct: descuentoPct === "" ? 0 : Number(descuentoPct),
 
         ventaIds,
-        glosas: glosas.map((g, i) => ({
-          descripcion: String(g.descripcion || "").trim(),
-          monto: round0(g.monto || 0), // BRUTO
-          manual: !!g.manual,
-          orden: i,
-          descuento_pct: clampPct(g.descuento_pct),
-        })),
+        glosas: glosas.map((g, i) => {
+          const c = Number(g.cantidad) || 1;
+          return {
+            descripcion: String(g.descripcion || "").trim(),
+            cantidad: c,
+            precio_unitario: g.manual ? Number(g.precio_unitario || 0) : round0((g.monto || 0) / c),
+            monto: round0(g.monto || 0), // BRUTO
+            manual: !!g.manual,
+            orden: i,
+            descuento_pct: clampPct(g.descuento_pct),
+          };
+        }),
       };
 
       const res = await fetch(`${API_URL}/cotizaciones/add`, {

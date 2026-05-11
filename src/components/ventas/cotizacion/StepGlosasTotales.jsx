@@ -63,12 +63,35 @@ export default function StepGlosasTotales({
     return max < 0 ? 0 : max;
   };
 
-  const handleMontoChange = (idx) => (e) => {
+  const handleCantidadChange = (idx) => (e) => {
     const raw = e.target.value;
     const digits = onlyDigits(raw);
 
     if (digits === "") {
-      setGlosa(idx, { monto: "" });
+      setGlosa(idx, { cantidad: "" });
+      return;
+    }
+
+    let c = parseInt(digits, 10);
+    if (!Number.isFinite(c) || c < 1) c = 1;
+
+    if (glosas[idx].manual) {
+      const pu = Number(glosas[idx].precio_unitario) || 0;
+      const maxMonto = maxForIdx(idx);
+      if (c * pu > maxMonto && pu > 0) {
+        c = Math.floor(maxMonto / pu);
+        if (c < 1) c = 1;
+      }
+    }
+    setGlosa(idx, { cantidad: c });
+  };
+
+  const handlePrecioUnitarioChange = (idx) => (e) => {
+    const raw = e.target.value;
+    const digits = onlyDigits(raw);
+
+    if (digits === "") {
+      setGlosa(idx, { precio_unitario: "" });
       return;
     }
 
@@ -76,10 +99,13 @@ export default function StepGlosasTotales({
     if (!Number.isFinite(value)) value = 0;
     if (value < 0) value = 0;
 
-    const max = maxForIdx(idx);
-    if (value > max) value = max;
+    const maxMonto = maxForIdx(idx);
+    const c = Number(glosas[idx].cantidad) || 1;
+    if (value * c > maxMonto) {
+      value = Math.floor(maxMonto / c);
+    }
 
-    setGlosa(idx, { monto: value });
+    setGlosa(idx, { precio_unitario: value });
   };
 
   const handleDescPctChange = (idx) => (e) => {
@@ -184,7 +210,7 @@ export default function StepGlosasTotales({
                 />
               </Box>
 
-              <Box sx={{ width: 190, minWidth: 190 }}>
+              <Box sx={{ width: 80, minWidth: 80 }}>
                 <Typography
                   sx={{
                     fontSize: 10,
@@ -194,29 +220,19 @@ export default function StepGlosasTotales({
                     textTransform: "uppercase",
                   }}
                 >
-                  Bruto (CLP)
+                  Cant.
                 </Typography>
 
                 <TextField
                   variant="standard"
                   type="text"
-                  value={showValue}
-                  onChange={handleMontoChange(idx)}
+                  value={g.cantidad}
+                  onChange={handleCantidadChange(idx)}
                   fullWidth
                   inputProps={{
                     inputMode: "numeric",
                     style: { textAlign: "right", fontWeight: 800 },
                   }}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start" sx={{ mr: 0.5 }}>
-                        $
-                      </InputAdornment>
-                    ),
-                  }}
-                  helperText={
-                    g.manual ? `Manual (máx ${formatCLP(max)})` : "Auto (remanente)"
-                  }
                 />
               </Box>
 
@@ -230,7 +246,51 @@ export default function StepGlosasTotales({
                     textTransform: "uppercase",
                   }}
                 >
-                  % Descuento
+                  Precio Unit.
+                </Typography>
+
+                <TextField
+                  variant="standard"
+                  type="text"
+                  value={
+                    g.manual
+                      ? formatCLPNumberOnly(g.precio_unitario)
+                      : formatCLPNumberOnly(
+                          round0((g.monto || 0) / (Number(g.cantidad) || 1))
+                        )
+                  }
+                  onChange={handlePrecioUnitarioChange(idx)}
+                  fullWidth
+                  inputProps={{
+                    inputMode: "numeric",
+                    style: { textAlign: "right", fontWeight: 800 },
+                  }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start" sx={{ mr: 0.5 }}>
+                        $
+                      </InputAdornment>
+                    ),
+                  }}
+                  helperText={
+                    g.manual
+                      ? `Máx Total: ${formatCLP(max)}`
+                      : "Auto (remanente)"
+                  }
+                />
+              </Box>
+
+              <Box sx={{ width: 110, minWidth: 110 }}>
+                <Typography
+                  sx={{
+                    fontSize: 10,
+                    fontWeight: 1000,
+                    color: "text.disabled",
+                    letterSpacing: ".16em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  % Desc
                 </Typography>
 
                 <TextField
@@ -255,10 +315,10 @@ export default function StepGlosasTotales({
                   }}
                   helperText={
                     hasGeneralDiscount
-                      ? "Deshabilitado por descuento general"
+                      ? "Bloqueado"
                       : descPct > 0
-                      ? "Con descuento"
-                      : "Sin descuento"
+                      ? "Sí"
+                      : "No"
                   }
                 />
               </Box>
@@ -273,18 +333,24 @@ export default function StepGlosasTotales({
                     textTransform: "uppercase",
                   }}
                 >
-                  Neto (info)
+                  Subtotales (Info)
                 </Typography>
 
                 <Typography sx={{ fontSize: 13, fontWeight: 900, mt: 0.8 }}>
-                  {formatCLP(neto)}{" "}
-                  <span style={{ fontWeight: 700, color: "rgba(0,0,0,.55)" }}>
-                    (Desc: {formatCLP(descMonto)} / {descPct}%)
-                  </span>
+                  Bruto: {formatCLP(bruto)}
+                </Typography>
+                
+                <Typography sx={{ fontSize: 13, fontWeight: 900, mt: 0.4 }}>
+                  Neto: {formatCLP(neto)}{" "}
+                  {descMonto > 0 && (
+                    <span style={{ fontWeight: 700, color: "rgba(0,0,0,.55)" }}>
+                      (-{descPct}%)
+                    </span>
+                  )}
                 </Typography>
 
                 <Typography sx={{ fontSize: 11, color: "text.secondary", mt: 0.5 }}>
-                  Neto = Bruto - Descuento
+                  Neto = Bruto - Desc
                 </Typography>
               </Box>
 

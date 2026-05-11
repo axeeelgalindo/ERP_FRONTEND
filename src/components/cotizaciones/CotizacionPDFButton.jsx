@@ -404,11 +404,12 @@ export default function CotizacionPDFButton({ cotizacion }) {
                 String(cantidad),
                 clp(precioUnitario),
                 pct ? `${pct}%` : "0%",
+                clp(netoLinea),
                 clp(impuestos),
                 clp(importe),
               ];
             })
-        : [["Esta cotización no tiene glosas.", "", "", "", "", ""]];
+        : [["Esta cotización no tiene glosas.", "", "", "", "", "", ""]];
 
       const tableW = W - mx * 2;
       const tableStartY = barY + 18;
@@ -421,11 +422,12 @@ export default function CotizacionPDFButton({ cotizacion }) {
         head: [
           [
             "Descripción",
-            "Cantidad",
-            "Precio Unitario",
-            "% de descuento",
-            "Impuestos",
-            "Importe",
+            "Cant.",
+            "Precio Unit.",
+            "Desc.",
+            "Subtotal",
+            "IVA",
+            "Total",
           ],
         ],
         body: glosasBody,
@@ -438,12 +440,13 @@ export default function CotizacionPDFButton({ cotizacion }) {
           valign: "top",
         },
         columnStyles: {
-          0: { cellWidth: 74 }, // descripción
-          1: { cellWidth: 20, halign: "right" }, // cantidad
-          2: { cellWidth: 30, halign: "right" }, // unitario
-          3: { cellWidth: 20, halign: "right" }, // % desc
-          4: { cellWidth: 30, halign: "right" }, // impuestos
-          5: { cellWidth: tableW - (74 + 20 + 30 + 20 + 30), halign: "right" }, // importe
+          0: { cellWidth: 58 }, // descripción
+          1: { cellWidth: 15, halign: "right" }, // cantidad
+          2: { cellWidth: 26, halign: "right" }, // unitario
+          3: { cellWidth: 15, halign: "right" }, // % desc
+          4: { cellWidth: 26, halign: "right" }, // subtotal
+          5: { cellWidth: 26, halign: "right" }, // iva
+          6: { cellWidth: tableW - (58 + 15 + 26 + 15 + 26 + 26), halign: "right" }, // total
         },
         didParseCell: (data) => {
           data.cell.styles.lineWidth = data.section === "head" ? 0.25 : 0.18;
