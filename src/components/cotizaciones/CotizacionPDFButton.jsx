@@ -83,16 +83,16 @@ export default function CotizacionPDFButton({ cotizacion }) {
     if (!res.ok) {
       throw new Error(
         data?.detalle ||
-          data?.error ||
-          data?.message ||
-          "No se pudo cargar la cotización",
+        data?.error ||
+        data?.message ||
+        "No se pudo cargar la cotización",
       );
     }
     return data;
   };
 
   const round0 = (n) => Math.round(Number(n || 0));
-  
+
   const clampPct = (v) => {
     if (v === "" || v == null) return 0;
     const n = Number(v);
@@ -211,7 +211,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
         drawWaveBand(0, HEADER_H, "down");
         if (logo) doc.addImage(logo, "PNG", mx, 6.0, 44, 13.5);
 
-        doc.setFont("cambria", "normal");
+        doc.setFont("helvetica", "normal");
         doc.setFontSize(8.2);
         doc.setTextColor(...C.muted);
         doc.text(
@@ -231,7 +231,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
           "RUT 78115957-3",
         ];
 
-        doc.setFont("cambria", "normal");
+        doc.setFont("helvetica", "normal");
         doc.setFontSize(8.1);
 
         doc.setDrawColor(180, 210, 230);
@@ -249,7 +249,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
       const drawFooter = (page, pages) => {
         drawWaveBand(H - FOOTER_H, FOOTER_H, "up");
 
-        doc.setFont("cambria", "normal");
+        doc.setFont("helvetica", "normal");
         doc.setFontSize(8.2);
         doc.setTextColor(...C.text);
         doc.text("administracion@blueinge.com", W / 2, H - 9.3, {
@@ -285,7 +285,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
       const respCargo = safe(resp?.cargo);
       const respCorreo = safe(resp?.correo);
 
-      doc.setFont("cambria", "normal");
+      doc.setFont("helvetica", "normal");
       doc.setTextColor(...C.text);
       doc.setFontSize(9.4);
       doc.text(clienteNombre || "Cliente", mx, yCliente);
@@ -314,13 +314,13 @@ export default function CotizacionPDFButton({ cotizacion }) {
       // =========================
       const yTitle = Math.max(yyInfo + 8, HEADER_H + 34);
 
-      doc.setFont("cambria", "normal");
+      doc.setFont("helvetica", "normal");
       doc.setFontSize(17.5);
       doc.setTextColor(...C.blue);
       doc.text(docTitle, mx, yTitle);
 
       if (vigenciaLabel) {
-        doc.setFont("cambria", "bold");
+        doc.setFont("helvetica", "bold");
         doc.setFontSize(9.2);
         doc.setTextColor(...C.muted);
         doc.text(vigenciaLabel, W - mx, yTitle, { align: "right" });
@@ -330,12 +330,12 @@ export default function CotizacionPDFButton({ cotizacion }) {
       const asuntoUpper = asuntoText ? String(asuntoText).toUpperCase() : "";
 
       if (asuntoUpper) {
-        doc.setFont("cambria", "bold");
+        doc.setFont("helvetica", "bold");
         doc.setFontSize(8.4);
         doc.setTextColor(...C.muted);
         doc.text("ASUNTO", mx, yTitle + 6);
 
-        doc.setFont("cambria", "normal");
+        doc.setFont("helvetica", "normal");
         doc.setFontSize(9.2);
         doc.setTextColor(...C.text);
 
@@ -348,7 +348,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
       doc.setFillColor(...C.bar);
       doc.roundedRect(mx, barY, W - mx * 2, 12, 2.5, 2.5, "F");
 
-      doc.setFont("cambria", "bold");
+      doc.setFont("helvetica", "bold");
       doc.setFontSize(8.6);
       doc.setTextColor(...C.blue);
       doc.text("Fecha", mx + 4, barY + 5);
@@ -365,7 +365,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
         vendedorNombre = `${firstNames[0]} ${lastNames[0]}`;
       }
 
-      doc.setFont("cambria", "normal");
+      doc.setFont("helvetica", "normal");
       doc.setFontSize(9.2);
       doc.setTextColor(...C.text);
       doc.text(fmtDate(cot?.fecha_documento), mx + 4, barY + 10);
@@ -382,34 +382,33 @@ export default function CotizacionPDFButton({ cotizacion }) {
 
       const glosasBody = glosas.length
         ? glosas
-            .slice()
-            .sort((a, b) => Number(a?.orden ?? 0) - Number(b?.orden ?? 0))
-            .map((g) => {
-              const descripcion = safe(g.descripcion) || "—";
+          .slice()
+          .sort((a, b) => Number(a?.orden ?? 0) - Number(b?.orden ?? 0))
+          .map((g) => {
+            const descripcion = safe(g.descripcion) || "—";
 
-              const cantidad = Number(g.cantidad ?? 1);
-              const precioUnitario = Number(g.precio_unitario ?? g.monto ?? 0);
-              const brutoLinea = Number(g.monto ?? (cantidad * precioUnitario));
-              
-              const pct = clampPct(g.descuento_pct || 0);
+            const cantidad = Number(g.cantidad ?? 1);
+            const precioUnitario = Number(g.precio_unitario ?? g.monto ?? 0);
+            const brutoLinea = Number(g.monto ?? (cantidad * precioUnitario));
 
-              const descMonto = round0(brutoLinea * (pct / 100));
-              const netoLinea = Math.max(0, brutoLinea - descMonto);
+            const pct = clampPct(g.descuento_pct || 0);
 
-              const impuestos = round0(netoLinea * ivaRateNum);
-              const importe = round0(netoLinea + impuestos);
+            const descMonto = round0(brutoLinea * (pct / 100));
+            const netoLinea = Math.max(0, brutoLinea - descMonto);
 
-              return [
-                descripcion,
-                String(cantidad),
-                clp(precioUnitario),
-                pct ? `${pct}%` : "0%",
-                clp(netoLinea),
-                clp(impuestos),
-                clp(importe),
-              ];
-            })
-        : [["Esta cotización no tiene glosas.", "", "", "", "", "", ""]];
+            const impuestos = round0(netoLinea * ivaRateNum);
+            const importe = round0(netoLinea + impuestos);
+
+            return [
+              descripcion,
+              String(cantidad),
+              clp(precioUnitario),
+              pct ? `${pct}%` : "0%",
+              clp(netoLinea),
+              clp(importe),
+            ];
+          })
+        : [["Esta cotización no tiene glosas.", "", "", "", "", ""]];
 
       const tableW = W - mx * 2;
       const tableStartY = barY + 18;
@@ -426,14 +425,14 @@ export default function CotizacionPDFButton({ cotizacion }) {
             "Precio Unit.",
             "Desc.",
             "Subtotal",
-            "IVA",
+            //"IVA",
             "Total",
           ],
         ],
         body: glosasBody,
         theme: "plain",
         styles: {
-          font: "cambria",
+          font: "helvetica",
           fontSize: 9.0,
           textColor: C.text,
           cellPadding: { top: 2.2, right: 2.2, bottom: 2.2, left: 2.2 },
@@ -445,8 +444,8 @@ export default function CotizacionPDFButton({ cotizacion }) {
           2: { cellWidth: 26, halign: "right" }, // unitario
           3: { cellWidth: 15, halign: "right" }, // % desc
           4: { cellWidth: 26, halign: "right" }, // subtotal
-          5: { cellWidth: 26, halign: "right" }, // iva
-          6: { cellWidth: tableW - (58 + 15 + 26 + 15 + 26 + 26), halign: "right" }, // total
+          //5: { cellWidth: 26, halign: "right" }, // iva
+          5: { cellWidth: tableW - (58 + 15 + 26 + 15 + 26), halign: "right" }, // total
         },
         didParseCell: (data) => {
           data.cell.styles.lineWidth = data.section === "head" ? 0.25 : 0.18;
@@ -489,14 +488,14 @@ export default function CotizacionPDFButton({ cotizacion }) {
         tableWidth: 92,
         theme: "plain",
         styles: {
-          font: "cambria",
+          font: "helvetica",
           fontSize: 9.4,
           cellPadding: { top: 2.5, right: 2.5, bottom: 2.5, left: 2.5 },
           textColor: C.text,
         },
         body: [
-        //  ["Precio", clp(brutoTotal)],
-        //  ["Descuento", clp(descTotal)],
+          //  ["Precio", clp(brutoTotal)],
+          //  ["Descuento", clp(descTotal)],
           ["Subtotal", clp(neto)],
           ["IVA 19%", clp(iva)],
           ["Total", clp(total)],
@@ -529,13 +528,13 @@ export default function CotizacionPDFButton({ cotizacion }) {
           yy = HEADER_H + 16;
         }
 
-        doc.setFont("cambria", "bold");
+        doc.setFont("helvetica", "bold");
         doc.setFontSize(9);
         doc.setTextColor(...C.muted);
         doc.text(title, mx, yy);
         yy += 5;
 
-        doc.setFont("cambria", "normal");
+        doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
         doc.setTextColor(...C.text);
 

@@ -131,12 +131,10 @@ export default function IndependentRendicionModal({
   const handleSave = async () => {
     setErr("");
     if (!empleadoId) return setErr("Seleccione un empleado");
-    if (!descripcion.trim()) return setErr("Ingrese una descripción");
     if (destino === "PROYECTO" && !proyectoId) return setErr("Seleccione un proyecto");
     if (destino !== "PROYECTO" && !centroCosto) return setErr("Seleccione un centro de costo");
 
     const validItems = items.filter(it => it.descripcion || it.monto);
-    if (validItems.length === 0) return setErr("Agregue al menos un ítem");
 
     setLoading(true);
     try {
