@@ -226,7 +226,7 @@ export default function EmpleadoFormModal({
     >
       {currentEmp && (
         <div className="space-y-4">
-          {currentEmp.usuario && (
+          {currentEmp.usuario ? (
             <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-gray-600">
               <div className="font-medium text-gray-800">
                 {currentEmp.usuario.nombre}
@@ -241,20 +241,20 @@ export default function EmpleadoFormModal({
                 </div>
               )}
             </div>
-          )}
+          ) : null}
 
           {/* ✅ CREATE usuario nuevo */}
-          {showCreateUserBox && (
+          {showCreateUserBox ? (
             <div className="rounded-lg border border-slate-200 bg-white p-3">
               <div className="mb-2 text-xs font-semibold text-slate-700">
                 Acceso (crear usuario)
               </div>
 
-              {userErr && (
+              {userErr ? (
                 <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
                   {userErr}
                 </div>
-              )}
+              ) : null}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -338,20 +338,20 @@ export default function EmpleadoFormModal({
                 </span>
               </p>
             </div>
-          )}
+          ) : null}
 
           {/* ✅ EDIT usuario existente */}
-          {showEditUserBox && (
+          {showEditUserBox ? (
             <div className="rounded-lg border border-slate-200 bg-white p-3">
               <div className="mb-2 text-xs font-semibold text-slate-700">
                 Acceso (Usuario)
               </div>
 
-              {userErr && (
+              {userErr ? (
                 <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
                   {userErr}
                 </div>
-              )}
+              ) : null}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -395,7 +395,7 @@ export default function EmpleadoFormModal({
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* Datos del empleado */}
           <div className="grid gap-4 sm:grid-cols-2">

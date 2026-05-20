@@ -90,6 +90,15 @@ export default function Sidebar() {
         roles: ["superadmin", "admin"],
       },
       {
+        label: "Asistencia",
+        icon: "event_available",
+        roles: ["superadmin", "admin"],
+        children: [
+          { href: "/asistencia", label: "Registro diario" },
+          { href: "/asistencia/mensual", label: "Vista mensual" },
+        ],
+      },
+      {
         href: "/hh",
         label: "HH",
         icon: "timer",
@@ -211,12 +220,13 @@ export default function Sidebar() {
         <nav className="flex-1 flex flex-col gap-1 overflow-y-auto pr-1">
           {navItems.map((item) => (
             <NavItem
-              key={item.href}
+              key={item.href || item.label}
               href={item.href}
               label={item.label}
               icon={item.icon}
               open={open}
               onNavigate={closeOnMobile}
+              children={item.children}
             />
           ))}
         </nav>
