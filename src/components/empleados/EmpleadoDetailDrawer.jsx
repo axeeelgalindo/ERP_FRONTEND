@@ -266,7 +266,7 @@ export default function EmpleadoDetailDrawer({ open, onClose, empleado }) {
 
   const getFullUrl = (url) => {
     if (!url) return null;
-    const baseUrl = API_URL.replace('/api', '');
+    const baseUrl = API_URL.replace(/\/api\/?$/, '');
     return `${baseUrl}${url}`;
   };
 
