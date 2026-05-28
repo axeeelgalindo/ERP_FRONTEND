@@ -42,119 +42,97 @@ export default function Sidebar() {
     .toString()
     .toLowerCase();
 
-  // Catálogo de items con control de acceso por rol
-  const navItems = useMemo(() => {
-    const all = [
+  // Catálogo estructurado por categorías con control de acceso
+  const navGroups = useMemo(() => {
+    const groups = [
+      // ── Inicio (sin grupo) ─────────────────────────────────────────────
       {
+        type: "item",
         href: "/",
         label: "Inicio",
         icon: "dashboard",
-        roles: ["superadmin", "admin", "user"],
+        roles: ["superadmin", "admin", "user", "empleado", "cliente"],
       },
+
+      // ── Gestión comercial ──────────────────────────────────────────────
       {
-        href: "/clientes",
-        label: "Clientes",
-        icon: "group",
+        type: "group",
+        label: "Comercial",
+        icon: "storefront",
         roles: ["superadmin", "admin", "user", "empleado"],
-      },
-      {
-        href: "/proveedores",
-        label: "Proveedores",
-        icon: "conveyor_belt",
-        roles: ["superadmin", "admin"],
-      },
-      /* { 
-       {
-         href: "/productos",
-         label: "Productos",
-         icon: "inventory_2",
-         roles: ["superadmin", "admin"],
-       },
-       }*/
-      {
-        href: "/proyectos",
-        label: "Proyectos",
-        icon: "account_tree",
-        roles: ["superadmin", "admin"],
-      },
-      {
-        href: "/kanban",
-        label: "Kanban",
-        icon: "view_kanban",
-        roles: ["superadmin", "admin", "user", "empleado"],
-      },
-      {
-        href: "/empleados",
-        label: "Empleados",
-        icon: "badge",
-        roles: ["superadmin", "admin"],
-      },
-      {
-        label: "Asistencia",
-        icon: "event_available",
-        roles: ["superadmin", "admin"],
         children: [
-          { href: "/asistencia", label: "Registro diario" },
-          { href: "/asistencia/mensual", label: "Vista mensual" },
+          { href: "/clientes", label: "Clientes", icon: "group", roles: ["superadmin", "admin", "user", "empleado"] },
+          { href: "/cotizaciones", label: "Cotizaciones", icon: "request_quote", roles: ["superadmin", "admin", "user", "empleado"] },
+          { href: "/proveedores", label: "Proveedores", icon: "conveyor_belt", roles: ["superadmin", "admin", "user", "empleado"] },
         ],
       },
+
+      // ── Ejecución de proyectos ─────────────────────────────────────────
       {
-        href: "/hh",
-        label: "HH",
-        icon: "timer",
-        roles: ["superadmin", "admin"],
+        type: "group",
+        label: "Operaciones",
+        icon: "construction",
+        roles: ["superadmin", "admin", "user", "empleado"],
+        children: [
+          { href: "/proyectos", label: "Proyectos", icon: "account_tree", roles: ["superadmin", "admin"] },
+          { href: "/kanban", label: "Kanban", icon: "view_kanban", roles: ["superadmin", "admin", "user", "empleado"] },
+          { href: "/hh", label: "HH", icon: "timer", roles: ["superadmin", "admin"] },
+        ],
       },
+
+      // ── Control financiero ─────────────────────────────────────────────
       {
-        href: "/costeos",
-        label: "Costeos",
+        type: "group",
+        label: "Finanzas",
         icon: "payments",
         roles: ["superadmin", "admin", "user", "empleado"],
+        children: [
+          { href: "/costeos", label: "Costeos", icon: "calculate", roles: ["superadmin", "admin", "user", "empleado"] },
+          { href: "/compras", label: "Compras", icon: "shopping_cart", roles: ["superadmin", "admin"] },
+          { href: "/rendiciones", label: "Rendiciones", icon: "receipt_long", roles: ["superadmin", "admin", "empleado"] },
+        ],
       },
+
+      // ── Recursos humanos ───────────────────────────────────────────────
       {
-        href: "/compras",
-        label: "Compras",
-        icon: "shopping_cart",
+        type: "group",
+        label: "RRHH",
+        icon: "groups",
         roles: ["superadmin", "admin"],
+        children: [
+          { href: "/empleados", label: "Empleados", icon: "badge", roles: ["superadmin", "admin"] },
+          { href: "/asistencia", label: "Registro diario", icon: "event_available", roles: ["superadmin", "admin"] },
+          { href: "/asistencia/mensual", label: "Vista mensual", icon: "calendar_month", roles: ["superadmin", "admin"] },
+        ],
       },
+
+      // ── Administración del sistema ─────────────────────────────────────
       {
-        href: "/rendiciones",
-        label: "Rendiciones",
-        icon: "receipt_long",
-        roles: ["superadmin", "admin", "empleado"],
-      },
-      {
-        href: "/cotizaciones",
-        label: "Cotizaciones",
-        icon: "request_quote",
-        roles: ["superadmin", "admin", "user", "empleado"],
-      },
-      {
-        href: "/empresas",
-        label: "Empresas",
-        icon: "domain",
+        type: "group",
+        label: "Administración",
+        icon: "admin_panel_settings",
         roles: ["superadmin"],
-      },
-      {
-        href: "/usuarios",
-        label: "Usuarios",
-        icon: "manage_accounts",
-        roles: ["superadmin"],
-      },
-      {
-        href: "/admin/folio-cotizaciones",
-        label: "Folio Cotizaciones",
-        icon: "description",
-        roles: ["superadmin"],
+        children: [
+          { href: "/empresas", label: "Empresas", icon: "domain", roles: ["superadmin"] },
+          { href: "/usuarios", label: "Usuarios", icon: "manage_accounts", roles: ["superadmin"] },
+          { href: "/admin/folio-cotizaciones", label: "Folio Cotizaciones", icon: "description", roles: ["superadmin"] },
+        ],
       },
     ];
-    if (rol === "superadmin") return all;
-    if (rol === "admin") return all.filter((i) => i.roles.includes("admin"));
-    if (rol === "empleado")
-      return all.filter((i) => i.roles.includes("empleado"));
-    if (rol === "cliente")
-      return all.filter((i) => i.roles.includes("cliente"));
 
-    return all.filter((i) => i.roles.includes("empleado"));
+    // Filtra grupos e ítems hijos según rol
+    return groups
+      .filter((g) => g.roles.includes(rol) || rol === "superadmin")
+      .map((g) => {
+        if (g.type === "group") {
+          const filteredChildren = (g.children || []).filter(
+            (c) => c.roles.includes(rol) || rol === "superadmin"
+          );
+          return { ...g, children: filteredChildren };
+        }
+        return g;
+      })
+      .filter((g) => g.type === "item" || (g.children && g.children.length > 0));
   }, [rol]);
 
   function closeOnMobile() {
@@ -217,8 +195,8 @@ export default function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 flex flex-col gap-1 overflow-y-auto pr-1">
-          {navItems.map((item) => (
+        <nav className={`flex-1 flex flex-col gap-1 pr-1 ${open ? "overflow-y-auto" : "overflow-visible"}`}>
+          {navGroups.map((item) => (
             <NavItem
               key={item.href || item.label}
               href={item.href}
@@ -226,7 +204,7 @@ export default function Sidebar() {
               icon={item.icon}
               open={open}
               onNavigate={closeOnMobile}
-              children={item.children}
+              children={item.type === "group" ? item.children : undefined}
             />
           ))}
         </nav>
