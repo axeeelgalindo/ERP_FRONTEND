@@ -35,6 +35,8 @@ export default function KanbanPage() {
     nombre: "",
     descripcion: "",
     proyecto_id: "",
+    destino: "PROYECTO",
+    centro_costo: "",
     epica_id: "",
     tarea_id: "",
     responsable_id: "",
@@ -57,9 +59,14 @@ export default function KanbanPage() {
     }
   }, [isAddModalOpen, filters.proyecto_id]);
 
-  // Cargar padres (Epicas o Tareas) según el proyecto y tipo seleccionado
+  // Cargar padres (Epicas o Tareas) según el proyecto/destino y tipo seleccionado
   useEffect(() => {
-    if (!isAddModalOpen || !formData.proyecto_id || formType === "EPICA") {
+    if (!isAddModalOpen || formType === "EPICA") {
+      setParentOptions([]);
+      return;
+    }
+
+    if (formData.destino === "PROYECTO" && !formData.proyecto_id) {
       setParentOptions([]);
       return;
     }
@@ -70,9 +77,17 @@ export default function KanbanPage() {
         const headers = makeHeaders(session);
         let url = "";
         if (formType === "TAREA") {
-          url = `${process.env.NEXT_PUBLIC_API_URL}/epicas?proyecto_id=${formData.proyecto_id}`;
+          if (formData.destino === "PROYECTO") {
+            url = `${process.env.NEXT_PUBLIC_API_URL}/epicas?proyecto_id=${formData.proyecto_id}`;
+          } else {
+            url = `${process.env.NEXT_PUBLIC_API_URL}/epicas?destino=${formData.destino}${formData.centro_costo ? `&centro_costo=${formData.centro_costo}` : ''}`;
+          }
         } else if (formType === "SUBTAREA") {
-          url = `${process.env.NEXT_PUBLIC_API_URL}/tareas?proyectoId=${formData.proyecto_id}&pageSize=200`;
+          if (formData.destino === "PROYECTO") {
+            url = `${process.env.NEXT_PUBLIC_API_URL}/tareas?proyectoId=${formData.proyecto_id}&pageSize=200`;
+          } else {
+            url = `${process.env.NEXT_PUBLIC_API_URL}/tareas?destino=${formData.destino}${formData.centro_costo ? `&centro_costo=${formData.centro_costo}` : ''}&pageSize=200`;
+          }
         }
 
         const res = await fetch(url, { headers });
@@ -92,11 +107,11 @@ export default function KanbanPage() {
     };
 
     fetchParents();
-  }, [isAddModalOpen, formData.proyecto_id, formType, session]);
+  }, [isAddModalOpen, formData.proyecto_id, formData.destino, formData.centro_costo, formType, session]);
 
   // Cargar miembros del proyecto
   useEffect(() => {
-    if (!isAddModalOpen || !formData.proyecto_id) {
+    if (!isAddModalOpen || formData.destino !== "PROYECTO" || !formData.proyecto_id) {
       setProjectMembers([]);
       return;
     }
@@ -122,7 +137,7 @@ export default function KanbanPage() {
     };
 
     fetchMembers();
-  }, [isAddModalOpen, formData.proyecto_id, session]);
+  }, [isAddModalOpen, formData.proyecto_id, formData.destino, session]);
 
   const fetchData = useCallback(async (q = "") => {
     if (!session) return;
@@ -980,6 +995,8 @@ export default function KanbanPage() {
                 nombre: "",
                 descripcion: "",
                 proyecto_id: filters.proyecto_id || "",
+                destino: "PROYECTO",
+                centro_costo: "",
                 epica_id: "",
                 tarea_id: "",
                 responsable_id: "",
@@ -1122,21 +1139,70 @@ export default function KanbanPage() {
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Proyecto</label>
-                  <SearchableSelect
-                    label="P"
-                    placeholder="Seleccionar..."
-                    options={filterOptions.projects}
-                    value={formData.proyecto_id}
-                    onChange={(val) => setFormData({ ...formData, proyecto_id: val, epica_id: "", tarea_id: "" })}
-                  />
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Destino</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { val: "PROYECTO", lab: "Proyecto", icon: "construction" },
+                      { val: "TALLER", lab: "Taller", icon: "precision_manufacturing" },
+                      { val: "ADMINISTRACION", lab: "Admin", icon: "corporate_fare" }
+                    ].map(opt => (
+                      <button
+                        type="button"
+                        key={opt.val}
+                        onClick={() => {
+                          setFormData(prev => ({
+                            ...prev,
+                            destino: opt.val,
+                            proyecto_id: opt.val === "PROYECTO" ? prev.proyecto_id : "",
+                            centro_costo: opt.val !== "PROYECTO" ? "PMC" : "",
+                            epica_id: "",
+                            tarea_id: ""
+                          }));
+                        }}
+                        className={`group relative flex flex-col items-center justify-center p-3 rounded-xl border transition-all ${formData.destino === opt.val
+                            ? "bg-blue-50 text-blue-600 border-blue-200 shadow-sm"
+                            : "bg-gray-50 text-gray-400 border-transparent hover:border-gray-200"
+                          }`}
+                      >
+                        <span className="material-symbols-outlined mb-1 text-xl">{opt.icon}</span>
+                        <span className="text-[10px] font-extrabold uppercase tracking-tight">{opt.lab}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                {formData.destino === "PROYECTO" ? (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Proyecto</label>
+                    <SearchableSelect
+                      label="P"
+                      placeholder="Seleccionar..."
+                      options={filterOptions.projects}
+                      value={formData.proyecto_id}
+                      onChange={(val) => setFormData({ ...formData, proyecto_id: val, epica_id: "", tarea_id: "" })}
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Centro de Costo</label>
+                    <SearchableSelect
+                      label="CC"
+                      placeholder="Seleccionar..."
+                      options={[
+                        { id: "PMC", nombre: "PMC" },
+                        { id: "PUQ", nombre: "PUQ" }
+                      ]}
+                      value={formData.centro_costo}
+                      onChange={(val) => setFormData({ ...formData, centro_costo: val })}
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Responsable</label>
-                    {formData.proyecto_id && (
+                    {formData.destino === "PROYECTO" && formData.proyecto_id && (
                       <button 
                         onClick={() => setShowQuickAddMember(!showQuickAddMember)}
                         className="text-[9px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-0.5"
@@ -1148,7 +1214,7 @@ export default function KanbanPage() {
                     )}
                   </div>
                   
-                  {showQuickAddMember ? (
+                  {showQuickAddMember && formData.destino === "PROYECTO" ? (
                     <div className="flex gap-2">
                        <div className="flex-1">
                           <SearchableSelect
@@ -1200,8 +1266,8 @@ export default function KanbanPage() {
                   ) : (
                     <SearchableSelect
                       label="R"
-                      placeholder={loadingMembers ? "Cargando..." : "Miembros..."}
-                      options={projectMembers}
+                      placeholder={formData.destino === "PROYECTO" && loadingMembers ? "Cargando..." : "Buscar responsable..."}
+                      options={formData.destino === "PROYECTO" ? projectMembers : filterOptions.employees}
                       value={formData.responsable_id}
                       onChange={(val) => setFormData({ ...formData, responsable_id: val })}
                     />
@@ -1265,7 +1331,7 @@ export default function KanbanPage() {
                 Cancelar
               </button>
               <button
-                disabled={addingItem || !formData.nombre || !formData.proyecto_id || (formType === "TAREA" && !formData.epica_id) || (formType === "SUBTAREA" && !formData.tarea_id)}
+                disabled={addingItem || !formData.nombre || (formData.destino === "PROYECTO" && !formData.proyecto_id) || (formData.destino !== "PROYECTO" && !formData.centro_costo) || (formType === "TAREA" && !formData.epica_id) || (formType === "SUBTAREA" && !formData.tarea_id)}
                 onClick={async () => {
                   setAddingItem(true);
                   try {
@@ -1296,6 +1362,20 @@ export default function KanbanPage() {
                     if (!json.ok) throw new Error(json.message || "Error al crear");
                     
                     setIsAddModalOpen(false);
+                    // Reset formData
+                    setFormData({
+                      nombre: "",
+                      descripcion: "",
+                      proyecto_id: "",
+                      destino: "PROYECTO",
+                      centro_costo: "",
+                      epica_id: "",
+                      tarea_id: "",
+                      responsable_id: "",
+                      fecha_inicio_plan: new Date().toISOString().split('T')[0],
+                      dias_plan: 1,
+                      prioridad: 2,
+                    });
                     fetchData(searchTerm);
                   } catch (err) {
                     alert(err.message);

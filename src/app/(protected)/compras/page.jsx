@@ -205,7 +205,22 @@ export default function ComprasPage() {
   const [savingVinc, setSavingVinc] = useState(false);
   const [savingErr, setSavingErr] = useState("");
 
+  // ===== Confirmación de Pago & Toast =====
+  const [compraToToggle, setCompraToToggle] = useState(null);
+  const [toast, setToast] = useState({ open: false, msg: "", type: "success" });
 
+  const triggerToast = (msg, type = "success") => {
+    setToast({ open: true, msg, type });
+  };
+
+  useEffect(() => {
+    if (toast.open) {
+      const timer = setTimeout(() => {
+        setToast((t) => ({ ...t, open: false }));
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast.open]);
 
   /* =========================
      Loaders
@@ -742,6 +757,44 @@ export default function ComprasPage() {
     }
   }
 
+  function toggleCompraPago(compra) {
+    if (!compra) return;
+    setCompraToToggle(compra);
+  }
+
+  async function confirmToggleCompraPago() {
+    const compra = compraToToggle;
+    if (!session || !compra) return;
+    const nuevoEstado = compra.estado === "PAGADA" ? "FACTURADA" : "PAGADA";
+
+    // Cerrar el modal de confirmación antes
+    setCompraToToggle(null);
+
+    try {
+      setErr("");
+      const res = await fetch(`${API}/compras/${compra.id}`, {
+        method: "PUT",
+        headers: makeHeadersJson(session),
+        body: JSON.stringify({ estado: nuevoEstado }),
+      });
+      const payload = await jsonOrNull(res);
+      if (!res.ok) {
+        throw new Error(payload?.message || payload?.error || "Error al actualizar estado de la compra");
+      }
+
+      // Mostrar Toast Exitoso
+      const provNombre = compra.proveedor?.nombre || "Proveedor";
+      const totalFmt = toCLP(compra.total);
+      triggerToast(`Compra de "${provNombre}" (${totalFmt}) cambiada a ${nuevoEstado} exitosamente.`, "success");
+
+      await loadCompras({ page, pageSize });
+    } catch (e) {
+      const errMsg = e?.message || "Error al actualizar estado de la compra";
+      setErr(errMsg);
+      triggerToast(errMsg, "error");
+    }
+  }
+
   async function handleRefresh() {
     await Promise.all([loadCompras({ page, pageSize }), loadLookups()]);
   }
@@ -882,6 +935,7 @@ export default function ComprasPage() {
             onOpenVincular={openVincularModal}
             onOpenRendicion={() => {}} // Dis habilitar vinculación desde aquí
             onUploadPdfClick={(c) => openFilePicker(c.id)}
+            onTogglePaid={toggleCompraPago}
             fmtDateDMY={fmtDateDMY}
             toCLP={toCLP}
             getVincPct={getVincPct}
@@ -987,6 +1041,81 @@ export default function ComprasPage() {
         toCLP={toCLP}
         sumAsignado={sumAsignado}
       />
+
+      {/* ===== MODAL CONFIRMACION DE PAGO ===== */}
+      {compraToToggle && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-100 p-6 flex flex-col gap-4 animate-scale-up">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-amber-500 bg-amber-50 p-2.5 rounded-xl text-2xl">
+                {compraToToggle.estado === "PAGADA" ? "unpublished" : "task_alt"}
+              </span>
+              <h3 className="text-xl font-bold text-slate-900">
+                Confirmar Cambio de Estado
+              </h3>
+            </div>
+            
+            <p className="text-slate-600 text-sm leading-relaxed">
+              La compra de <strong>{compraToToggle.proveedor?.nombre || "Proveedor"}</strong> por un monto de <strong>{toCLP(compraToToggle.total)}</strong> se encuentra registrada actualmente como <span className="font-bold">{compraToToggle.estado}</span>.
+            </p>
+            
+            <p className="text-slate-600 text-sm leading-relaxed">
+              ¿Estás seguro de que deseas marcarla como <span className={`font-bold ${compraToToggle.estado === "PAGADA" ? "text-amber-600" : "text-emerald-600"}`}>{compraToToggle.estado === "PAGADA" ? "FACTURADA (No pagada)" : "PAGADA"}</span>?
+            </p>
+
+            <div className="flex items-center justify-end gap-3 mt-2 border-t border-slate-100 pt-4">
+              <button
+                className="px-5 py-2.5 rounded-lg text-slate-600 hover:bg-slate-100 font-semibold transition-colors text-sm"
+                type="button"
+                onClick={() => setCompraToToggle(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                className={`px-6 py-2.5 rounded-lg text-white font-bold transition-all text-sm flex items-center gap-2 ${
+                  compraToToggle.estado === "PAGADA"
+                    ? "bg-amber-600 hover:bg-amber-700 shadow-lg shadow-amber-900/10"
+                    : "bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-900/10"
+                }`}
+                type="button"
+                onClick={confirmToggleCompraPago}
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== DYNAMIC CUSTOM TOAST SYSTEM ===== */}
+      {toast.open && (
+        <div className="fixed bottom-6 right-6 z-[99999] animate-slide-in">
+          <div className={`flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl border ${
+            toast.type === "success"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+              : toast.type === "error"
+              ? "bg-red-50 border-red-200 text-red-800"
+              : "bg-blue-50 border-blue-200 text-blue-800"
+          }`}>
+            <span className="material-symbols-outlined text-xl">
+              {toast.type === "success" ? "check_circle" : toast.type === "error" ? "error" : "info"}
+            </span>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-bold tracking-tight">
+                {toast.type === "success" ? "Acción Completada" : toast.type === "error" ? "Error" : "Notificación"}
+              </span>
+              <p className="text-xs font-medium opacity-90">{toast.msg}</p>
+            </div>
+            <button
+              onClick={() => setToast((t) => ({ ...t, open: false }))}
+              className="ml-4 p-0.5 hover:bg-black/5 rounded text-slate-500 hover:text-slate-800 transition-colors"
+              type="button"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
 

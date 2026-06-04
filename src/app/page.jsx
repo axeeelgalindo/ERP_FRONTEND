@@ -273,12 +273,9 @@ export default function HomePage() {
         {/* Report Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
           <div className="flex flex-col">
-            <h1 className="text-2xl font-bold tracking-tight text-[#0F172A] mb-1">
-              Executive Dashboard, {userName.split(" ")[0]}
+            <h1 className="text-3xl font-black tracking-widest text-[#002477] mb-1 uppercase">
+              Dashboard
             </h1>
-            <p className="text-sm font-medium text-[#64748B]">
-              {empresa?.nombre || "Blue Ingeniería SPA"} · Periodo actual ({rolNombre || rolCodigo})
-            </p>
           </div>
 
           {/* Filters Row */}

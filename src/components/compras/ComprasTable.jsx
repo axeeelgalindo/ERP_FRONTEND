@@ -57,6 +57,7 @@ export default function ComprasTable({
   onOpenVincular,
   onOpenRendicion,
   onUploadPdfClick,
+  onTogglePaid,
   // helpers
   fmtDateDMY,
   toCLP,
@@ -310,6 +311,19 @@ export default function ComprasTable({
 
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center gap-2">
+                        <button
+                          className={`p-1.5 rounded-lg transition-all ${
+                            c?.estado === "PAGADA"
+                              ? "text-emerald-600 bg-emerald-50 hover:bg-emerald-100"
+                              : "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
+                          }`}
+                          title={c?.estado === "PAGADA" ? "Marcar como no pagada (FACTURADA)" : "Marcar como pagada (PAGADA)"}
+                          type="button"
+                          onClick={() => onTogglePaid?.(c)}
+                        >
+                          💵
+                        </button>
+
                         <button
                           className="p-1.5 text-slate-400 hover:text-primary hover:bg-blue-50  rounded-lg transition-all"
                           title="Vincular a Costeo"
