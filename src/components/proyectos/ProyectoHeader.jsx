@@ -40,9 +40,14 @@ export default function ProyectoHeader({ proyecto, metrics, tareas = [] }) {
     }
   }
 
-  const formatD = (d) => {
+  const formatD = (d, isPlan = false) => {
     if (!d) return "No defin.";
-    return d.toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric"});
+    return d.toLocaleDateString("es-CL", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      ...(isPlan ? { timeZone: "UTC" } : {}),
+    });
   };
 
   const today = new Date();
@@ -87,12 +92,12 @@ export default function ProyectoHeader({ proyecto, metrics, tareas = [] }) {
               <div className="flex items-center gap-3">
                 <div className="flex flex-col">
                   <span className="text-[10px] text-on-surface-variant/70 uppercase">Inicio</span>
-                  <span className="text-sm font-semibold text-on-surface">{fIniPlan ? formatD(fIniPlan) : "No def."}</span>
+                  <span className="text-sm font-semibold text-on-surface">{fIniPlan ? formatD(fIniPlan, true) : "No def."}</span>
                 </div>
                 <span className="text-outline-variant">→</span>
                 <div className="flex flex-col">
                   <span className="text-[10px] text-on-surface-variant/70 uppercase">Término</span>
-                  <span className="text-sm font-semibold text-on-surface">{fFinPlan ? formatD(fFinPlan) : "No def."}</span>
+                  <span className="text-sm font-semibold text-on-surface">{fFinPlan ? formatD(fFinPlan, true) : "No def."}</span>
                 </div>
               </div>
             </div>

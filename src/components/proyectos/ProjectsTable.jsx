@@ -82,14 +82,14 @@ function fmtCLShort(value) {
   if (!value) return null;
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("es-CL", { day: "2-digit", month: "short" });
+  return d.toLocaleDateString("es-CL", { day: "2-digit", month: "short", timeZone: "UTC" });
 }
 
 function fmtCL(value) {
   if (!value) return "—";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("es-CL");
+  return d.toLocaleDateString("es-CL", { timeZone: "UTC" });
 }
 
 function EstadoPill({ estado }) {

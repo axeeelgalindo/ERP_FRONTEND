@@ -227,8 +227,8 @@ export default function ProyectoKpis({ proyecto = {}, items = [] }) {
   // Ojo: formatPercent -> asumimos que quiere 0..100
   const pct = (v) => formatPercent(clampPct(v));
   
-  const fInicio = proyecto?.fecha_inicio_plan ? new Date(proyecto.fecha_inicio_plan).toLocaleDateString() : "No definida";
-  const fFin = proyecto?.fecha_fin_plan ? new Date(proyecto.fecha_fin_plan).toLocaleDateString() : "No definida";
+  const fInicio = proyecto?.fecha_inicio_plan ? new Date(proyecto.fecha_inicio_plan).toLocaleDateString("es-CL", { timeZone: "UTC" }) : "No definida";
+  const fFin = proyecto?.fecha_fin_plan ? new Date(proyecto.fecha_fin_plan).toLocaleDateString("es-CL", { timeZone: "UTC" }) : "No definida";
   
   const today = new Date();
   today.setHours(0,0,0,0);

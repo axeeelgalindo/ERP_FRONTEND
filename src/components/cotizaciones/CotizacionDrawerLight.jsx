@@ -18,6 +18,7 @@ import {
   Stack,
   ListItemIcon,
   ListItemText,
+  Alert,
 } from "@mui/material";
 
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
@@ -26,6 +27,7 @@ import ThumbUpAltOutlinedIcon from "@mui/icons-material/ThumbUpAltOutlined";
 import ThumbDownAltOutlinedIcon from "@mui/icons-material/ThumbDownAltOutlined";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import DateRangeIcon from "@mui/icons-material/DateRange";
 
 import { useSession } from "next-auth/react";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -391,14 +393,13 @@ export default function CotizacionDrawerLight({
   const estado = (c?.estado || "COTIZACION").toUpperCase();
   const siguiente = nextEstados(estado)?.[0] || null;
 
-  const [anchorEl, setAnchorEl] = useState(null);
-  const openMenu = Boolean(anchorEl);
+  const [openAcciones, setOpenAcciones] = useState(false);
 
   const openEstadoMenu = (e) => {
     e?.stopPropagation?.();
-    setAnchorEl(e.currentTarget);
+    setOpenAcciones(true);
   };
-  const closeEstadoMenu = () => setAnchorEl(null);
+  const closeEstadoMenu = () => setOpenAcciones(false);
 
   const [cotizacionIdLocked, setCotizacionIdLocked] = useState(null);
 
@@ -928,60 +929,128 @@ export default function CotizacionDrawerLight({
       </div>
 
       {/* MENU */}
-      <Menu
-        anchorEl={anchorEl}
-        open={openMenu && !openAceptada && !openRechazar}
+      {/* Dialogo Acciones (Cambiar Estado / Editar) */}
+      <Dialog
+        open={openAcciones}
         onClose={closeEstadoMenu}
-        PaperProps={{ sx: { borderRadius: 2, minWidth: 280 } }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 4,
+            p: 1.5,
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+          },
+        }}
+        sx={{ zIndex: (t) => t.zIndex.modal + 10 }}
       >
-        {siguiente ? (
-          <MenuItem onClick={goNext}>
-            <ListItemIcon>
-              <ArrowForwardIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText
-              primary={
-                siguiente === "ACEPTADA"
-                  ? "Aceptar cotización"
-                  : `Avanzar a ${siguiente.replaceAll("_", " ")}`
-              }
-              secondary={
-                siguiente === "ACEPTADA"
-                  ? "Define fechas planificadas y crea el proyecto"
-                  : "Cambia el estado al siguiente paso"
-              }
-            />
-          </MenuItem>
-        ) : (
-          <MenuItem disabled>
-            <ListItemIcon>
-              <CheckCircleOutlineIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText primary="Cotización finalizada" secondary={`Estado: ${estado}`} />
-          </MenuItem>
-        )}
+        <DialogTitle sx={{ pb: 1 }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-slate-800">Acciones de Cotización</h3>
+              <p className="text-xs text-slate-500 font-normal mt-0.5">
+                Selecciona la acción que deseas realizar para la cotización #{c?.numero}
+              </p>
+            </div>
+            <button
+              onClick={closeEstadoMenu}
+              className="text-slate-400 hover:text-slate-600 transition-colors p-1.5 rounded-lg hover:bg-slate-100 font-semibold"
+            >
+              ✕
+            </button>
+          </div>
+        </DialogTitle>
 
-        {puedeRechazar && (
-          <MenuItem onClick={openRechazarModal}>
-            <ListItemIcon>
-              <ThumbDownAltOutlinedIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText
-              primary="Rechazar cotización"
-              secondary="Marca como RECHAZADA (con motivo opcional)"
-            />
-          </MenuItem>
-        )}
+        <DialogContent sx={{ py: 2 }}>
+          <div className="space-y-3.5">
+            {/* 1. Siguiente Estado (Avanzar / Aceptar) */}
+            {siguiente ? (
+              <button
+                onClick={() => {
+                  closeEstadoMenu();
+                  goNext();
+                }}
+                className="w-full text-left p-4 rounded-2xl border border-blue-100 hover:border-blue-300 bg-gradient-to-r from-blue-50/50 to-white hover:from-blue-50/80 transition-all duration-200 group flex items-start gap-4 hover:shadow-md hover:scale-[1.01] hover:cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+                  <ArrowForwardIcon />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-bold text-slate-800">
+                    {siguiente === "ACEPTADA" ? "Aceptar cotización" : `Avanzar a ${siguiente.replaceAll("_", " ")}`}
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    {siguiente === "ACEPTADA" 
+                      ? "Define fechas planificadas y crea el proyecto automáticamente"
+                      : "Cambia el estado de la cotización al siguiente paso del flujo"}
+                  </p>
+                </div>
+                <div className="text-slate-300 group-hover:text-blue-500 font-bold self-center text-lg">
+                  →
+                </div>
+              </button>
+            ) : (
+              <div className="p-4 rounded-2xl border border-slate-100 bg-slate-50 flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-slate-200 flex items-center justify-center text-slate-500">
+                  <CheckCircleOutlineIcon />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-700">Flujo de Cotización Finalizado</h4>
+                  <p className="text-xs text-slate-500 mt-1">
+                    La cotización ya se encuentra en su estado final: <span className="font-bold text-slate-600">{estado}</span>
+                  </p>
+                </div>
+              </div>
+            )}
 
-        <Divider />
+            {/* 2. Rechazar Cotización */}
+            {puedeRechazar && (
+              <button
+                onClick={() => {
+                  closeEstadoMenu();
+                  openRechazarModal();
+                }}
+                className="w-full text-left p-4 rounded-2xl border border-rose-100 hover:border-rose-300 bg-gradient-to-r from-rose-50/50 to-white hover:from-rose-50/80 transition-all duration-200 group flex items-start gap-4 hover:shadow-md hover:scale-[1.01] hover:cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center text-rose-600 group-hover:scale-110 transition-transform">
+                  <ThumbDownAltOutlinedIcon />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-bold text-slate-800">Rechazar cotización</h4>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Marca la cotización como RECHAZADA. Podrás ingresar un motivo de rechazo opcional.
+                  </p>
+                </div>
+                <div className="text-slate-300 group-hover:text-rose-500 font-bold self-center text-lg">
+                  →
+                </div>
+              </button>
+            )}
 
-        <MenuItem onClick={handleEdit} disabled={!c?.id}>
-          <ListItemIcon>
-            <EditIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText primary="Editar cotización" secondary="Editar datos de la cotización" />
-        </MenuItem>
-      </Menu>
+            {/* 3. Editar Cotización */}
+            <button
+              onClick={() => {
+                closeEstadoMenu();
+                handleEdit();
+              }}
+              className="w-full text-left p-4 rounded-2xl border border-slate-200 hover:border-slate-300 bg-gradient-to-r from-slate-50/50 to-white hover:from-slate-50/80 transition-all duration-200 group flex items-start gap-4 hover:shadow-md hover:scale-[1.01] hover:cursor-pointer"
+            >
+              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 group-hover:scale-110 transition-transform">
+                <EditIcon />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-sm font-bold text-slate-800">Editar cotización</h4>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  Modifica los datos principales, montos, clientes y glosas de esta cotización.
+                </p>
+              </div>
+              <div className="text-slate-300 group-hover:text-slate-600 font-bold self-center text-lg">
+                →
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal Aceptada */}
       <Dialog
@@ -990,46 +1059,104 @@ export default function CotizacionDrawerLight({
           setOpenAceptada(false);
           setCotizacionIdLocked(null);
         }}
-        maxWidth="xs"
+        maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 4,
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+            overflow: "hidden",
+          },
+        }}
         sx={{ zIndex: (t) => t.zIndex.modal + 20 }}
       >
-        <DialogTitle>Aceptar cotización</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
-              label="Fecha inicio planificada"
-              type="date"
-              value={inicioPlan}
-              onChange={(e) => setInicioPlan(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-            />
-            <TextField
-              label="Fecha fin planificada"
-              type="date"
-              value={finPlan}
-              onChange={(e) => setFinPlan(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-            />
-            {errAceptada ? (
-              <div style={{ color: "#d32f2f", fontSize: 13 }}>{errAceptada}</div>
-            ) : null}
-          </Stack>
+        {/* Banner de Cabecera Premium */}
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-5 text-white flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white shrink-0">
+            <DateRangeIcon sx={{ fontSize: 28 }} />
+          </div>
+          <div>
+            <h3 className="text-lg font-black tracking-tight text-white">Aceptar Cotización</h3>
+            <p className="text-xs text-blue-100 mt-0.5">
+              Establece las fechas estimadas para la ejecución del nuevo proyecto.
+            </p>
+          </div>
+        </div>
+
+        <DialogContent className="p-6 md:p-8">
+          <div className="space-y-6">
+            {/* Fechas Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Fecha Inicio */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Fecha Inicio Planificada
+                </label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={inicioPlan}
+                    onChange={(e) => setInicioPlan(e.target.value)}
+                    className="w-full px-4 py-3 h-[46px] border border-slate-200 bg-slate-50 rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all font-semibold text-slate-700 cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Fecha Fin */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Fecha Fin Planificada
+                </label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={finPlan}
+                    onChange={(e) => setFinPlan(e.target.value)}
+                    className="w-full px-4 py-3 h-[46px] border border-slate-200 bg-slate-50 rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all font-semibold text-slate-700 cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Ilustración de línea de tiempo */}
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex items-center justify-between text-xs text-slate-500">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                <span>Inicio</span>
+              </div>
+              <div className="flex-1 border-t border-dashed border-slate-300 mx-4" />
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+                <span>Fin del Proyecto</span>
+              </div>
+            </div>
+
+            {/* Alerta de error */}
+            {errAceptada && (
+              <Alert severity="error" className="rounded-xl border border-red-100">
+                {errAceptada}
+              </Alert>
+            )}
+          </div>
         </DialogContent>
-        <DialogActions>
-          <Button
+
+        <DialogActions className="px-6 py-4 bg-slate-50 border-t border-slate-100 gap-2">
+          <button
             onClick={() => {
               setOpenAceptada(false);
               setCotizacionIdLocked(null);
             }}
+            className="px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-all text-slate-600 font-semibold text-sm hover:cursor-pointer"
           >
             Cancelar
-          </Button>
-          <Button variant="contained" startIcon={<ThumbUpAltOutlinedIcon />} onClick={confirmAceptada}>
-            Aceptar
-          </Button>
+          </button>
+          <button
+            onClick={confirmAceptada}
+            className="px-6 py-2.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-all font-bold text-sm shadow-md hover:shadow-lg flex items-center gap-2 hover:scale-[1.02] active:scale-95 hover:cursor-pointer"
+          >
+            <ThumbUpAltOutlinedIcon sx={{ fontSize: 16 }} />
+            Aceptar y Crear Proyecto
+          </button>
         </DialogActions>
       </Dialog>
 
@@ -1040,39 +1167,72 @@ export default function CotizacionDrawerLight({
           setOpenRechazar(false);
           setCotizacionIdLocked(null);
         }}
-        maxWidth="xs"
+        maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 4,
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+            overflow: "hidden",
+          },
+        }}
         sx={{ zIndex: (t) => t.zIndex.modal + 20 }}
       >
-        <DialogTitle>Rechazar cotización</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
-              label="Motivo (opcional)"
-              placeholder="Ej: presupuesto fuera de alcance, fechas no calzan, etc."
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-              multiline
-              minRows={3}
-              fullWidth
-            />
-            {errRechazo ? (
-              <div style={{ color: "#d32f2f", fontSize: 13 }}>{errRechazo}</div>
-            ) : null}
-          </Stack>
+        {/* Banner de Cabecera Premium Rechazo */}
+        <div className="bg-gradient-to-r from-rose-600 to-red-700 px-6 py-5 text-white flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center text-white shrink-0">
+            <ThumbDownAltOutlinedIcon sx={{ fontSize: 26 }} />
+          </div>
+          <div>
+            <h3 className="text-lg font-black tracking-tight text-white">Rechazar Cotización</h3>
+            <p className="text-xs text-rose-100 mt-0.5">
+              Marca esta cotización como rechazada y especifica un motivo opcional.
+            </p>
+          </div>
+        </div>
+
+        <DialogContent className="p-6 md:p-8">
+          <div className="space-y-6">
+            {/* Campo de Motivo */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                Motivo de Rechazo <span className="text-slate-300 normal-case font-normal">(opcional)</span>
+              </label>
+              <textarea
+                placeholder="Indica el motivo (ej. fuera de presupuesto, cambio de alcance, etc.)..."
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                rows={4}
+                className="w-full px-4 py-3 border border-slate-200 bg-slate-50 rounded-xl text-sm focus:ring-2 focus:ring-rose-600/20 focus:border-rose-600 transition-all font-medium text-slate-700 placeholder-slate-400"
+              />
+            </div>
+
+            {/* Alerta de error */}
+            {errRechazo && (
+              <Alert severity="error" className="rounded-xl border border-red-100">
+                {errRechazo}
+              </Alert>
+            )}
+          </div>
         </DialogContent>
-        <DialogActions>
-          <Button
+
+        <DialogActions className="px-6 py-4 bg-slate-50 border-t border-slate-100 gap-2">
+          <button
             onClick={() => {
               setOpenRechazar(false);
               setCotizacionIdLocked(null);
             }}
+            className="px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-all text-slate-600 font-semibold text-sm hover:cursor-pointer"
           >
             Cancelar
-          </Button>
-          <Button variant="contained" color="error" startIcon={<ThumbDownAltOutlinedIcon />} onClick={confirmRechazar}>
-            Rechazar
-          </Button>
+          </button>
+          <button
+            onClick={confirmRechazar}
+            className="px-6 py-2.5 rounded-xl bg-rose-600 text-white hover:bg-rose-700 transition-all font-bold text-sm shadow-md hover:shadow-lg flex items-center gap-2 hover:scale-[1.02] active:scale-95 hover:cursor-pointer"
+          >
+            <ThumbDownAltOutlinedIcon sx={{ fontSize: 16 }} />
+            Rechazar Cotización
+          </button>
         </DialogActions>
       </Dialog>
 
