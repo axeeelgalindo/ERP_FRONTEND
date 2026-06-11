@@ -1,15 +1,12 @@
 "use client";
 
 import {
-  MoreVertical,
-  Eye,
   Pencil,
   Trash,
   Users,
-  Play,
-  SquareCheckBig,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Pagination from "@/components/ui/Pagination";
 
@@ -185,167 +182,7 @@ function ProgressDatesCell({ row }) {
   );
 }
 
-/**
- * Menú acciones robusto:
- * - cierra al click fuera
- * - posiciona el dropdown con coords del botón
- * - usa "fixed" para que no lo corte overflow-hidden del contenedor
- */
-function RowMenu({ row, onEdit, onDelete, onStart, onFinish }) {
-  const btnRef = useRef(null);
-  const menuRef = useRef(null);
-
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-
-  const started = !!row?.fecha_inicio_real;
-  const finished = !!row?.fecha_fin_real;
-
-  const showStart = !started && !finished;
-  const showFinish = started && !finished;
-
-  const calcPos = () => {
-    const el = btnRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const width = 224; // w-56
-    const gap = 8;
-
-    // derecha alineada al botón
-    let left = r.right - width;
-    if (left < 8) left = 8;
-
-    let top = r.bottom + gap;
-
-    // si se sale por abajo, lo subimos
-    const maxBottom = window.innerHeight - 8;
-    const estimatedHeight = 5 * 40; // aprox
-    if (top + estimatedHeight > maxBottom) {
-      top = Math.max(8, r.top - gap - estimatedHeight);
-    }
-
-    setPos({ top, left });
-  };
-
-  useEffect(() => {
-    if (!open) return;
-
-    calcPos();
-
-    const onResize = () => calcPos();
-    const onScroll = () => calcPos();
-
-    const onDown = (e) => {
-      const t = e.target;
-      if (btnRef.current?.contains(t)) return;
-      if (menuRef.current?.contains(t)) return;
-      setOpen(false);
-    };
-
-    window.addEventListener("resize", onResize);
-    window.addEventListener("scroll", onScroll, true);
-    document.addEventListener("mousedown", onDown);
-
-    return () => {
-      window.removeEventListener("resize", onResize);
-      window.removeEventListener("scroll", onScroll, true);
-      document.removeEventListener("mousedown", onDown);
-    };
-  }, [open]);
-
-  return (
-    <>
-      <button
-        ref={btnRef}
-        className="text-gray-400 hover:text-gray-600 
-          p-2 rounded-full hover:bg-gray-100  transition-colors"
-        onClick={() => setOpen((o) => !o)}
-        aria-label="Abrir menú"
-        type="button"
-      >
-        <MoreVertical size={18} />
-      </button>
-
-      {open && (
-        <div
-          ref={menuRef}
-          className="fixed z-[60] w-56 origin-top-right rounded-lg
-            border border-gray-200 
-            bg-white  shadow-lg overflow-hidden"
-          style={{ top: pos.top, left: pos.left }}
-        >
-          <div className="py-1 text-sm">
-            <Link
-              href={`/proyectos/${row.id}`}
-              className="flex items-center gap-2 px-3 py-2
-                text-gray-700 
-                hover:bg-gray-50 "
-              onClick={() => setOpen(false)}
-            >
-              <Eye size={14} /> Ver
-            </Link>
-
-            {showStart && (
-              <button
-                className="w-full flex items-center gap-2 px-3 py-2 text-left
-                  text-gray-700 
-                  hover:bg-gray-50 "
-                onClick={() => {
-                  setOpen(false);
-                  onStart?.(row);
-                }}
-                type="button"
-              >
-                <Play size={14} /> Iniciar proyecto
-              </button>
-            )}
-
-            {showFinish && (
-              <button
-                className="w-full flex items-center gap-2 px-3 py-2 text-left
-                  text-gray-700 
-                  hover:bg-gray-50 "
-                onClick={() => {
-                  setOpen(false);
-                  onFinish?.(row);
-                }}
-                type="button"
-              >
-                <SquareCheckBig size={14} /> Finalizar proyecto
-              </button>
-            )}
-
-            <button
-              className="w-full flex items-center gap-2 px-3 py-2 text-left
-                text-gray-700 
-                hover:bg-gray-50 "
-              onClick={() => {
-                setOpen(false);
-                onEdit?.(row);
-              }}
-              type="button"
-            >
-              <Pencil size={14} /> Editar
-            </button>
-
-            <button
-              className="w-full flex items-center gap-2 px-3 py-2 text-left
-                text-red-600 
-                hover:bg-red-50 "
-              onClick={() => {
-                setOpen(false);
-                onDelete?.(row);
-              }}
-              type="button"
-            >
-              <Trash size={14} /> Eliminar
-            </button>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
+// RowMenu was removed as requested.
 
 export default function ProjectsTable({
   rows,
@@ -360,6 +197,7 @@ export default function ProjectsTable({
   total = 0,
   onPageChange,
 }) {
+  const router = useRouter();
   if (loading) {
     return (
       <div className="p-6 text-sm text-gray-500 ">Cargando proyectos…</div>
@@ -416,10 +254,16 @@ export default function ProjectsTable({
               return (
                 <tr
                   key={id}
-                  className="group hover:bg-gray-50  transition-colors"
+                  className="group hover:bg-gray-50 transition-colors cursor-pointer"
+                  onClick={() => router.push(`/proyectos/${id}`)}
                 >
                   <td className="p-5">
-                    <div className="font-semibold text-gray-900 ">{nombre}</div>
+                    <Link
+                      href={`/proyectos/${id}`}
+                      className="font-semibold text-gray-900 hover:text-blue-600 transition-colors hover:cursor-pointer"
+                    >
+                      {nombre}
+                    </Link>
                     <div className="text-xs text-gray-400 mt-1">
                       ID:{" "}
                       {codigo
@@ -445,13 +289,30 @@ export default function ProjectsTable({
                   </td>
 
                   <td className="p-5 text-right">
-                    <RowMenu
-                      row={row}
-                      onEdit={onEdit}
-                      onDelete={onDelete}
-                      onStart={onStart}
-                      onFinish={onFinish}
-                    />
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEdit?.(row);
+                        }}
+                        className="text-gray-400 hover:text-blue-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors hover:cursor-pointer"
+                        title="Editar"
+                        type="button"
+                      >
+                        <Pencil size={18} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete?.(row);
+                        }}
+                        className="text-gray-400 hover:text-rose-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors hover:cursor-pointer"
+                        title="Eliminar"
+                        type="button"
+                      >
+                        <Trash size={18} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import ProyectoFormModal from "@/components/proyectos/ProyectoFormModal";
 import ProjectsTable from "@/components/proyectos/ProjectsTable";
 
@@ -56,8 +57,98 @@ export default function ProyectosPageClient({
   onFinishProyecto,
 }) {
   const router = useRouter();
+  const { data: session } = useSession();
   const [openModal, setOpenModal] = useState(false);
   const [editingProyecto, setEditingProyecto] = useState(null);
+
+  const handleDeleteProyecto = async (proyecto) => {
+    if (!proyecto?.id) return;
+    if (!confirm(`¿Estás seguro de eliminar el proyecto "${proyecto.nombre}"?`)) return;
+
+    try {
+      const token = session?.user?.accessToken || session?.accessToken || "";
+      const empresaId = session?.user?.empresaId ?? session?.user?.empresa_id ?? session?.user?.empresa?.id ?? null;
+      
+      const headers = {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(empresaId ? { "x-empresa-id": String(empresaId) } : {}),
+      };
+
+      const API = process.env.NEXT_PUBLIC_API_URL;
+      const res = await fetch(`${API}/proyectos/delete/${proyecto.id}`, {
+        method: "DELETE",
+        headers,
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Error al eliminar proyecto");
+      }
+
+      router.refresh();
+    } catch (err) {
+      alert(err.message || "Error al eliminar el proyecto");
+    }
+  };
+
+  const handleStartProyecto = async (proyecto) => {
+    if (!proyecto?.id) return;
+    try {
+      const token = session?.user?.accessToken || session?.accessToken || "";
+      const empresaId = session?.user?.empresaId ?? session?.user?.empresa_id ?? session?.user?.empresa?.id ?? null;
+      
+      const headers = {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(empresaId ? { "x-empresa-id": String(empresaId) } : {}),
+      };
+
+      const API = process.env.NEXT_PUBLIC_API_URL;
+      const res = await fetch(`${API}/proyectos/${proyecto.id}/iniciar`, {
+        method: "POST",
+        headers,
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Error al iniciar proyecto");
+      }
+
+      router.refresh();
+    } catch (err) {
+      alert(err.message || "Error al iniciar el proyecto");
+    }
+  };
+
+  const handleFinishProyecto = async (proyecto) => {
+    if (!proyecto?.id) return;
+    try {
+      const token = session?.user?.accessToken || session?.accessToken || "";
+      const empresaId = session?.user?.empresaId ?? session?.user?.empresa_id ?? session?.user?.empresa?.id ?? null;
+      
+      const headers = {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(empresaId ? { "x-empresa-id": String(empresaId) } : {}),
+      };
+
+      const API = process.env.NEXT_PUBLIC_API_URL;
+      const res = await fetch(`${API}/proyectos/${proyecto.id}/finalizar`, {
+        method: "POST",
+        headers,
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Error al finalizar proyecto");
+      }
+
+      router.refresh();
+    } catch (err) {
+      alert(err.message || "Error al finalizar el proyecto");
+    }
+  };
 
   const totalPages = Math.max(1, Math.ceil((Number(total) || 0) / (Number(pageSize) || 10)));
 
@@ -208,9 +299,9 @@ export default function ProyectosPageClient({
             setEditingProyecto(row);
             setOpenModal(true);
           }}
-          onDelete={(row) => onDeleteProyecto?.(row)}
-          onStart={(row) => onStartProyecto?.(row)}
-          onFinish={(row) => onFinishProyecto?.(row)}
+          onDelete={handleDeleteProyecto}
+          onStart={handleStartProyecto}
+          onFinish={handleFinishProyecto}
         />
       </div>
 
