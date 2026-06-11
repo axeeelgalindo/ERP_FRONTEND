@@ -61,10 +61,10 @@ export default function Sidebar() {
         icon: "storefront",
         roles: ["superadmin", "admin", "user", "empleado"],
         children: [
-          { href: "/clientes", label: "Clientes", icon: "group", roles: ["superadmin", "admin", "user", "empleado"] },
-          { href: "/cotizaciones", label: "Cotizaciones", icon: "request_quote", roles: ["superadmin", "admin", "user", "empleado"] },
-          { href: "/proveedores", label: "Proveedores", icon: "conveyor_belt", roles: ["superadmin", "admin", "user", "empleado"] },
           { href: "/costeos", label: "Costeos", icon: "calculate", roles: ["superadmin", "admin", "user", "empleado"] },
+          { href: "/cotizaciones", label: "Cotizaciones", icon: "request_quote", roles: ["superadmin", "admin", "user", "empleado"] },
+          { href: "/clientes", label: "Clientes", icon: "group", roles: ["superadmin", "admin", "user", "empleado"] },
+          { href: "/proveedores", label: "Proveedores", icon: "conveyor_belt", roles: ["superadmin", "admin", "user", "empleado"] },
         ],
       },
 

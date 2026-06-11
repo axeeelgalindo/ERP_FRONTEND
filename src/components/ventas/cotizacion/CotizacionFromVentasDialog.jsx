@@ -352,6 +352,43 @@ export default function CotizacionFromVentasDialog({
     });
   };
 
+  const handleImportFromCosteos = () => {
+    if (!ventasDisponibles.length || !ventaIds.length) return;
+    const setIds = new Set(ventaIds.map(String));
+    const selectedVentas = ventasDisponibles.filter((v) => setIds.has(String(v.id)));
+    
+    const allDetalles = selectedVentas.flatMap((v) => v.detalles || []);
+    if (allDetalles.length === 0) return;
+
+    const importedGlosas = allDetalles.map((d, i) => {
+      const cant = Number(d.cantidad) || 1;
+      const totalItem = round0(Number(d.total ?? d.ventaTotal) || 0);
+      const pu = round0(totalItem / cant);
+      return {
+        descripcion: d.descripcion || "",
+        cantidad: cant,
+        precio_unitario: pu,
+        monto: totalItem,
+        manual: true,
+        orden: i,
+        descuento_pct: 0,
+      };
+    });
+
+    const sum = importedGlosas.reduce((acc, g) => acc + g.monto, 0);
+    const diff = subtotalBase - sum;
+    if (diff !== 0 && importedGlosas.length > 0) {
+      const lastIdx = importedGlosas.length - 1;
+      importedGlosas[lastIdx].monto += diff;
+      const cant = importedGlosas[lastIdx].cantidad || 1;
+      importedGlosas[lastIdx].precio_unitario = round0(importedGlosas[lastIdx].monto / cant);
+    }
+
+    setGlosas(importedGlosas);
+    const { error } = distributeGlosasBrutas(importedGlosas, subtotalBase);
+    setGlosaErr(error);
+  };
+
   // =========================
   // cargar clientes
   // =========================
@@ -676,6 +713,7 @@ export default function CotizacionFromVentasDialog({
             hasGeneralDiscount={hasGeneralDiscount}
             conflict={conflict}
             conflictMsg={conflictMsg}
+            onImportFromCosteos={handleImportFromCosteos}
           />
         ) : null}
       </Box>

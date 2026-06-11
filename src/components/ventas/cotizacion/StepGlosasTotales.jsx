@@ -13,6 +13,7 @@ import {
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 
 import { formatCLP } from "@/components/ventas/utils/money";
 
@@ -46,6 +47,7 @@ export default function StepGlosasTotales({
   hasGeneralDiscount = false,
   conflict = false,
   conflictMsg = "",
+  onImportFromCosteos,
 }) {
   const manualSum = useMemo(
     () => glosas.reduce((acc, g) => acc + (g.manual ? round0(g.monto) : 0), 0),
@@ -154,13 +156,25 @@ export default function StepGlosasTotales({
           Glosas del documento
         </Typography>
 
-        <Button
-          onClick={addGlosa}
-          startIcon={<AddCircleIcon />}
-          sx={{ fontWeight: 900, letterSpacing: ".06em" }}
-        >
-          Añadir línea
-        </Button>
+        <Box sx={{ display: "flex", gap: 1.5 }}>
+          {onImportFromCosteos && (
+            <Button
+              onClick={onImportFromCosteos}
+              startIcon={<ContentCopyIcon />}
+              sx={{ fontWeight: 900, letterSpacing: ".06em" }}
+              disabled={!subtotalNeto || subtotalNeto <= 0}
+            >
+              Traer ítems de costeos
+            </Button>
+          )}
+          <Button
+            onClick={addGlosa}
+            startIcon={<AddCircleIcon />}
+            sx={{ fontWeight: 900, letterSpacing: ".06em" }}
+          >
+            Añadir línea
+          </Button>
+        </Box>
       </Box>
 
       <Box sx={{ display: "grid", gap: 1.5 }}>
