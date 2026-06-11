@@ -64,6 +64,7 @@ export default function Sidebar() {
           { href: "/clientes", label: "Clientes", icon: "group", roles: ["superadmin", "admin", "user", "empleado"] },
           { href: "/cotizaciones", label: "Cotizaciones", icon: "request_quote", roles: ["superadmin", "admin", "user", "empleado"] },
           { href: "/proveedores", label: "Proveedores", icon: "conveyor_belt", roles: ["superadmin", "admin", "user", "empleado"] },
+          { href: "/costeos", label: "Costeos", icon: "calculate", roles: ["superadmin", "admin", "user", "empleado"] },
         ],
       },
 
@@ -87,7 +88,6 @@ export default function Sidebar() {
         icon: "payments",
         roles: ["superadmin", "admin", "user", "empleado"],
         children: [
-          { href: "/costeos", label: "Costeos", icon: "calculate", roles: ["superadmin", "admin", "user", "empleado"] },
           { href: "/compras", label: "Compras", icon: "shopping_cart", roles: ["superadmin", "admin"] },
           { href: "/rendiciones", label: "Rendiciones", icon: "receipt_long", roles: ["superadmin", "admin", "empleado"] },
         ],
