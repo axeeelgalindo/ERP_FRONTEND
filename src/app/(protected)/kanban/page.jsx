@@ -43,11 +43,17 @@ export default function KanbanPage() {
     fecha_inicio_plan: new Date().toISOString().split('T')[0],
     dias_plan: 1,
     prioridad: 2,
+    predecesora_id: "",
+    requisito_texto: "",
+    requisitos: [],
   });
 
   const [parentOptions, setParentOptions] = useState([]); // Epicas or Tareas
   const [loadingParents, setLoadingParents] = useState(false);
   
+  const [taskOptions, setTaskOptions] = useState([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+
   const [projectMembers, setProjectMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [showQuickAddMember, setShowQuickAddMember] = useState(false);
@@ -138,6 +144,56 @@ export default function KanbanPage() {
 
     fetchMembers();
   }, [isAddModalOpen, formData.proyecto_id, formData.destino, session]);
+
+  // Cargar tareas del proyecto para dependencias
+  useEffect(() => {
+    const active = isAddModalOpen ? formType === "TAREA" : (selectedItem?.tipo === "TAREA");
+    if (!active) {
+      setTaskOptions([]);
+      return;
+    }
+
+    const dest = isAddModalOpen ? formData.destino : selectedItem?.destino;
+    const projId = isAddModalOpen ? formData.proyecto_id : selectedItem?.proyecto_id;
+    const cc = isAddModalOpen ? formData.centro_costo : selectedItem?.centro_costo;
+
+    if (dest === "PROYECTO" && !projId) {
+      setTaskOptions([]);
+      return;
+    }
+
+    const fetchTasks = async () => {
+      setLoadingTasks(true);
+      try {
+        const headers = makeHeaders(session);
+        let url = "";
+        if (dest === "PROYECTO") {
+          url = `${process.env.NEXT_PUBLIC_API_URL}/tareas?proyectoId=${projId}&pageSize=200`;
+        } else {
+          url = `${process.env.NEXT_PUBLIC_API_URL}/tareas?destino=${dest}${cc ? `&centro_costo=${cc}` : ''}&pageSize=200`;
+        }
+        const res = await fetch(url, { headers });
+        const json = await res.json();
+        if (json.ok) {
+          const list = json.rows || json.items || [];
+          // Si estamos en detalle, filtrar la tarea actual
+          const filtered = selectedItem && !isAddModalOpen
+            ? list.filter(t => t.id !== selectedItem.id)
+            : list;
+          setTaskOptions(filtered.map(t => ({
+            id: t.id,
+            nombre: t.nombre || "Sin nombre"
+          })));
+        }
+      } catch (err) {
+        console.error("Error fetching tasks for dependencies:", err);
+      } finally {
+        setLoadingTasks(false);
+      }
+    };
+
+    fetchTasks();
+  }, [isAddModalOpen, formType, selectedItem, formData.proyecto_id, formData.destino, formData.centro_costo, session]);
 
   const fetchData = useCallback(async (q = "") => {
     if (!session) return;
@@ -462,6 +518,12 @@ export default function KanbanPage() {
               <p className="text-[9px] text-gray-400 mt-1 flex items-center gap-1 italic">
                 <span className="material-symbols-outlined text-[10px]">link</span>
                 {item.parent_name}
+              </p>
+            )}
+            {item.predecesora_nombre && (
+              <p className="text-[9px] text-amber-600 mt-0.5 flex items-center gap-1 font-semibold" title={`Requiere finalizar: ${item.predecesora_nombre}`}>
+                <span className="material-symbols-outlined text-[10px] font-bold">arrow_forward</span>
+                Req: {item.predecesora_nombre}
               </p>
             )}
           </div>
@@ -794,6 +856,195 @@ export default function KanbanPage() {
                   </select>
                 </div>
               </div>
+
+              {item.tipo === "TAREA" && (
+                <div className="space-y-3 md:col-span-2 pt-3 border-t border-gray-100">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                    <span className="material-symbols-outlined text-xs">playlist_add_check</span>
+                    Requisitos y Pendientes ({item.requisitos?.length || 0})
+                  </span>
+
+                  {/* Lista de Requisitos Existentes */}
+                  <div className="space-y-2">
+                    {(item.requisitos || []).map((req) => (
+                      <div key={req.id} className="flex items-center justify-between bg-slate-50 hover:bg-slate-100 p-2 rounded-lg border border-slate-200/60 transition-all">
+                        <label className="flex items-center gap-2.5 cursor-pointer select-none flex-1">
+                          <input
+                            type="checkbox"
+                            checked={req.completado}
+                            onChange={async (e) => {
+                              const newChecked = e.target.checked;
+                              // Optimistic UI update
+                              setSelectedItem(prev => ({
+                                ...prev,
+                                requisitos: (prev.requisitos || []).map(r => r.id === req.id ? { ...r, completado: newChecked } : r)
+                              }));
+
+                              try {
+                                const headers = makeHeaders(session);
+                                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tareas-requisito/update/${req.id}`, {
+                                  method: "PATCH",
+                                  headers,
+                                  body: JSON.stringify({ completado: newChecked }),
+                                });
+                                if (!res.ok) throw new Error("No se pudo actualizar el requisito");
+                                fetchData(searchTerm);
+                              } catch (err) {
+                                console.error(err);
+                                // Revert
+                                setSelectedItem(prev => ({
+                                  ...prev,
+                                  requisitos: (prev.requisitos || []).map(r => r.id === req.id ? { ...r, completado: !newChecked } : r)
+                                }));
+                              }
+                            }}
+                            className="rounded text-blue-600 focus:ring-blue-500 border-gray-300 w-4 h-4 cursor-pointer"
+                          />
+                          <span className={`text-xs font-semibold ${req.completado ? 'line-through text-slate-400' : 'text-slate-700'}`}>
+                            {req.nombre}
+                            {req.predecesora?.nombre && (
+                              <span className="ml-1.5 text-[9px] bg-blue-50 text-blue-600 px-1 rounded uppercase font-extrabold tracking-wider border border-blue-100/50">
+                                Tarea
+                              </span>
+                            )}
+                          </span>
+                        </label>
+
+                        <button
+                          onClick={async () => {
+                            if (!confirm("¿Eliminar este requisito?")) return;
+                            // Optimistic UI update
+                            setSelectedItem(prev => ({
+                              ...prev,
+                              requisitos: (prev.requisitos || []).filter(r => r.id !== req.id)
+                            }));
+
+                            try {
+                              const headers = makeHeaders(session);
+                              const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tareas-requisito/delete/${req.id}`, {
+                                  method: "DELETE",
+                                  headers,
+                              });
+                              if (!res.ok) throw new Error("No se pudo eliminar el requisito");
+                              fetchData(searchTerm);
+                            } catch (err) {
+                              console.error(err);
+                              alert(err.message);
+                              fetchData(searchTerm);
+                            }
+                          }}
+                          className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                        >
+                          <span className="material-symbols-outlined text-sm">delete</span>
+                        </button>
+                      </div>
+                    ))}
+
+                    {(!item.requisitos || item.requisitos.length === 0) && (
+                      <p className="text-[11px] text-slate-400 italic">No hay requisitos agregados aún.</p>
+                    )}
+                  </div>
+
+                  {/* Agregar Nuevo Requisito */}
+                  <div className="bg-slate-50 border border-slate-200/60 p-3 rounded-xl space-y-2.5 mt-2">
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                        Agregar Requisito desde Tarea Existente
+                      </span>
+                      <select
+                        id="new-req-predecesora-select"
+                        defaultValue=""
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (!val) return;
+                          const predTask = taskOptions.find(t => t.id === val);
+                          if (predTask) {
+                            const inputEl = document.getElementById("new-req-text-input");
+                            if (inputEl) {
+                              inputEl.value = predTask.nombre;
+                              inputEl.dataset.predecesoraId = predTask.id;
+                            }
+                          }
+                        }}
+                        className="bg-white border border-gray-200 text-xs font-semibold text-gray-700 rounded-lg p-1.5 outline-none focus:border-blue-500 cursor-pointer w-full"
+                      >
+                        <option value="">-- Seleccionar una tarea --</option>
+                        {taskOptions.map(t => (
+                          <option key={t.id} value={t.id}>{t.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                        O escribe un Requisito Personalizado
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          id="new-req-text-input"
+                          type="text"
+                          placeholder="Ej. Tener los implementos, comprar insumos..."
+                          className="bg-white border border-gray-200 text-xs font-semibold text-gray-700 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-500 flex-1"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              document.getElementById("btn-add-req-sidebar")?.click();
+                            }
+                          }}
+                        />
+                        <button
+                          id="btn-add-req-sidebar"
+                          onClick={async () => {
+                            const inputEl = document.getElementById("new-req-text-input");
+                            const nombre = inputEl?.value?.trim();
+                            const predecesora_id = inputEl?.dataset?.predecesoraId || null;
+
+                            if (!nombre) return;
+
+                            setIsUpdating(true);
+                            try {
+                              const headers = makeHeaders(session);
+                              const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tareas-requisito/add`, {
+                                method: "POST",
+                                headers,
+                                body: JSON.stringify({
+                                  tarea_id: item.id,
+                                  nombre,
+                                  predecesora_id,
+                                }),
+                              });
+                              if (!res.ok) throw new Error("No se pudo agregar el requisito");
+                              const json = await res.json();
+                              
+                              setSelectedItem(prev => ({
+                                ...prev,
+                                requisitos: [...(prev.requisitos || []), json.row]
+                              }));
+
+                              if (inputEl) {
+                                inputEl.value = "";
+                                delete inputEl.dataset.predecesoraId;
+                              }
+                              const selectEl = document.getElementById("new-req-predecesora-select");
+                              if (selectEl) selectEl.value = "";
+
+                              fetchData(searchTerm);
+                            } catch (err) {
+                              console.error(err);
+                              alert(err.message);
+                            } finally {
+                              setIsUpdating(false);
+                            }
+                          }}
+                          className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-1.5 text-xs font-bold transition-all flex items-center justify-center gap-1 shrink-0"
+                        >
+                          <span className="material-symbols-outlined text-sm">add</span>
+                          Añadir
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Dates Grid */}
@@ -1003,6 +1254,9 @@ export default function KanbanPage() {
                 fecha_inicio_plan: new Date().toISOString().split('T')[0],
                 dias_plan: 1,
                 prioridad: 2,
+                predecesora_id: "",
+                requisito_texto: "",
+                requisitos: [],
               });
               setIsAddModalOpen(true);
             }}
@@ -1289,6 +1543,118 @@ export default function KanbanPage() {
                   </div>
                 )}
 
+                {formType === "TAREA" && (
+                  <div className="space-y-3 md:col-span-2 pt-3 border-t border-gray-100">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                      <span className="material-symbols-outlined text-xs">playlist_add_check</span>
+                      Requisitos de la Tarea ({formData.requisitos?.length || 0})
+                    </span>
+
+                    {/* Lista Local de Requisitos */}
+                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                      {(formData.requisitos || []).map((req, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-gray-50 p-2.5 rounded-xl border border-gray-200/50">
+                          <span className="text-xs font-semibold text-gray-700">
+                            {req.nombre}
+                            {req.predecesora_id && (
+                              <span className="ml-1.5 text-[9px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded font-extrabold tracking-wider border border-blue-100/30 uppercase">
+                                Tarea
+                              </span>
+                            )}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                requisitos: formData.requisitos.filter((_, i) => i !== idx)
+                              });
+                            }}
+                            className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                          >
+                            <span className="material-symbols-outlined text-sm">delete</span>
+                          </button>
+                        </div>
+                      ))}
+
+                      {(!formData.requisitos || formData.requisitos.length === 0) && (
+                        <p className="text-[11px] text-gray-400 italic pl-1">No hay requisitos agregados.</p>
+                      )}
+                    </div>
+
+                    {/* Controles para Añadir Requisito */}
+                    <div className="bg-gray-50 border border-gray-200/50 p-3.5 rounded-2xl space-y-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                          Vincular Tarea Previa
+                        </label>
+                        <SearchableSelect
+                          label="R"
+                          placeholder={loadingTasks ? "Cargando..." : "Seleccionar tarea previa..."}
+                          options={taskOptions}
+                          value=""
+                          onChange={(val) => {
+                            if (!val) return;
+                            const predTask = taskOptions.find(t => t.id === val);
+                            if (predTask) {
+                              const inputEl = document.getElementById("new-modal-req-text-input");
+                              if (inputEl) {
+                                inputEl.value = predTask.nombre;
+                                inputEl.dataset.predecesoraId = predTask.id;
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                          O escribe un Requisito Personalizado
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            id="new-modal-req-text-input"
+                            type="text"
+                            placeholder="Ej. Tener los implementos, comprar insumos..."
+                            className="flex-1 bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-xs font-semibold focus:border-blue-500 outline-none"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                document.getElementById("btn-add-req-modal")?.click();
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            id="btn-add-req-modal"
+                            onClick={() => {
+                              const inputEl = document.getElementById("new-modal-req-text-input");
+                              const nombre = inputEl?.value?.trim();
+                              const predecesora_id = inputEl?.dataset?.predecesoraId || null;
+
+                              if (!nombre) return;
+
+                              setFormData({
+                                ...formData,
+                                requisitos: [...(formData.requisitos || []), { nombre, predecesora_id }]
+                              });
+
+                              if (inputEl) {
+                                inputEl.value = "";
+                                delete inputEl.dataset.predecesoraId;
+                              }
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2 text-xs font-bold transition-all flex items-center justify-center gap-1 shrink-0 active:scale-95"
+                          >
+                            <span className="material-symbols-outlined text-sm">add</span>
+                            Añadir
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fecha Inicio</label>
                   <input
@@ -1344,7 +1710,10 @@ export default function KanbanPage() {
                       body = { ...formData };
                     } else if (formType === "TAREA") {
                       url = `${process.env.NEXT_PUBLIC_API_URL}/tareas/add`;
-                      body = { ...formData };
+                      body = { 
+                        ...formData,
+                        requisitos: formData.requisitos || []
+                      };
                     } else if (formType === "SUBTAREA") {
                       url = `${process.env.NEXT_PUBLIC_API_URL}/tareas-detalle/add`;
                       body = { 
@@ -1375,6 +1744,9 @@ export default function KanbanPage() {
                       fecha_inicio_plan: new Date().toISOString().split('T')[0],
                       dias_plan: 1,
                       prioridad: 2,
+                      predecesora_id: "",
+                      requisito_texto: "",
+                      requisitos: [],
                     });
                     fetchData(searchTerm);
                   } catch (err) {

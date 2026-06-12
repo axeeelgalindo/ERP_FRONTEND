@@ -123,6 +123,9 @@ export default function TasksTreePremium({
 
   // evidence preview
   onViewEvidencia,
+
+  // requirements preview
+  onViewRequisitos,
 }) {
   return (
     <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
@@ -295,12 +298,37 @@ export default function TasksTreePremium({
                               <div className="flex items-start gap-2.5">
                                 <TaskAltIcon sx={{ fontSize: 20, color: "#2563EB" }} />
                                 <div className="flex flex-col">
-                                  <span
-                                    className="font-semibold text-sm text-slate-800 cursor-pointer"
-                                    onClick={() => onEditTarea?.(t)}
-                                  >
-                                    {t.nombre}
-                                  </span>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span
+                                      className="font-semibold text-sm text-slate-800 cursor-pointer hover:text-blue-600 transition-colors"
+                                      onClick={() => onEditTarea?.(t)}
+                                    >
+                                      {t.nombre}
+                                    </span>
+                                    {t.requisitos && t.requisitos.length > 0 ? (
+                                      <span
+                                        className="inline-flex items-center bg-amber-50 border border-amber-200/60 text-[9px] font-extrabold text-amber-700 px-1.5 py-0.5 rounded uppercase tracking-wider gap-1 cursor-pointer hover:bg-amber-150 transition-colors"
+                                        title={t.requisitos.map(r => `${r.completado ? '✅' : '❌'} ${r.nombre}`).join('\n')}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onViewRequisitos?.(t);
+                                        }}
+                                      >
+                                        <span className="material-symbols-outlined text-[10px]">playlist_add_check</span>
+                                        Reqs: {t.requisitos.filter(r => r.completado).length}/{t.requisitos.length}
+                                      </span>
+                                    ) : (t.dependencias?.[0]?.predecesora?.nombre || t.requisito_texto) ? (
+                                      <span
+                                        className="inline-flex items-center bg-amber-50 border border-amber-200/60 text-[9px] font-extrabold text-amber-700 px-1.5 py-0.5 rounded uppercase tracking-wider cursor-pointer hover:bg-amber-150 transition-colors"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onViewRequisitos?.(t);
+                                        }}
+                                      >
+                                        Req: {t.dependencias?.[0]?.predecesora?.nombre || t.requisito_texto}
+                                      </span>
+                                    ) : null}
+                                  </div>
                                   <span className="text-[10px] text-slate-400">
                                     ({detalles.filter((d) => d.estado === "completada").length}/{detalles.length} subtareas)
                                   </span>

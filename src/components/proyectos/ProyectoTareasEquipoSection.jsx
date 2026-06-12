@@ -36,6 +36,7 @@ import EpicaFormModal from "./tareas/modals/EpicaFormModal";
 import TareaFormModal from "./tareas/modals/TareaFormModal";
 import SubtareaFormModal from "./tareas/modals/SubtareaFormModal";
 import EvidencePreviewModal from "./tareas/modals/EvidencePreviewModal";
+import TareaRequisitosModal from "./tareas/modals/TareaRequisitosModal";
 
 import TasksTreePremium from "./tareas/TasksTreePremium";
 
@@ -170,6 +171,10 @@ export default function ProyectoTareasEquipoSection({
   const openEvidenceModal = (item) => setEvidenceItem(item);
   const closeEvidenceModal = () => setEvidenceItem(null);
 
+  // requirements modal
+  const [requisitosModalOpen, setRequisitosModalOpen] = useState(false);
+  const [requisitoTarea, setRequisitoTarea] = useState(null);
+
   // update subtarea action
   const [updatingDetalleId, setUpdatingDetalleId] = useState(null);
 
@@ -235,11 +240,11 @@ export default function ProyectoTareasEquipoSection({
   const [epicas, setEpicas] = useState([]);
   const [loadingEpicas, setLoadingEpicas] = useState(false);
 
-  const reloadEpicas = async () => {
+  const reloadEpicas = async (silent = false) => {
     if (!session?.user || !proyectoId) return;
 
     try {
-      setLoadingEpicas(true);
+      if (!silent) setLoadingEpicas(true);
       const res = await fetch(`${API}/epicas?proyectoId=${proyectoId}`, {
         headers: makeHeaders(session),
         cache: "no-store",
@@ -251,12 +256,12 @@ export default function ProyectoTareasEquipoSection({
       console.error("Error cargando épicas", e);
       setEpicas([]);
     } finally {
-      setLoadingEpicas(false);
+      if (!silent) setLoadingEpicas(false);
     }
   };
 
   useEffect(() => {
-    reloadEpicas();
+    reloadEpicas(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user, proyectoId]);
 
@@ -529,6 +534,10 @@ export default function ProyectoTareasEquipoSection({
                 onEditSubtarea={openEditSubtarea}
                 renderSubtareaAccionCell={renderSubtareaAccionCell}
                 onViewEvidencia={openEvidenceModal}
+                onViewRequisitos={(t) => {
+                  setRequisitoTarea(t);
+                  setRequisitosModalOpen(true);
+                }}
               />
             )}
           </CardContent>
@@ -540,7 +549,7 @@ export default function ProyectoTareasEquipoSection({
             proyectoId={proyectoId}
             epica={editingEpica}
             onSaved={async () => {
-              await reloadEpicas();
+              await reloadEpicas(true);
               router.refresh();
             }}
           />
@@ -555,7 +564,7 @@ export default function ProyectoTareasEquipoSection({
             tarea={editingTarea}
             presetEpicaId={presetEpicaId}
             onSaved={async () => {
-              await reloadEpicas();
+              await reloadEpicas(true);
               router.refresh();
             }}
           />
@@ -576,6 +585,21 @@ export default function ProyectoTareasEquipoSection({
             item={evidenceItem}
           />
 
+          <TareaRequisitosModal
+            open={requisitosModalOpen}
+            onClose={() => {
+              setRequisitosModalOpen(false);
+              setRequisitoTarea(null);
+            }}
+            session={session}
+            proyectoId={proyectoId}
+            tarea={requisitoTarea}
+            onSaved={async () => {
+              await reloadEpicas(true);
+              router.refresh();
+            }}
+          />
+
           {/* MODALES (tu legacy) */}
           <AddTareaModal
             open={modalOpen}
@@ -593,7 +617,7 @@ export default function ProyectoTareasEquipoSection({
             epicas={epicas}
             tarea={assignEpicTarea}
             onSaved={async () => {
-              await reloadEpicas();
+              await reloadEpicas(true);
               router.refresh();
             }}
           />
@@ -607,7 +631,7 @@ export default function ProyectoTareasEquipoSection({
             miembros={miembros}
             epicaPreselectId={wizardEpicaPreselectId}
             onSaved={async () => {
-              await reloadEpicas();
+              await reloadEpicas(true);
               router.refresh();
             }}
           />
