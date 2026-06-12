@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import ProyectoFormModal from "@/components/proyectos/ProyectoFormModal";
 import ProjectsTable from "@/components/proyectos/ProjectsTable";
 
-import { Filter, Plus, Folder, TrendingUp, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Filter, Plus, Folder, TrendingUp, AlertTriangle, CheckCircle2, X, Trash2 } from "lucide-react";
 
 import {
   calcProgresoProyecto,
@@ -60,11 +60,28 @@ export default function ProyectosPageClient({
   const { data: session } = useSession();
   const [openModal, setOpenModal] = useState(false);
   const [editingProyecto, setEditingProyecto] = useState(null);
+  const [proyectoToDelete, setProyectoToDelete] = useState(null);
+  const [toast, setToast] = useState({ open: false, msg: "", type: "success" });
 
-  const handleDeleteProyecto = async (proyecto) => {
+  const triggerToast = (msg, type = "success") => {
+    setToast({ open: true, msg, type });
+  };
+
+  useEffect(() => {
+    if (toast.open) {
+      const timer = setTimeout(() => {
+        setToast((t) => ({ ...t, open: false }));
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast.open]);
+
+  const handleDeleteProyecto = (proyecto) => {
     if (!proyecto?.id) return;
-    if (!confirm(`¿Estás seguro de eliminar el proyecto "${proyecto.nombre}"?`)) return;
+    setProyectoToDelete(proyecto);
+  };
 
+  const executeDeleteProyecto = async (proyecto) => {
     try {
       const token = session?.user?.accessToken || session?.accessToken || "";
       const empresaId = session?.user?.empresaId ?? session?.user?.empresa_id ?? session?.user?.empresa?.id ?? null;
@@ -79,6 +96,7 @@ export default function ProyectosPageClient({
       const res = await fetch(`${API}/proyectos/delete/${proyecto.id}`, {
         method: "DELETE",
         headers,
+        body: JSON.stringify({}), // ✅ Avoid empty body parser crash in Fastify
       });
 
       if (!res.ok) {
@@ -86,9 +104,10 @@ export default function ProyectosPageClient({
         throw new Error(data?.error || "Error al eliminar proyecto");
       }
 
+      triggerToast("Proyecto eliminado correctamente", "success");
       router.refresh();
     } catch (err) {
-      alert(err.message || "Error al eliminar el proyecto");
+      triggerToast(err.message || "Error al eliminar el proyecto", "error");
     }
   };
 
@@ -108,6 +127,7 @@ export default function ProyectosPageClient({
       const res = await fetch(`${API}/proyectos/${proyecto.id}/iniciar`, {
         method: "POST",
         headers,
+        body: JSON.stringify({}), // ✅ Avoid empty body parser crash in Fastify
       });
 
       if (!res.ok) {
@@ -115,9 +135,10 @@ export default function ProyectosPageClient({
         throw new Error(data?.error || "Error al iniciar proyecto");
       }
 
+      triggerToast("Proyecto iniciado correctamente", "success");
       router.refresh();
     } catch (err) {
-      alert(err.message || "Error al iniciar el proyecto");
+      triggerToast(err.message || "Error al iniciar el proyecto", "error");
     }
   };
 
@@ -137,6 +158,7 @@ export default function ProyectosPageClient({
       const res = await fetch(`${API}/proyectos/${proyecto.id}/finalizar`, {
         method: "POST",
         headers,
+        body: JSON.stringify({}), // ✅ Avoid empty body parser crash in Fastify
       });
 
       if (!res.ok) {
@@ -144,9 +166,10 @@ export default function ProyectosPageClient({
         throw new Error(data?.error || "Error al finalizar proyecto");
       }
 
+      triggerToast("Proyecto finalizado correctamente", "success");
       router.refresh();
     } catch (err) {
-      alert(err.message || "Error al finalizar el proyecto");
+      triggerToast(err.message || "Error al finalizar el proyecto", "error");
     }
   };
 
@@ -317,9 +340,77 @@ export default function ProyectosPageClient({
         onSaved={() => {
           setOpenModal(false);
           setTimeout(() => setEditingProyecto(null), 200);
+          triggerToast(
+            editingProyecto
+              ? "Proyecto actualizado correctamente"
+              : "Proyecto creado correctamente",
+            "success"
+          );
           router.refresh();
         }}
       />
+
+      {/* CONFIRM DELETE MODAL */}
+      {proyectoToDelete && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-md bg-white rounded-2xl border border-gray-100 shadow-2xl p-6 transition-all transform scale-100">
+            <div className="flex items-center gap-3 text-red-600 mb-4">
+              <div className="p-2 bg-red-50 rounded-full">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Eliminar Proyecto</h3>
+            </div>
+            
+            <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+              ¿Estás seguro de que deseas eliminar el proyecto <span className="font-semibold text-gray-800">"{proyectoToDelete.nombre}"</span>? Esta acción es irreversible y borrará toda la información relacionada.
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setProyectoToDelete(null)}
+                className="px-4 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium hover:cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const p = proyectoToDelete;
+                  setProyectoToDelete(null);
+                  executeDeleteProyecto(p);
+                }}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium shadow-md shadow-red-600/10 hover:cursor-pointer"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM TOAST NOTIFICATION SYSTEM */}
+      {toast.open && (
+        <div className="fixed bottom-5 right-5 z-[10001] flex items-center gap-3 bg-gray-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-gray-800 animate-slide-in min-w-[320px] max-w-md">
+          {toast.type === "success" ? (
+            <div className="p-1 bg-green-500/20 text-green-400 rounded-full">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+          ) : (
+            <div className="p-1 bg-red-500/20 text-red-400 rounded-full">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+          )}
+          <div className="flex-1 text-sm font-medium">{toast.msg}</div>
+          <button
+            onClick={() => setToast((t) => ({ ...t, open: false }))}
+            className="text-gray-400 hover:text-white transition-colors hover:cursor-pointer"
+            type="button"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
