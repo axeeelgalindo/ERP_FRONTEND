@@ -481,6 +481,26 @@ export default function ProyectoTareasEquipoSection({
     );
   };
 
+  const handleSwitchTab = (target) => {
+    setEpicaModalOpen(false);
+    setTareaModalOpen(false);
+    setSubModalOpen(false);
+
+    if (target === "epica") {
+      setEditingEpica(null);
+      setEpicaModalOpen(true);
+    } else if (target === "tarea") {
+      setEditingTarea(null);
+      setPresetEpicaId(null);
+      setTareaModalOpen(true);
+    } else if (target === "subtarea") {
+      const firstTask = (Array.isArray(tareas) ? tareas : []).find(t => t?.id) || null;
+      setSubTareaParent(firstTask);
+      setEditingSub(null);
+      setSubModalOpen(true);
+    }
+  };
+
   return (
     <>
       <div className="bg-surface-container-lowest rounded-xl shadow-md border-t-4 border-primary overflow-hidden border-x border-b border-outline-variant/10 mt-6">
@@ -552,6 +572,7 @@ export default function ProyectoTareasEquipoSection({
               await reloadEpicas(true);
               router.refresh();
             }}
+            onSwitchTab={handleSwitchTab}
           />
 
           <TareaFormModal
@@ -567,6 +588,7 @@ export default function ProyectoTareasEquipoSection({
               await reloadEpicas(true);
               router.refresh();
             }}
+            onSwitchTab={handleSwitchTab}
           />
 
           <SubtareaFormModal
@@ -577,6 +599,7 @@ export default function ProyectoTareasEquipoSection({
             miembros={miembros}
             subtarea={editingSub}
             onSaved={() => router.refresh()}
+            onSwitchTab={handleSwitchTab}
           />
 
           <EvidencePreviewModal
