@@ -65,6 +65,19 @@ export default function CotizacionPDFButton({ cotizacion }) {
     });
   };
 
+  const getImageDimensions = (dataUrl) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      };
+      img.onerror = () => {
+        resolve({ width: 0, height: 0 });
+      };
+      img.src = dataUrl;
+    });
+  };
+
   const fetchCotizacionCompleta = async (id) => {
     if (!id) return null;
 
@@ -112,7 +125,8 @@ export default function CotizacionPDFButton({ cotizacion }) {
       const tieneObjResponsable = !!(
         cot?.cliente_responsable || cot?.clienteResponsable
       );
-      if (!tieneObjResponsable && cot?.id) {
+      const tieneEmpresa = !!cot?.empresa;
+      if ((!tieneObjResponsable || !tieneEmpresa) && cot?.id) {
         const full = await fetchCotizacionCompleta(cot.id);
         if (full) cot = full;
       }
@@ -153,8 +167,72 @@ export default function CotizacionPDFButton({ cotizacion }) {
           : "";
 
       let logo = null;
+      // Puedes ajustar el tamaño máximo del logo cambiando estos valores (en milímetros):
+      const MAX_LOGO_W = 60; // Ancho máximo del logo
+      const MAX_LOGO_H = 23; // Alto máximo del logo
+
+      let logoW = MAX_LOGO_W;
+      let logoH = MAX_LOGO_H;
+      let logoY = 4.0;
+
       try {
-        logo = await loadImageDataURL("/Logo_blue.png");
+        const empId = cot?.empresa?.id || cot?.empresa_id || null;
+        const empNombre = cot?.empresa?.nombre || "";
+        const isBlue = String(empNombre).toLowerCase().includes("blue");
+
+        if (empId) {
+          const backendBase = API_URL ? API_URL.replace(/\/api$/, "") : "";
+          let dbLogoUrl = null;
+          if (cot?.empresa?.logo_url) {
+            const rawUrl = cot.empresa.logo_url;
+            if (rawUrl.startsWith("http")) {
+              dbLogoUrl = rawUrl;
+            } else {
+              let cleanPath = rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
+              if (cleanPath.startsWith("/uploads/") && !cleanPath.startsWith("/api/")) {
+                cleanPath = `/api${cleanPath}`;
+              }
+              dbLogoUrl = `${backendBase}${cleanPath}`;
+            }
+          }
+
+          const pathsToTry = [
+            dbLogoUrl,
+            `/logos/logo_${empId}.png`,
+            `/logos/${empId}.png`,
+            `/logo_${empId}.png`,
+            `/${empId}.png`,
+            ...(isBlue ? [`/Logo_blue.png`] : [])
+          ].filter(Boolean);
+          for (const p of pathsToTry) {
+            try {
+              logo = await loadImageDataURL(p);
+              if (logo) break;
+            } catch {
+              // try next path
+            }
+          }
+        } else {
+          logo = await loadImageDataURL("/Logo_blue.png");
+        }
+
+        if (logo) {
+          const dimensions = await getImageDimensions(logo);
+          if (dimensions.width > 0 && dimensions.height > 0) {
+            const ratio = dimensions.width / dimensions.height;
+            const maxRatio = MAX_LOGO_W / MAX_LOGO_H;
+            if (ratio > maxRatio) {
+              // Limita por el ancho
+              logoW = MAX_LOGO_W;
+              logoH = MAX_LOGO_W / ratio;
+            } else {
+              // Limita por el alto
+              logoH = MAX_LOGO_H;
+              logoW = MAX_LOGO_H * ratio;
+            }
+            logoY = 4.0 + (MAX_LOGO_H - logoH) / 2;
+          }
+        }
       } catch {
         logo = null;
       }
@@ -209,57 +287,111 @@ export default function CotizacionPDFButton({ cotizacion }) {
 
       const drawHeader = () => {
         drawWaveBand(0, HEADER_H, "down");
-        if (logo) doc.addImage(logo, "PNG", mx, 6.0, 44, 13.5);
+
+        const emp = cot?.empresa || {};
+        const empNombre = emp.nombre || "Empresa";
+        const empRut = emp.rut ? `RUT ${emp.rut}` : "";
+        const empCorreo = emp.correo || "";
+        const empTelefono = emp.telefono || "";
+
+        if (logo) {
+          doc.addImage(logo, "PNG", mx, logoY, logoW, logoH);
+        } else {
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(14);
+          doc.setTextColor(...C.blue);
+          doc.text(empNombre, mx, 14);
+        }
 
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8.2);
         doc.setTextColor(...C.muted);
-        doc.text(
-          "Tecnología que impulsa, soluciones que transforman",
-          mx,
-          22.0,
-        );
+        if (String(empNombre).toLowerCase().includes("blue")) {
+          doc.text(
+            "Tecnología que impulsa, soluciones que transforman",
+            mx,
+            22.0,
+          );
+        } else {
+          doc.text(
+            "",
+            mx,
+            22.0,
+          );
+        }
 
         const boxW = 72;
         const boxX = W - mx - boxW;
 
-        const direccionLines = [
-          "Punta Arenas",
-          "Capitán Juan Guillermo 02233",
-          "Puerto Montt",
-          "Av. San Agustín S/N, La Paloma PC #38",
-          "RUT 78115957-3",
-        ];
+        let direccionLines = [];
+        if (String(empNombre).toLowerCase().includes("blue")) {
+          direccionLines = [
+            "Punta Arenas",
+            "Capitán Juan Guillermo 02233",
+            "Puerto Montt",
+            "Av. San Agustín S/N, La Paloma PC #38",
+            empRut || "RUT 78115957-3",
+          ];
+        } else {
+          direccionLines = [
+            empNombre,
+            emp.direccion ? `${emp.direccion}` : "",
+            empTelefono ? `Tel: ${empTelefono}` : "",
+            empCorreo ? `Email: ${empCorreo}` : "",
+            empRut || "",
+          ].filter(Boolean);
+        }
 
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8.1);
 
         doc.setDrawColor(180, 210, 230);
         doc.setFillColor(...C.lightBlue);
-        doc.roundedRect(boxX, 4, boxW, HEADER_H - 8, 2.5, 2.5, "FD");
+        const boxH = HEADER_H - 8;
+        doc.roundedRect(boxX, 4, boxW, boxH, 2.5, 2.5, "FD");
 
         doc.setTextColor(...C.text);
-        let y = 9;
+        const N = direccionLines.length;
+        const lineSpacing = N > 4 ? 3.4 : 4.0;
+        const totalTextHeight = (N - 1) * lineSpacing;
+        const boxCenterY = 4 + boxH / 2;
+        let y = boxCenterY - totalTextHeight / 2 + 0.8;
+
         direccionLines.forEach((t) => {
-          doc.text(String(t), boxX + boxW - 4, y, { align: "right" });
-          y += 3.4;
+          doc.text(String(t), boxX + boxW / 2, y, { align: "center" });
+          y += lineSpacing;
         });
       };
 
       const drawFooter = (page, pages) => {
         drawWaveBand(H - FOOTER_H, FOOTER_H, "up");
 
+        const emp = cot?.empresa || {};
+        const empCorreo = emp.correo || "contacto@empresa.com";
+        let empWeb = "";
+        if (empCorreo.includes("@")) {
+          const domain = empCorreo.split("@")[1];
+          if (!["gmail.com", "hotmail.com", "outlook.com", "yahoo.com"].includes(domain.toLowerCase())) {
+            empWeb = `www.${domain}`;
+          }
+        }
+        if (!empWeb && String(emp.nombre || "").toLowerCase().includes("blue")) {
+          empWeb = "blue-ingenieria.com";
+        }
+
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8.2);
         doc.setTextColor(...C.text);
-        doc.text("administracion@blueinge.com", W / 2, H - 9.3, {
+        doc.text(empCorreo, W / 2, H - 9.3, {
           align: "center",
         });
 
-        doc.setTextColor(...C.blue);
-        doc.text("https://blue-ingenieria.com/", W / 2, H - 5.8, {
-          align: "center",
-        });
+        if (empWeb) {
+          doc.setTextColor(...C.blue);
+          doc.text(empWeb, W / 2, H - 5.8, {
+            align: "center",
+          });
+        }
 
         doc.setTextColor(...C.muted);
         doc.setFontSize(7.2);

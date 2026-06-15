@@ -35,6 +35,26 @@ export default function EmpresaFormModal({
     rol_id: "",
   });
 
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setLogoFile(null);
+      const currentLogo = currentEmpresa?.logo_url || "";
+      if (currentLogo) {
+        if (currentLogo.startsWith("http")) {
+          setLogoPreview(currentLogo);
+        } else {
+          const backendBase = API_URL ? API_URL.replace(/\/api$/, "") : "";
+          setLogoPreview(`${backendBase}${currentLogo}`);
+        }
+      } else {
+        setLogoPreview("");
+      }
+    }
+  }, [open, currentEmpresa]);
+
   // Cargar roles si el modal está abierto y se va a crear un usuario base
   useEffect(() => {
     if (open && session && roles.length === 0) {
@@ -84,7 +104,7 @@ export default function EmpresaFormModal({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave(createBaseUser ? baseUser : null);
+    onSave(createBaseUser ? baseUser : null, logoFile);
   };
 
   return (
@@ -129,6 +149,56 @@ export default function EmpresaFormModal({
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                 placeholder="Ej. Mi Empresa SPA"
               />
+            </div>
+
+            {/* Logo de la Empresa */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">
+                Logo de la Empresa
+              </label>
+              <div className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+                {logoPreview ? (
+                  <div className="relative h-16 w-16 rounded-xl border border-slate-200 bg-white overflow-hidden flex items-center justify-center flex-shrink-0">
+                    <img src={logoPreview} alt="Logo" className="max-h-full max-w-full object-contain" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLogoFile(null);
+                        setLogoPreview("");
+                        onChangeCurrentEmpresa({ ...currentEmpresa, logo_url: "" });
+                      }}
+                      className="absolute top-0 right-0 bg-red-500 text-white rounded-bl p-0.5 hover:bg-red-600 transition-colors flex items-center justify-center"
+                      title="Eliminar logo"
+                    >
+                      <span className="material-symbols-outlined text-[12px] block font-bold">close</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="h-16 w-16 rounded-xl border border-dashed border-slate-300 bg-white flex items-center justify-center flex-shrink-0 text-slate-400">
+                    <span className="material-symbols-outlined text-2xl">image</span>
+                  </div>
+                )}
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setLogoFile(file);
+                        setLogoPreview(URL.createObjectURL(file));
+                      }
+                    }}
+                    className="block w-full text-xs text-slate-500
+                      file:mr-4 file:py-1.5 file:px-3
+                      file:rounded-xl file:border-0
+                      file:text-xs file:font-semibold
+                      file:bg-blue-50 file:text-blue-700
+                      hover:file:bg-blue-100 cursor-pointer"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">PNG, JPG, WEBP de hasta 2MB</p>
+                </div>
+              </div>
             </div>
 
             {/* RUT y Teléfono */}
@@ -177,6 +247,22 @@ export default function EmpresaFormModal({
                 }
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                 placeholder="contacto@empresa.com"
+              />
+            </div>
+
+            {/* Dirección */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">
+                Dirección
+              </label>
+              <input
+                type="text"
+                value={currentEmpresa?.direccion || ""}
+                onChange={(e) =>
+                  onChangeCurrentEmpresa({ ...currentEmpresa, direccion: e.target.value })
+                }
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                placeholder="Ej. Av. Nueva Providencia 1881, Oficina 501"
               />
             </div>
 

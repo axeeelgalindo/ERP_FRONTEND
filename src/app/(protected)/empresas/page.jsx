@@ -94,6 +94,7 @@ export default function EmpresasPage() {
       rut: "",
       correo: "",
       telefono: "",
+      direccion: "",
     });
     setOpenEmpresaModal(true);
   };
@@ -106,6 +107,8 @@ export default function EmpresasPage() {
       rut: emp.rut || "",
       correo: emp.correo || "",
       telefono: emp.telefono || "",
+      logo_url: emp.logo_url || "",
+      direccion: emp.direccion || "",
     });
     setOpenEmpresaModal(true);
   };
@@ -116,7 +119,7 @@ export default function EmpresasPage() {
   };
 
   // Guardar Empresa (y opcionalmente su usuario base)
-  const handleSaveEmpresa = async (baseUserData) => {
+  const handleSaveEmpresa = async (baseUserData, logoFile) => {
     try {
       if (!session) return;
       setErr("");
@@ -135,11 +138,33 @@ export default function EmpresasPage() {
         if (!res.ok) throw new Error(json?.message || json?.error || "No se pudo crear la empresa");
         createdEmpresa = json;
 
-        // 2. Si se solicitó crear usuario base, crearlo usando la empresa recién creada
-        if (baseUserData && createdEmpresa?.id) {
+        const empresaId = createdEmpresa?.id;
+
+        // 2. Subir logo si viene
+        if (logoFile && empresaId) {
+          const formData = new FormData();
+          formData.append("file", logoFile);
+
+          const uploadHeaders = { ...makeHeaders(session) };
+          delete uploadHeaders["Content-Type"];
+
+          const logoRes = await fetch(`${API_URL}/empresa/logo/${empresaId}`, {
+            method: "POST",
+            headers: uploadHeaders,
+            body: formData,
+          });
+          const logoJson = await safeJson(logoRes);
+          if (!logoRes.ok) {
+            console.error("Error al subir logo:", logoJson);
+            alert(`Empresa creada, pero falló la subida del logo: ${logoJson?.message || logoJson?.error || "Error desconocido"}`);
+          }
+        }
+
+        // 3. Si se solicitó crear usuario base, crearlo usando la empresa recién creada
+        if (baseUserData && empresaId) {
           const userPayload = {
             ...baseUserData,
-            empresa_id: createdEmpresa.id,
+            empresa_id: empresaId,
           };
 
           const userRes = await fetch(`${API_URL}/usuarios/add`, {
@@ -157,13 +182,41 @@ export default function EmpresasPage() {
       } else {
         // Editar Empresa
         if (!currentEmpresa.id) throw new Error("Falta el ID de la empresa");
+
+        // Si borró el logo
+        const payload = {
+          ...currentEmpresa,
+          logo_url: currentEmpresa.logo_url === "" ? null : undefined,
+          logo_public_id: currentEmpresa.logo_url === "" ? null : undefined,
+        };
+
         const res = await fetch(`${API_URL}/empresa/update/${currentEmpresa.id}`, {
           method: "PATCH",
           headers: makeHeaders(session),
-          body: JSON.stringify(currentEmpresa),
+          body: JSON.stringify(payload),
         });
         const json = await safeJson(res);
         if (!res.ok) throw new Error(json?.message || json?.error || "No se pudo actualizar la empresa");
+
+        // Subir logo si viene nuevo
+        if (logoFile) {
+          const formData = new FormData();
+          formData.append("file", logoFile);
+
+          const uploadHeaders = { ...makeHeaders(session) };
+          delete uploadHeaders["Content-Type"];
+
+          const logoRes = await fetch(`${API_URL}/empresa/logo/${currentEmpresa.id}`, {
+            method: "POST",
+            headers: uploadHeaders,
+            body: formData,
+          });
+          const logoJson = await safeJson(logoRes);
+          if (!logoRes.ok) {
+            console.error("Error al subir logo:", logoJson);
+            alert(`Empresa actualizada, pero falló la subida del logo: ${logoJson?.message || logoJson?.error || "Error desconocido"}`);
+          }
+        }
       }
 
       closeEmpresaModal();
@@ -373,12 +426,34 @@ export default function EmpresasPage() {
                 const isActive = !emp.eliminado && emp.activa;
                 const activeUsers = Array.isArray(emp.usuarios) ? emp.usuarios : [];
 
+                const backendBase = API_URL ? API_URL.replace(/\/api$/, "") : "";
+                let tableLogoUrl = null;
+                if (emp.logo_url) {
+                  if (emp.logo_url.startsWith("http")) {
+                    tableLogoUrl = emp.logo_url;
+                  } else {
+                    let cleanPath = emp.logo_url.startsWith("/") ? emp.logo_url : `/${emp.logo_url}`;
+                    if (cleanPath.startsWith("/uploads/") && !cleanPath.startsWith("/api/")) {
+                      cleanPath = `/api${cleanPath}`;
+                    }
+                    tableLogoUrl = `${backendBase}${cleanPath}`;
+                  }
+                }
+
                 return (
                   <tr key={emp.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 text-slate-600 font-bold shadow-sm border border-slate-200/50">
-                          {emp.nombre?.[0]?.toUpperCase() || "?"}
+                        <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 text-slate-600 font-bold shadow-sm border border-slate-200/50 overflow-hidden">
+                          {tableLogoUrl ? (
+                            <img
+                              src={tableLogoUrl}
+                              alt={emp.nombre}
+                              className="h-full w-full object-contain p-1"
+                            />
+                          ) : (
+                            emp.nombre?.[0]?.toUpperCase() || "?"
+                          )}
                         </div>
                         <div>
                           <div className={`font-bold ${isActive ? 'text-slate-900' : 'text-slate-500 line-through decoration-slate-300'}`}>
