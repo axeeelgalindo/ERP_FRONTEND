@@ -10,6 +10,7 @@ import ImportRcvPanel from "@/components/compras/ImportRcvPanel";
 import ComprasTable from "@/components/compras/ComprasTable";
 import ComprasPagination from "@/components/compras/ComprasPagination";
 import CompraManualModal from "@/components/compras/CompraManualModal";
+import CompraProvOllamaModal from "@/components/compras/CompraProvOllamaModal";
 import QuickProveedorModal from "@/components/compras/QuickProveedorModal";
 import VincularCosteoModal from "@/components/compras/VincularCosteoModal";
 
@@ -168,6 +169,7 @@ export default function ComprasPage() {
 
   // ===== Crear manual (modal) =====
   const [openCreate, setOpenCreate] = useState(false);
+  const [openOllama, setOpenOllama] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createErr, setCreateErr] = useState("");
 
@@ -860,6 +862,21 @@ export default function ComprasPage() {
             >
               ＋ Crear manual
             </button>
+
+            <button
+              className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-lg transition-all font-bold shadow-lg shadow-indigo-900/10"
+              onClick={() => {
+                setCreateErr("");
+                if (proveedores.length === 0 || proyectos.length === 0) {
+                  loadLookups();
+                }
+                setOpenOllama(true);
+              }}
+              type="button"
+            >
+              <span className="material-symbols-outlined text-lg">psychology</span>
+              Crear desde cotización
+            </button>
           </div>
         </div>
 
@@ -876,7 +893,7 @@ export default function ComprasPage() {
           importing={importing}
           importErr={importErr}
           importResult={importResult}
-          onPickFile={() => {}}
+          onPickFile={() => { }}
           onImportFile={handleImportCSV}
           onClear={() => {
             setImportErr("");
@@ -933,7 +950,7 @@ export default function ComprasPage() {
             }}
             uploadingId={uploadingId}
             onOpenVincular={openVincularModal}
-            onOpenRendicion={() => {}} // Dis habilitar vinculación desde aquí
+            onOpenRendicion={() => { }} // Dis habilitar vinculación desde aquí
             onUploadPdfClick={(c) => openFilePicker(c.id)}
             onTogglePaid={toggleCompraPago}
             fmtDateDMY={fmtDateDMY}
@@ -971,31 +988,50 @@ export default function ComprasPage() {
       {/* MODAL CREAR MANUAL */}
       <CompraManualModal
         open={openCreate}
-        creating={creating}
-        createErr={createErr}
         onClose={() => setOpenCreate(false)}
-        onSubmit={createCompraManual}
+        onSuccess={async (created) => {
+          setPage(1);
+          await loadCompras({ page: 1, pageSize });
+        }}
+        API={API}
+        session={
+          session
+            ? {
+                token: pickToken(session),
+                empresaId: pickEmpresaId(session),
+              }
+            : null
+        }
         proveedores={proveedores}
         proyectos={proyectos}
         lookupsLoading={lookupsLoading}
-        c_proveedorId={c_proveedorId}
-        setC_proveedorId={setC_proveedorId}
-        c_destino={c_destino}
-        setC_destino={setC_destino}
-        c_centro={c_centro}
-        setC_centro={setC_centro}
-        c_proyectoId={c_proyectoId}
-        setC_proyectoId={setC_proyectoId}
-        c_tipoDoc={c_tipoDoc}
-        setC_tipoDoc={setC_tipoDoc}
-        c_folio={c_folio}
-        setC_folio={setC_folio}
-        c_estado={c_estado}
-        setC_estado={setC_estado}
-        c_fechaDocto={c_fechaDocto}
-        setC_fechaDocto={setC_fechaDocto}
-        c_total={c_total}
-        setC_total={setC_total}
+        onAddProveedorClick={() => {
+          setQuickProvErr("");
+          setOpenQuickProv(true);
+        }}
+      />
+
+
+      {/* MODAL CREAR DESDE COTIZACIÓN PROVEEDOR (OLLAMA AI) */}
+      <CompraProvOllamaModal
+        open={openOllama}
+        onClose={() => setOpenOllama(false)}
+        onSuccess={async (created) => {
+          setPage(1);
+          await loadCompras({ page: 1, pageSize });
+        }}
+        API={API}
+        session={
+          session
+            ? {
+                token: pickToken(session),
+                empresaId: pickEmpresaId(session),
+              }
+            : null
+        }
+        proveedores={proveedores}
+        proyectos={proyectos}
+        lookupsLoading={lookupsLoading}
         onAddProveedorClick={() => {
           setQuickProvErr("");
           setOpenQuickProv(true);
@@ -1054,11 +1090,11 @@ export default function ComprasPage() {
                 Confirmar Cambio de Estado
               </h3>
             </div>
-            
+
             <p className="text-slate-600 text-sm leading-relaxed">
               La compra de <strong>{compraToToggle.proveedor?.nombre || "Proveedor"}</strong> por un monto de <strong>{toCLP(compraToToggle.total)}</strong> se encuentra registrada actualmente como <span className="font-bold">{compraToToggle.estado}</span>.
             </p>
-            
+
             <p className="text-slate-600 text-sm leading-relaxed">
               ¿Estás seguro de que deseas marcarla como <span className={`font-bold ${compraToToggle.estado === "PAGADA" ? "text-amber-600" : "text-emerald-600"}`}>{compraToToggle.estado === "PAGADA" ? "FACTURADA (No pagada)" : "PAGADA"}</span>?
             </p>
@@ -1072,11 +1108,10 @@ export default function ComprasPage() {
                 Cancelar
               </button>
               <button
-                className={`px-6 py-2.5 rounded-lg text-white font-bold transition-all text-sm flex items-center gap-2 ${
-                  compraToToggle.estado === "PAGADA"
+                className={`px-6 py-2.5 rounded-lg text-white font-bold transition-all text-sm flex items-center gap-2 ${compraToToggle.estado === "PAGADA"
                     ? "bg-amber-600 hover:bg-amber-700 shadow-lg shadow-amber-900/10"
                     : "bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-900/10"
-                }`}
+                  }`}
                 type="button"
                 onClick={confirmToggleCompraPago}
               >
@@ -1090,13 +1125,12 @@ export default function ComprasPage() {
       {/* ===== DYNAMIC CUSTOM TOAST SYSTEM ===== */}
       {toast.open && (
         <div className="fixed bottom-6 right-6 z-[99999] animate-slide-in">
-          <div className={`flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl border ${
-            toast.type === "success"
+          <div className={`flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl border ${toast.type === "success"
               ? "bg-emerald-50 border-emerald-200 text-emerald-800"
               : toast.type === "error"
-              ? "bg-red-50 border-red-200 text-red-800"
-              : "bg-blue-50 border-blue-200 text-blue-800"
-          }`}>
+                ? "bg-red-50 border-red-200 text-red-800"
+                : "bg-blue-50 border-blue-200 text-blue-800"
+            }`}>
             <span className="material-symbols-outlined text-xl">
               {toast.type === "success" ? "check_circle" : toast.type === "error" ? "error" : "info"}
             </span>

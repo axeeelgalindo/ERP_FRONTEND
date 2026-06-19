@@ -19,11 +19,11 @@ function pickEmpresaId(session) {
   return session?.user?.empresaId ?? session?.user?.empresa?.id ?? null;
 }
 
-function makeHeaders(session) {
+function makeHeaders(session, { skipContentType = false } = {}) {
   const token = session?.accessToken || session?.user?.accessToken || "";
   const empresaId = pickEmpresaId(session);
   return {
-    "Content-Type": "application/json",
+    ...(skipContentType ? {} : { "Content-Type": "application/json" }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(empresaId ? { "x-empresa-id": String(empresaId) } : {}),
   };
@@ -60,6 +60,13 @@ export default function RendicionesPage() {
   const [openDrawer, setOpenDrawer] = useState(false);
   const [openCreate, setOpenCreate] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [rendicionToEdit, setRendicionToEdit] = useState(null);
+  const [toast, setToast] = useState({ open: false, msg: "", type: "success" });
+  const [rendicionToDelete, setRendicionToDelete] = useState(null);
+
+  const triggerToast = (msg, type = "success") => {
+    setToast({ open: true, msg, type });
+  };
 
   async function loadData() {
     if (status === "loading") return;
@@ -99,6 +106,13 @@ export default function RendicionesPage() {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, status, page]);
+
+  useEffect(() => {
+    if (toast.open) {
+      const t = setTimeout(() => setToast(prev => ({ ...prev, open: false })), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [toast.open]);
 
   // ── Client-side filtering ──────────────────────────────────────
   const filtered = useMemo(() => {
@@ -184,6 +198,36 @@ export default function RendicionesPage() {
     }
   }
 
+  function handleDeleteRendicion(r) {
+    setRendicionToDelete(r);
+  }
+
+  async function confirmDeleteRendicion() {
+    if (!rendicionToDelete || !session) return;
+    const id = rendicionToDelete.id;
+    const displayId = `RD-${String(id).slice(-6).toUpperCase()}`;
+    setUpdating(true);
+    setRendicionToDelete(null);
+    try {
+      const res = await fetch(`${API}/rendiciones/${id}`, {
+        method: "DELETE",
+        headers: makeHeaders(session, { skipContentType: true }),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        throw new Error(payload?.error || "Error al eliminar la rendición");
+      }
+      triggerToast(`La rendición ${displayId} fue eliminada correctamente.`, "success");
+      await loadData();
+      setOpenDrawer(false);
+      setSelectedRendicion(null);
+    } catch (e) {
+      triggerToast(e.message, "error");
+    } finally {
+      setUpdating(false);
+    }
+  }
+
   function handleVerRendicion(r) {
     setSelectedRendicion(r);
     setOpenDrawer(true);
@@ -208,7 +252,7 @@ export default function RendicionesPage() {
             <p className="text-slate-400 text-sm mt-1">Gestión inteligente de gastos y reembolsos.</p>
           </div>
           <button
-            onClick={() => setOpenCreate(true)}
+            onClick={() => { setRendicionToEdit(null); setOpenCreate(true); }}
             className="flex items-center gap-2 px-5 py-2.5 bg-white text-slate-900 rounded-xl font-bold text-sm shadow-lg hover:bg-slate-100 transition-all active:scale-95"
           >
             <span className="material-symbols-outlined text-base">add</span>
@@ -377,15 +421,100 @@ export default function RendicionesPage() {
         onRefresh={loadData}
         loading={updating}
         session={session}
+        onEdit={(r) => {
+          setRendicionToEdit(r);
+          setOpenCreate(true);
+          setOpenDrawer(false);
+        }}
+        onDelete={handleDeleteRendicion}
       />
 
       <IndependentRendicionModal
         open={openCreate}
-        onClose={() => setOpenCreate(false)}
+        onClose={() => { setOpenCreate(false); setRendicionToEdit(null); }}
         session={session}
         apiBase={API}
         onSaved={loadData}
+        rendicionToEdit={rendicionToEdit}
       />
+
+      {/* ===== MODAL CONFIRMACION DE ELIMINACION ===== */}
+      {rendicionToDelete && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-100 p-6 flex flex-col gap-4 animate-scale-up">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-red-500 bg-red-50 p-2.5 rounded-xl text-2xl">
+                delete_forever
+              </span>
+              <h3 className="text-xl font-bold text-slate-900">
+                Eliminar Rendición
+              </h3>
+            </div>
+            
+            <p className="text-slate-600 text-sm leading-relaxed">
+              ¿Estás seguro de que deseas eliminar la rendición <strong>RD-{String(rendicionToDelete.id).slice(-6).toUpperCase()}</strong>?
+            </p>
+
+            {rendicionToDelete.descripcion && (
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Descripción</p>
+                <p className="text-xs text-slate-700 font-medium italic">"{rendicionToDelete.descripcion}"</p>
+              </div>
+            )}
+
+            <div className="bg-red-50/50 p-3 rounded-lg border border-red-100 text-xs text-red-700 font-medium">
+              Esta acción es permanente y eliminará todos los registros de gastos, boletas y anticipos asociados a esta rendición.
+            </div>
+
+            <div className="flex items-center justify-end gap-3 mt-2 border-t border-slate-100 pt-4">
+              <button
+                className="px-5 py-2.5 rounded-lg text-slate-600 hover:bg-slate-100 font-semibold transition-colors text-sm"
+                type="button"
+                onClick={() => setRendicionToDelete(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-all text-sm flex items-center gap-2 shadow-lg shadow-red-900/10"
+                type="button"
+                onClick={confirmDeleteRendicion}
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== DYNAMIC CUSTOM TOAST SYSTEM ===== */}
+      {toast.open && (
+        <div className="fixed bottom-6 right-6 z-[99999] animate-slide-in">
+          <div className={`flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl border ${
+            toast.type === "success"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+              : toast.type === "error"
+              ? "bg-red-50 border-red-200 text-red-800"
+              : "bg-blue-50 border-blue-200 text-blue-800"
+          }`}>
+            <span className="material-symbols-outlined text-xl">
+              {toast.type === "success" ? "check_circle" : toast.type === "error" ? "error" : "info"}
+            </span>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-bold tracking-tight">
+                {toast.type === "success" ? "Acción Completada" : toast.type === "error" ? "Error" : "Notificación"}
+              </span>
+              <p className="text-xs font-medium opacity-90">{toast.msg}</p>
+            </div>
+            <button
+              onClick={() => setToast((t) => ({ ...t, open: false }))}
+              className="ml-4 p-0.5 hover:bg-black/5 rounded text-slate-500 hover:text-slate-800 transition-colors"
+              type="button"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

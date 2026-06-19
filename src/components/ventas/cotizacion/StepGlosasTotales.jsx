@@ -270,8 +270,8 @@ export default function StepGlosasTotales({
                     g.manual
                       ? formatCLPNumberOnly(g.precio_unitario)
                       : formatCLPNumberOnly(
-                          round0((g.monto || 0) / (Number(g.cantidad) || 1))
-                        )
+                        round0((g.monto || 0) / (Number(g.cantidad) || 1))
+                      )
                   }
                   onChange={handlePrecioUnitarioChange(idx)}
                   fullWidth
@@ -331,8 +331,8 @@ export default function StepGlosasTotales({
                     hasGeneralDiscount
                       ? "Bloqueado"
                       : descPct > 0
-                      ? "Sí"
-                      : "No"
+                        ? "Sí"
+                        : "No"
                   }
                 />
               </Box>
@@ -351,9 +351,9 @@ export default function StepGlosasTotales({
                 </Typography>
 
                 <Typography sx={{ fontSize: 13, fontWeight: 900, mt: 0.8 }}>
-                  Bruto: {formatCLP(bruto)}
+                  Subtotal: {formatCLP(bruto)}
                 </Typography>
-                
+
                 <Typography sx={{ fontSize: 13, fontWeight: 900, mt: 0.4 }}>
                   Neto: {formatCLP(neto)}{" "}
                   {descMonto > 0 && (
@@ -364,7 +364,7 @@ export default function StepGlosasTotales({
                 </Typography>
 
                 <Typography sx={{ fontSize: 11, color: "text.secondary", mt: 0.5 }}>
-                  Neto = Bruto - Desc
+                  Neto = Subtotal - Descuentos
                 </Typography>
               </Box>
 
@@ -388,7 +388,7 @@ export default function StepGlosasTotales({
         <Alert severity="warning">{glosaErr}</Alert>
       ) : okCuadra ? (
         <Alert icon={<VerifiedIcon />} severity="success">
-          Las glosas coinciden exactamente con el subtotal <b>BRUTO</b> de las ventas seleccionadas.
+          Las glosas coinciden exactamente con el subtotal de las ventas seleccionadas.
         </Alert>
       ) : null}
     </Box>

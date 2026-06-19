@@ -39,6 +39,7 @@ export default function IndependentRendicionModal({
   session,
   apiBase,
   onSaved,
+  rendicionToEdit,
 }) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -63,6 +64,14 @@ export default function IndependentRendicionModal({
   const [filterQ, setFilterQ] = useState("");
   const [filterE, setFilterE] = useState("");
 
+  const getFullUrl = (url) => {
+    if (!url) return "";
+    if (url.startsWith("http")) return url;
+    const base = apiBase?.endsWith("/") ? apiBase.slice(0, -1) : apiBase;
+    const path = url.startsWith("/") ? url : `/${url}`;
+    return `${base}${path}`;
+  };
+
   const filteredProyectos = useMemo(() => {
     if (!filterQ) return proyectos;
     const low = filterQ.toLowerCase();
@@ -85,11 +94,50 @@ export default function IndependentRendicionModal({
   useEffect(() => {
     if (open) {
       loadInitialData();
-      const u = session?.user || session || {};
-      const eId = u?.empleadoId ?? u?.empleado_id ?? u?.empleado?.id ?? "";
-      if (eId) setEmpleadoId(String(eId));
+      if (rendicionToEdit) {
+        setStep(1);
+        setDestino(rendicionToEdit.destino || "PROYECTO");
+        setCentroCosto(rendicionToEdit.centro_costo || "");
+        setProyectoId(rendicionToEdit.proyecto_id || "");
+        setEmpleadoId(rendicionToEdit.empleado_id || "");
+        setDescripcion(rendicionToEdit.descripcion || "");
+        setMontoEntregado(rendicionToEdit.monto_entregado || "");
+        setDocEntregaFile(null);
+        setDocEntregaName(rendicionToEdit.doc_entrega_url ? "Comprobante cargado" : "");
+        if (rendicionToEdit.items && rendicionToEdit.items.length > 0) {
+          setItems(rendicionToEdit.items.map(it => ({
+            id: it.id,
+            fecha: it.fecha ? it.fecha.slice(0, 10) : "",
+            descripcion: it.descripcion || "",
+            monto: it.monto || "",
+            categoria: it.categoria || "",
+            comprobante_url: it.comprobante_url || null,
+            comprobante_file: null,
+            comprobante_name: it.comprobante_url ? "Comprobante cargado" : ""
+          })));
+        } else {
+          setItems([
+            { fecha: "", descripcion: "", monto: "", categoria: "", comprobante_file: null, comprobante_name: "" }
+          ]);
+        }
+      } else {
+        setStep(1);
+        setDestino("PROYECTO");
+        setCentroCosto("");
+        setProyectoId("");
+        const u = session?.user || session || {};
+        const eId = u?.empleadoId ?? u?.empleado_id ?? u?.empleado?.id ?? "";
+        setEmpleadoId(eId ? String(eId) : "");
+        setDescripcion("");
+        setMontoEntregado("");
+        setDocEntregaFile(null);
+        setDocEntregaName("");
+        setItems([
+          { fecha: "", descripcion: "", monto: "", categoria: "", comprobante_file: null, comprobante_name: "" }
+        ]);
+      }
     }
-  }, [open]);
+  }, [open, rendicionToEdit]);
 
   async function loadInitialData() {
     if (!session) return;
@@ -149,15 +197,22 @@ export default function IndependentRendicionModal({
           fecha: it.fecha ? new Date(it.fecha).toISOString() : new Date().toISOString(),
           descripcion: it.descripcion,
           monto: Number(it.monto || 0),
-          categoria: it.categoria || null
+          categoria: it.categoria || null,
+          comprobante_url: it.comprobante_url || null
         }))
       };
 
       const token = session?.accessToken || session?.user?.accessToken || "";
       const empresaId = session?.user?.empresaId ?? session?.user?.empresa?.id ?? session?.empresaId ?? null;
 
-      const res = await fetch(`${apiBase}/rendiciones`, {
-        method: "POST",
+      const url = rendicionToEdit 
+        ? `${apiBase}/rendiciones/${rendicionToEdit.id}`
+        : `${apiBase}/rendiciones`;
+        
+      const method = rendicionToEdit ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -167,9 +222,10 @@ export default function IndependentRendicionModal({
       });
 
       const payload = await jsonOrNull(res);
-      if (!res.ok) throw new Error(payload?.error || "Error al crear");
+      if (!res.ok) throw new Error(payload?.error || `Error al ${rendicionToEdit ? 'actualizar' : 'crear'}`);
 
-      const rendId = payload.id;
+      const rendId = rendicionToEdit ? payload.row?.id : payload.id;
+      const createdItems = rendicionToEdit ? (payload.row?.items || []) : (payload.items || []);
 
       // 2) Subir comprobante de anticipo si existe
       if (docEntregaFile) {
@@ -187,7 +243,6 @@ export default function IndependentRendicionModal({
 
       // 3) Subir comprobantes por ítem
       // El payload.items viene con los IDs creados. Macheamos por orden.
-      const createdItems = payload.items || [];
       for (let i = 0; i < validItems.length; i++) {
         const file = validItems[i].comprobante_file;
         if (file && createdItems[i]) {
@@ -222,7 +277,7 @@ export default function IndependentRendicionModal({
         {/* Header section */}
         <div className="px-8 py-6 border-b border-surface-container flex items-center justify-between bg-surface-container-low/50">
           <div>
-            <h2 className="text-xl font-bold text-on-surface tracking-tight">Nueva Rendición</h2>
+            <h2 className="text-xl font-bold text-on-surface tracking-tight">{rendicionToEdit ? "Editar Rendición" : "Nueva Rendición"}</h2>
             <p className="text-sm text-on-surface-variant font-medium">
               {step === 1 ? "Paso 1: Identificación y Clasificación" : "Paso 2: Detalle de Gastos"}
             </p>
@@ -417,11 +472,22 @@ export default function IndependentRendicionModal({
                         }}
                       />
                     </label>
-                    <span className="text-xs text-on-surface-variant truncate font-medium">
+                    <span className="text-xs text-on-surface-variant truncate font-medium flex-1">
                       {docEntregaName || "Ningún archivo seleccionado"}
                     </span>
-                    {docEntregaFile && (
-                      <button onClick={() => { setDocEntregaFile(null); setDocEntregaName(""); }} className="text-error">
+                    {!docEntregaFile && rendicionToEdit?.doc_entrega_url && (
+                      <a
+                        href={getFullUrl(rendicionToEdit.doc_entrega_url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-1.5 hover:bg-white rounded-lg text-primary transition-colors cursor-pointer"
+                        title="Ver comprobante actual"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">visibility</span>
+                      </a>
+                    )}
+                    {(docEntregaFile || rendicionToEdit?.doc_entrega_url) && (
+                      <button onClick={() => { setDocEntregaFile(null); setDocEntregaName(rendicionToEdit?.doc_entrega_url ? "Comprobante cargado" : ""); }} className="text-error">
                         <span className="material-symbols-outlined text-lg">close</span>
                       </button>
                     )}
@@ -477,7 +543,7 @@ export default function IndependentRendicionModal({
                         <div className="md:col-span-4 flex items-center gap-4 mt-2 p-3 bg-surface-container-lowest/50 rounded-xl border border-outline-variant/5">
                           <label className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-outline-variant/30 text-[10px] font-bold cursor-pointer hover:bg-white transition-all shadow-sm">
                             <span className="material-symbols-outlined text-[16px]">attach_file</span>
-                            {it.comprobante_file ? "CAMBIAR BOLETA" : "ADJUNTAR BOLETA"}
+                            {it.comprobante_file ? "CAMBIAR BOLETA" : it.comprobante_url ? "CAMBIAR BOLETA" : "ADJUNTAR BOLETA"}
                             <input
                               type="file"
                               className="hidden"
@@ -493,8 +559,26 @@ export default function IndependentRendicionModal({
                           <span className="text-[10px] text-on-surface-variant truncate font-medium flex-1">
                             {it.comprobante_name || "Sin comprobante adjunto"}
                           </span>
-                          {it.comprobante_file && (
-                            <button onClick={() => { updateItem(idx, "comprobante_file", null); updateItem(idx, "comprobante_name", ""); }} className="text-error/70 hover:text-error transition-colors">
+                          {it.comprobante_url && !it.comprobante_file && (
+                            <a
+                              href={getFullUrl(it.comprobante_url)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-1.5 hover:bg-white rounded-lg text-primary transition-colors cursor-pointer"
+                              title="Ver comprobante"
+                            >
+                              <span className="material-symbols-outlined text-[20px]">visibility</span>
+                            </a>
+                          )}
+                          {(it.comprobante_file || it.comprobante_url) && (
+                            <button 
+                              onClick={() => { 
+                                updateItem(idx, "comprobante_file", null); 
+                                updateItem(idx, "comprobante_name", ""); 
+                                updateItem(idx, "comprobante_url", null); 
+                              }} 
+                              className="text-error/70 hover:text-error transition-colors"
+                            >
                               <span className="material-symbols-outlined text-[18px]">close</span>
                             </button>
                           )}
@@ -529,7 +613,7 @@ export default function IndependentRendicionModal({
           >
             {loading ? "Procesando..." : (
               <>
-                {step === 1 ? "Siguiente Paso" : "Finalizar Rendición"}
+                {step === 1 ? "Siguiente Paso" : (rendicionToEdit ? "Guardar Cambios" : "Finalizar Rendición")}
                 <span className="material-symbols-outlined text-lg">{step === 1 ? "arrow_forward" : "check_circle"}</span>
               </>
             )}

@@ -31,6 +31,8 @@ export default function RendicionDetailDrawer({
   onRefresh,
   loading,
   session,
+  onEdit,
+  onDelete,
 }) {
   const [editPaid, setEditPaid] = useState(false);
   const [newPaidAmount, setNewPaidAmount] = useState("");
@@ -302,12 +304,28 @@ export default function RendicionDetailDrawer({
               {rendicion.proyecto?.nombre || rendicion.centro_costo || rendicion.destino || "Sin Destino"}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-surface-container-low transition-colors outline-none"
-          >
-            <span className="material-symbols-outlined text-on-surface-variant">close</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onDelete(rendicion)}
+              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-error/10 hover:text-error transition-colors outline-none text-error/60"
+              title="Eliminar Rendición"
+            >
+              <span className="material-symbols-outlined text-[20px]">delete</span>
+            </button>
+            <button
+              onClick={() => onEdit(rendicion)}
+              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-surface-container-low transition-colors outline-none text-primary"
+              title="Editar Rendición"
+            >
+              <span className="material-symbols-outlined text-[20px]">edit</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-surface-container-low transition-colors outline-none"
+            >
+              <span className="material-symbols-outlined text-on-surface-variant">close</span>
+            </button>
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto px-8 py-6 space-y-8 pb-32 scrollbar-none">

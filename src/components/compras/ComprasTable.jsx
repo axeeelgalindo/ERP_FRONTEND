@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import CompraPDFButton from "./CompraPDFButton";
 
 function pctBadge(p) {
   const v = Number(p || 0);
@@ -333,7 +334,7 @@ export default function ComprasTable({
                           🔗
                         </button>
 
-
+                        <CompraPDFButton compra={c} />
 
                         <button
                           className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50  rounded-lg transition-all disabled:opacity-60"

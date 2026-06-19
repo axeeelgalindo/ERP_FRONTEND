@@ -2,9 +2,6 @@
 
 import { useState } from "react";
 import { useSession } from "next-auth/react";
-import { Button, CircularProgress } from "@mui/material";
-import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
-
 import { safeJson } from "@/components/ventas/utils/safeJson";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -24,10 +21,14 @@ function buildAuthHeaders(session) {
   return { headers, token, empresaId };
 }
 
-export default function CotizacionPDFButton({ cotizacion }) {
+export default function CompraPDFButton({ compra }) {
   const { data: session } = useSession();
   const [busy, setBusy] = useState(false);
-  if (!cotizacion) return null;
+  const [showBranchModal, setShowBranchModal] = useState(false);
+  const [selectedBranch, setSelectedBranch] = useState("puerto_montt");
+  const [fetchedCompra, setFetchedCompra] = useState(null);
+
+  if (!compra) return null;
 
   const clp = (v) =>
     Number(v || 0).toLocaleString("es-CL", {
@@ -111,7 +112,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
     });
   };
 
-  const fetchCotizacionCompleta = async (id) => {
+  const fetchCompraCompleta = async (id) => {
     if (!id) return null;
 
     const { headers, token, empresaId } = buildAuthHeaders(session);
@@ -119,7 +120,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
     if (!empresaId)
       throw new Error("Falta empresaId (x-empresa-id) para generar PDF.");
 
-    const res = await fetch(`${API_URL}/cotizaciones/${id}`, {
+    const res = await fetch(`${API_URL}/compras/${id}`, {
       method: "GET",
       headers,
       cache: "no-store",
@@ -131,19 +132,10 @@ export default function CotizacionPDFButton({ cotizacion }) {
         data?.detalle ||
         data?.error ||
         data?.message ||
-        "No se pudo cargar la cotización",
+        "No se pudo cargar la compra",
       );
     }
     return data;
-  };
-
-  const round0 = (n) => Math.round(Number(n || 0));
-
-  const clampPct = (v) => {
-    if (v === "" || v == null) return 0;
-    const n = Number(v);
-    if (!Number.isFinite(n)) return 0;
-    return Math.max(0, Math.min(99.99, n));
   };
 
   const generarPDF = async (e) => {
@@ -154,15 +146,36 @@ export default function CotizacionPDFButton({ cotizacion }) {
     try {
       setBusy(true);
 
-      let cot = cotizacion;
-      const tieneObjResponsable = !!(
-        cot?.cliente_responsable || cot?.clienteResponsable
-      );
-      const tieneEmpresa = !!cot?.empresa;
-      if ((!tieneObjResponsable || !tieneEmpresa) && cot?.id) {
-        const full = await fetchCotizacionCompleta(cot.id);
-        if (full) cot = full;
+      let cmp = compra;
+      const tieneItems = Array.isArray(cmp?.items) && cmp.items.length > 0;
+      const tieneProveedor = !!cmp?.proveedor;
+      const tieneEmpresa = !!cmp?.empresa;
+
+      if ((!tieneItems || !tieneProveedor || !tieneEmpresa) && cmp?.id) {
+        const full = await fetchCompraCompleta(cmp.id);
+        if (full) cmp = full;
       }
+
+      const empNombre = cmp?.empresa?.nombre || "";
+      const isBlue = String(empNombre).toLowerCase().includes("blue");
+
+      if (isBlue) {
+        setFetchedCompra(cmp);
+        setShowBranchModal(true);
+        setBusy(false);
+      } else {
+        await executeGenerarPDF(cmp, null);
+      }
+    } catch (err) {
+      console.error("❌ Error al obtener compra:", err);
+      alert(err?.message || "Error al obtener compra");
+      setBusy(false);
+    }
+  };
+
+  const executeGenerarPDF = async (cmp, branch) => {
+    try {
+      setBusy(true);
 
       const [{ jsPDF }, autoTableMod] = await Promise.all([
         import("jspdf"),
@@ -186,9 +199,9 @@ export default function CotizacionPDFButton({ cotizacion }) {
         white: [255, 255, 255],
       };
 
-      const numero = cot?.numero != null ? String(cot.numero) : safe(cot?.id);
-      const numDoc = numero ? `S${numero.padStart(5, "0")}` : "S00000";
-      const docTitle = `Cotización #${numDoc}`;
+      const numero = cmp?.numero != null ? String(cmp.numero) : safe(cmp?.id);
+      const numDoc = numero ? `P${numero.padStart(5, "0")}` : "P00000";
+      const docTitle = `Orden de compra #${numDoc}`;
 
       let logo = null;
       const MAX_LOGO_W = 43;
@@ -199,15 +212,15 @@ export default function CotizacionPDFButton({ cotizacion }) {
       let logoY = 14.0;
 
       try {
-        const empId = cot?.empresa?.id || cot?.empresa_id || null;
-        const empNombre = cot?.empresa?.nombre || "";
+        const empId = cmp?.empresa?.id || cmp?.empresa_id || null;
+        const empNombre = cmp?.empresa?.nombre || "";
         const isBlue = String(empNombre).toLowerCase().includes("blue");
 
         if (empId) {
           const backendBase = API_URL ? API_URL.replace(/\/api$/, "") : "";
           let dbLogoUrl = null;
-          if (cot?.empresa?.logo_url) {
-            const rawUrl = cot.empresa.logo_url;
+          if (cmp?.empresa?.logo_url) {
+            const rawUrl = cmp.empresa.logo_url;
             if (rawUrl.startsWith("http")) {
               dbLogoUrl = rawUrl;
             } else {
@@ -269,6 +282,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
       });
 
       const drawHeader = () => {
+        // Draw header wave band
         doc.setFillColor(...C.blueSoft);
         doc.moveTo(0, 0);
         doc.lineTo(210, 0);
@@ -278,7 +292,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
         doc.close();
         doc.fill();
 
-        const emp = cot?.empresa || {};
+        const emp = cmp?.empresa || {};
         const empNombre = emp.nombre || "Blue Ingeniería";
         const empRut = emp.rut ? `RUT ${emp.rut}` : "RUT 78115957-3";
 
@@ -299,6 +313,11 @@ export default function CotizacionPDFButton({ cotizacion }) {
           doc.setFontSize(11);
           doc.text("Ingeniería", mx + 10, 23.5);
         }
+
+        // Tagline
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        doc.setTextColor(...C.blue);
 
         // Company info
         doc.setFont("helvetica", "normal");
@@ -322,7 +341,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
         doc.close();
         doc.fill();
 
-        const emp = cot?.empresa || {};
+        const emp = cmp?.empresa || {};
         const empCorreo = emp.correo || "administracion@blueinge.com";
         let empWeb = "https://blue-ingenieria.com/";
         if (empCorreo.includes("@")) {
@@ -354,53 +373,67 @@ export default function CotizacionPDFButton({ cotizacion }) {
       // =========================
       let yContent = 55;
 
-      const clienteNombre = safe(cot?.cliente?.nombre);
-      const clienteRut = safe(cot?.cliente?.rut);
-      const clienteCorreo = safe(cot?.cliente?.correo);
+      const proveedorNombre = safe(cmp?.proveedor?.nombre || cmp?.razon_social);
+      const proveedorRut = safe(cmp?.proveedor?.rut || cmp?.rut_proveedor);
+      const proveedorCorreo = safe(cmp?.proveedor?.correo);
+      const proveedorTelefono = safe(cmp?.proveedor?.telefono);
+      const proveedorDireccion = safe(cmp?.proveedor?.direccion);
 
-      const resp = cot?.cliente_responsable || cot?.clienteResponsable || null;
-      const respNombre = safe(resp?.nombre);
-      const respCargo = safe(resp?.cargo);
-      const respCorreo = safe(resp?.correo);
-
-      // Left Column: Cliente
+      // Left Column: Dirección de envío
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
       doc.setTextColor(31, 41, 51); // #1f2933
-      doc.text("CLIENTE:", mx, yContent);
+      doc.text("Dirección de envío:", mx, yContent);
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9.5);
       doc.setTextColor(...C.text);
       let yLeft = yContent + 4.5;
-      doc.text(clienteNombre || "Cliente", mx, yLeft);
+      doc.text("Blue ingeniería", mx, yLeft);
       yLeft += 4;
-      if (clienteRut) {
-        doc.text(`RUT: ${clienteRut}`, mx, yLeft);
+      if (branch === "punta_arenas") {
+        doc.text("Capitán Juan Guillermo 02233", mx, yLeft);
         yLeft += 4;
+        doc.text("Punta Arenas", mx, yLeft);
+      } else {
+        doc.text("Av. San Agustín s/n La Paloma PC#38", mx, yLeft);
+        yLeft += 4;
+        doc.text("Puerto Montt 10 5480000", mx, yLeft);
       }
-      if (clienteCorreo) {
-        doc.text(clienteCorreo, mx, yLeft);
-        yLeft += 4;
+      yLeft += 4;
+      doc.text("Chile", mx, yLeft);
+
+      // Right Column: Proveedor / Supplier
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.5);
+      doc.setTextColor(31, 41, 51);
+      let yRight = yContent;
+      const nameLines = doc.splitTextToSize((proveedorNombre || "PROVEEDOR").toUpperCase(), 90);
+      doc.text(nameLines, W / 2 + 5, yRight);
+      yRight += nameLines.length * 3.8;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(...C.text);
+      if (proveedorRut) {
+        doc.text(`RUT: ${proveedorRut}`, W / 2 + 5, yRight);
+        yRight += 3.8;
       }
-      if (respNombre) {
-        doc.setFont("helvetica", "bold");
-        doc.text("Contacto:", mx, yLeft);
-        doc.setFont("helvetica", "normal");
-        yLeft += 4;
-        doc.text(respNombre, mx, yLeft);
-        yLeft += 4;
-        if (respCargo) {
-          doc.text(respCargo, mx, yLeft);
-          yLeft += 4;
-        }
-        if (respCorreo) {
-          doc.text(respCorreo, mx, yLeft);
-          yLeft += 4;
-        }
+      if (proveedorDireccion) {
+        const dirLines = doc.splitTextToSize(proveedorDireccion, 90);
+        doc.text(dirLines, W / 2 + 5, yRight);
+        yRight += dirLines.length * 3.8;
+      }
+      if (proveedorTelefono) {
+        doc.text(`Teléfono: ${proveedorTelefono}`, W / 2 + 5, yRight);
+        yRight += 3.8;
+      }
+      if (proveedorCorreo) {
+        doc.text(`Email: ${proveedorCorreo}`, W / 2 + 5, yRight);
+        yRight += 3.8;
       }
 
-      yContent = yLeft + 6;
+      yContent = Math.max(yLeft, yRight) + 12;
 
       // =========================
       // Document Title
@@ -420,33 +453,33 @@ export default function CotizacionPDFButton({ cotizacion }) {
 
       const colW = (W - mx * 2) / 4;
 
-      // Col 1: Vendedor
-      const vendedorNombre = safe(cot?.vendedor?.nombre || cot?.usuario?.nombre || "Víctor Morales");
+      // Col 1: Comprador
+      const compradorNombre = safe(cmp?.comprador?.nombre || cmp?.usuario?.nombre || "Víctor Morales");
       let colX = mx + 2;
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8.5);
       doc.setTextColor(11, 111, 164); // #0b6fa4
-      doc.text("Vendedor", colX, yContent + 4.5);
+      doc.text("Comprador", colX, yContent + 4.5);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9.5);
       doc.setTextColor(...C.text);
-      doc.text(vendedorNombre, colX, yContent + 9.5);
+      doc.text(compradorNombre, colX, yContent + 9.5);
 
-      // Col 2: Asunto / Referencia
-      const referenciaDoc = safe(cot?.referencia || cot?.asunto || "024613");
-      const refLines = doc.splitTextToSize(referenciaDoc, colW - 4);
+      // Col 2: La referencia de su orden
+      const cotNum = cmp?.cotizacion?.numero;
+      const referenciaDoc = safe(cmp?.referencia || (cotNum ? `Ref: S${String(cotNum).padStart(5, "0")}` : "024613"));
       colX += colW;
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8.5);
       doc.setTextColor(11, 111, 164);
       doc.text("La referencia de su orden", colX, yContent + 4.5);
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
+      doc.setFontSize(9.5);
       doc.setTextColor(...C.text);
-      doc.text(refLines[0] || "—", colX, yContent + 9.5);
+      doc.text(referenciaDoc, colX, yContent + 9.5);
 
-      // Col 3: Fecha
-      const fechaDoc = fmtDate(cot?.fecha_documento || cot?.creada_en || Date.now());
+      // Col 3: Fecha de la orden
+      const fechaDoc = fmtDate(cmp?.fecha_docto || cmp?.creada_en || Date.now());
       colX += colW;
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8.5);
@@ -457,17 +490,17 @@ export default function CotizacionPDFButton({ cotizacion }) {
       doc.setTextColor(...C.text);
       doc.text(fechaDoc, colX, yContent + 9.5);
 
-      // Col 4: Vencimiento
-      let vencimientoRaw = cot?.vencimiento_documento;
-      if (!vencimientoRaw && (cot?.fecha_documento || cot?.creada_en)) {
-        vencimientoRaw = new Date(new Date(cot.fecha_documento || cot.creada_en).getTime() + 15 * 24 * 60 * 60 * 1000);
+      // Col 4: Llegada esperada
+      let llegadaRaw = cmp?.fecha_entrega_esperada;
+      if (!llegadaRaw && (cmp?.fecha_docto || cmp?.creada_en)) {
+        llegadaRaw = new Date(new Date(cmp.fecha_docto || cmp.creada_en).getTime() + 14 * 24 * 60 * 60 * 1000);
       }
-      const venceLlegadaDoc = fmtDate(vencimientoRaw || Date.now());
+      const venceLlegadaDoc = fmtDate(llegadaRaw || Date.now());
       colX += colW;
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8.5);
       doc.setTextColor(11, 111, 164);
-      doc.text("Fecha expiración:", colX, yContent + 4.5);
+      doc.text("Llegada esperada:", colX, yContent + 4.5);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9.5);
       doc.setTextColor(...C.text);
@@ -476,80 +509,50 @@ export default function CotizacionPDFButton({ cotizacion }) {
       yContent += barH + 6;
 
       // =========================
-      // TOTALES con descuento general (calculado antes)
-      // =========================
-      const glosas = Array.isArray(cot?.glosas) ? cot.glosas : [];
-
-      const brutoTotal = round0(
-        glosas.reduce((a, g) => a + round0(g.monto || 0), 0),
-      );
-      const descGlosas = round0(
-        glosas.reduce((a, g) => {
-          const m = round0(g.monto || 0);
-          const pct = Number(g.descuento_pct || 0);
-          return a + Math.round(m * (pct / 100));
-        }, 0),
-      );
-      const afterGlosas = Math.max(0, brutoTotal - descGlosas);
-      const descGeneral = Math.round(
-        afterGlosas * (Number(cot?.descuento_pct || 0) / 100),
-      );
-      const descTotal = round0(descGlosas + descGeneral);
-      const neto = round0(Math.max(0, afterGlosas - descGeneral));
-
-      const iva = round0(cot?.iva ?? Math.round(neto * 0.19));
-      const total = round0(cot?.total ?? neto + iva);
-
-      const hasDiscount = descTotal > 0 || glosas.some((g) => clampPct(g.descuento_pct || 0) > 0);
-
-      // =========================
       // Items Table
       // =========================
-      const ivaRate = Number(cot?.ivaRate ?? 0.19);
-      const ivaRateNum = Number.isFinite(ivaRate) ? ivaRate : 0.19;
+      const items = Array.isArray(cmp?.items) ? cmp.items : [];
+      const hasDiscount = items.some((it) => Number(it.descuento || 0) > 0);
 
-      const glosasBody = glosas.length
-        ? glosas
-          .slice()
-          .sort((a, b) => Number(a?.orden ?? 0) - Number(b?.orden ?? 0))
-          .map((g) => {
-            const descripcion = safe(g.descripcion) || "—";
-            const cantidad = Number(g.cantidad ?? 1);
-            const precioUnitario = Number(g.precio_unitario ?? g.monto ?? 0);
-            const brutoLinea = Number(g.monto ?? (cantidad * precioUnitario));
+      const glosasBody = items.length
+        ? items.map((it) => {
+          const desc = safe(it.item || (it.producto?.nombre ? `${it.producto.nombre} (${it.producto.sku || ""})` : "—"));
+          const cant = Number(it.cantidad ?? 1);
+          const unit = Number(it.precio_unit ?? it.precio_unitario ?? 0);
+          const descVal = it.descuento ? clp(it.descuento) : "0,00";
+          const taxVal = it.impuesto ? `${it.impuesto}%` : "No aplica";
+          const lineTotal = Number(it.total ?? (cant * unit - (it.descuento || 0)));
 
-            const pct = clampPct(g.descuento_pct || 0);
-            const descMonto = round0(brutoLinea * (pct / 100));
-            const netoLinea = Math.max(0, brutoLinea - descMonto);
-            const impuestos = round0(netoLinea * ivaRateNum);
-            const importe = round0(netoLinea + impuestos);
+          const unitLabel = String(it.unidad || "").trim();
+          const unitLower = unitLabel.toLowerCase();
+          const qtyText = (!unitLabel || ["unidad", "unidades", "uni", "un", "u"].includes(unitLower))
+            ? String(cant)
+            : `${cant}\n${unitLabel}`;
 
-            const unitLabel = String(g.unidad || "").trim();
-            const unitLower = unitLabel.toLowerCase();
-            const qtyText = (!unitLabel || ["unidad", "unidades", "uni", "un", "u"].includes(unitLower))
-              ? String(cantidad)
-              : `${cantidad}\n${unitLabel}`;
-
-            if (hasDiscount) {
-              return [
-                descripcion,
-                { content: qtyText, styles: { halign: "right" } },
-                clp(precioUnitario),
-                pct ? `${pct}%` : "0,00%",
-                impuestos > 0 ? clp(impuestos) : "No aplica",
-                clp(importe),
-              ];
-            } else {
-              return [
-                descripcion,
-                { content: qtyText, styles: { halign: "right" } },
-                clp(precioUnitario),
-                impuestos > 0 ? clp(impuestos) : "No aplica",
-                clp(importe),
-              ];
-            }
-          })
-        : [hasDiscount ? ["Esta cotización no tiene glosas.", "", "", "", "", ""] : ["Esta cotización no tiene glosas.", "", "", "", ""]];
+          if (hasDiscount) {
+            return [
+              desc,
+              { content: qtyText, styles: { halign: "right" } },
+              clp(unit),
+              descVal,
+              taxVal,
+              clp(lineTotal),
+            ];
+          } else {
+            return [
+              desc,
+              { content: qtyText, styles: { halign: "right" } },
+              clp(unit),
+              taxVal,
+              clp(lineTotal),
+            ];
+          }
+        })
+        : [
+          hasDiscount
+            ? ["Esta orden de compra no tiene items.", "", "", "", "", ""]
+            : ["Esta orden de compra no tiene items.", "", "", "", ""]
+        ];
 
       const tableW = W - mx * 2;
       const tableHeaders = hasDiscount
@@ -559,17 +562,17 @@ export default function CotizacionPDFButton({ cotizacion }) {
       const columnStyles = hasDiscount
         ? {
           0: { cellWidth: 90 }, // Descripción
-          1: { cellWidth: 18, halign: "right" }, // Cant.
+          1: { cellWidth: 20, halign: "right" }, // Cant.
           2: { cellWidth: 26, halign: "right" }, // Precio unitario
           3: { cellWidth: 16, halign: "right" }, // Desc.
-          4: { cellWidth: 22, halign: "center" }, // Impuestos
+          4: { cellWidth: 20, halign: "center" }, // Impuestos
           5: { cellWidth: 20, halign: "right", fontStyle: "bold" }, // Importe
         }
         : {
-          0: { cellWidth: 106 }, // Descripción (90 + 16)
-          1: { cellWidth: 18, halign: "right" }, // Cant.
+          0: { cellWidth: 106 }, // Descripción (90 + 16 de la col Descuento)
+          1: { cellWidth: 20, halign: "right" }, // Cant.
           2: { cellWidth: 26, halign: "right" }, // Precio unitario
-          3: { cellWidth: 22, halign: "center" }, // Impuestos
+          3: { cellWidth: 20, halign: "center" }, // Impuestos
           4: { cellWidth: 20, halign: "right", fontStyle: "bold" }, // Importe
         };
 
@@ -606,18 +609,16 @@ export default function CotizacionPDFButton({ cotizacion }) {
       // =========================
       let yTotals = (doc.lastAutoTable?.finalY ?? yContent + 40) + 4;
 
-      const totalsBody = hasDiscount
-        ? [
-          ["Subtotal", clp(brutoTotal)],
-          ["Descuento", clp(descTotal)],
-          ["Impuestos", clp(iva)],
-          ["Total", clp(total)],
-        ]
-        : [
-          ["Subtotal", clp(neto)],
-          ["Impuestos", clp(iva)],
-          ["Total", clp(total)],
-        ];
+      const totalVal = Math.round(Number(cmp?.total || 0));
+      const isExento = Number(cmp?.tipo_doc) === 34;
+      const netoVal = isExento ? totalVal : Math.round(totalVal / 1.19);
+      const ivaVal = isExento ? 0 : totalVal - netoVal;
+
+      const totalsBody = [
+        [isExento ? "Monto Exento" : "Subtotal", clp(netoVal)],
+        ["Impuestos", clp(ivaVal)],
+        ["Total", clp(totalVal)],
+      ];
 
       autoTable(doc, {
         startY: yTotals,
@@ -663,7 +664,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
       doc.setFontSize(7.5);
       doc.setTextColor(...C.text);
 
-      const rawTerms = [cot?.terminos_condiciones, cot?.acuerdo_pago].filter(Boolean).join("\n");
+      const rawTerms = [cmp?.observaciones, cmp?.terminos_condiciones].filter(Boolean).join("\n");
       const termsLines = rawTerms ? rawTerms.split("\n").filter(line => line.trim()) : [];
 
       if (termsLines.length > 0) {
@@ -679,9 +680,9 @@ export default function CotizacionPDFButton({ cotizacion }) {
         });
       } else {
         const defaultTerms = [
-          "Cotización válida por los días indicados en la vigencia.",
-          "Precios y condiciones comerciales sujetos a confirmación por parte del vendedor.",
-          "Forma de pago y plazos según acuerdo establecido.",
+          "Según Proforma Invoice o cotización comercial acordada previamente.",
+          "Por favor, al facturar esta orden de compra, indique claramente el número de Orden de Compra (OC) en el documento de facturación.",
+          "Cualquier diferencia o modificación en cantidades o precios debe ser notificada antes del despacho de los productos.",
         ];
         defaultTerms.forEach((line, idx) => {
           const cleanLine = `${idx + 1}. ${line}`;
@@ -701,8 +702,8 @@ export default function CotizacionPDFButton({ cotizacion }) {
         drawFooter(p, pageCount);
       }
 
-      const fileName = `Cotizacion_${numDoc}_${safeName(
-        cot?.cliente?.nombre || cot?.proyecto?.nombre || "cotizacion",
+      const fileName = `Compra_${numDoc}_${safeName(
+        cmp?.proveedor?.nombre || cmp?.razon_social || "compra",
       )}.pdf`;
 
       doc.save(fileName);
@@ -715,21 +716,99 @@ export default function CotizacionPDFButton({ cotizacion }) {
   };
 
   return (
-    <Button
-      size="small"
-      variant="outlined"
-      startIcon={busy ? <CircularProgress size={16} /> : <PictureAsPdfIcon />}
-      onClick={generarPDF}
-      disabled={busy}
-      sx={{
-        borderRadius: 2,
-        textTransform: "none",
-        fontWeight: 800,
-        px: 1.25,
-        minWidth: 92,
-      }}
-    >
-      {busy ? "Generando..." : "PDF"}
-    </Button>
+    <>
+      <button
+        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all disabled:opacity-60 flex items-center justify-center"
+        title="Descargar Orden de Compra PDF"
+        type="button"
+        onClick={generarPDF}
+        disabled={busy}
+      >
+        {busy ? (
+          <span className="animate-spin text-xs">⏳</span>
+        ) : (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1.5}
+            stroke="currentColor"
+            className="w-[18px] h-[18px]"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+            />
+          </svg>
+        )}
+      </button>
+
+      {showBranchModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-100 animate-in fade-in zoom-in duration-200">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Seleccionar Dirección de Envío</h3>
+            <p className="text-slate-500 text-xs mb-4">
+              Por favor, seleccione a cuál de las sucursales de Blue Ingeniería debe enviarse esta Orden de Compra:
+            </p>
+
+            <div className="flex flex-col gap-3 mb-6">
+              <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition-all">
+                <input
+                  type="radio"
+                  name="sucursal"
+                  value="puerto_montt"
+                  checked={selectedBranch === "puerto_montt"}
+                  onChange={() => setSelectedBranch("puerto_montt")}
+                  className="mt-1 text-indigo-600 focus:ring-indigo-500"
+                />
+                <div>
+                  <span className="font-bold text-sm text-slate-800">Puerto Montt</span>
+                  <p className="text-xs text-slate-500 mt-0.5">Av. San Agustín s/n La Paloma PC#38</p>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer transition-all">
+                <input
+                  type="radio"
+                  name="sucursal"
+                  value="punta_arenas"
+                  checked={selectedBranch === "punta_arenas"}
+                  onChange={() => setSelectedBranch("punta_arenas")}
+                  className="mt-1 text-indigo-600 focus:ring-indigo-500"
+                />
+                <div>
+                  <span className="font-bold text-sm text-slate-800">Punta Arenas</span>
+                  <p className="text-xs text-slate-500 mt-0.5">Capitán Juan Guillermo 02233</p>
+                </div>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBranchModal(false);
+                  setBusy(false);
+                }}
+                className="px-4 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 rounded-lg transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setShowBranchModal(false);
+                  await executeGenerarPDF(fetchedCompra, selectedBranch);
+                }}
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-all shadow-lg shadow-indigo-600/10"
+              >
+                Descargar PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
