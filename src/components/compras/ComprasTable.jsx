@@ -59,6 +59,7 @@ export default function ComprasTable({
   onOpenRendicion,
   onUploadPdfClick,
   onTogglePaid,
+  onOpenImputacion,
   // helpers
   fmtDateDMY,
   toCLP,
@@ -161,7 +162,7 @@ export default function ComprasTable({
                 Fecha
               </th>
               <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">
-                Proyecto
+                Destino
               </th>
               <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px] text-center">
                 PDF
@@ -257,9 +258,33 @@ export default function ComprasTable({
                     </td>
 
                     <td className="px-6 py-4">
-                      <span className="text-xs bg-slate-100  px-2 py-1 rounded-md text-slate-600  whitespace-nowrap">
-                        {proyecto}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => onOpenImputacion?.(c)}
+                          className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all border hover:opacity-85 ${
+                            c?.destino === "PROYECTO"
+                              ? "bg-blue-50 text-blue-700 border-blue-200 hover:border-blue-300"
+                              : c?.destino === "TALLER"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:border-emerald-300"
+                                : c?.destino === "ADMINISTRACION"
+                                  ? "bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-300"
+                                  : "bg-slate-50 text-slate-400 border-dashed border-slate-300 hover:border-slate-400"
+                          }`}
+                          title="Asignar / Cambiar Imputación"
+                        >
+                          {c?.destino === "PROYECTO"
+                            ? `Proyecto: ${proyecto}`
+                            : c?.destino === "TALLER"
+                              ? `Taller (${c.centro_costo || "S/CC"})`
+                              : c?.destino === "ADMINISTRACION"
+                                ? `Admin (${c.centro_costo || "S/CC"})`
+                                : "No imputado"}
+                          <span className="material-symbols-outlined text-[10px] ml-1.5 opacity-60">
+                            edit
+                          </span>
+                        </button>
+                      </div>
                     </td>
 
                     <td className="px-6 py-4 text-center">

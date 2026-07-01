@@ -13,6 +13,7 @@ import CompraManualModal from "@/components/compras/CompraManualModal";
 import CompraProvOllamaModal from "@/components/compras/CompraProvOllamaModal";
 import QuickProveedorModal from "@/components/compras/QuickProveedorModal";
 import VincularCosteoModal from "@/components/compras/VincularCosteoModal";
+import AsignarImputacionModal from "@/components/compras/AsignarImputacionModal";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -206,6 +207,12 @@ export default function ComprasPage() {
   const [asignaciones, setAsignaciones] = useState([]);
   const [savingVinc, setSavingVinc] = useState(false);
   const [savingErr, setSavingErr] = useState("");
+
+  // ===== Asignar Imputación =====
+  const [openImputacion, setOpenImputacion] = useState(false);
+  const [compraImputacionSel, setCompraImputacionSel] = useState(null);
+  const [savingImputacion, setSavingImputacion] = useState(false);
+  const [imputacionErr, setImputacionErr] = useState("");
 
   // ===== Confirmación de Pago & Toast =====
   const [compraToToggle, setCompraToToggle] = useState(null);
@@ -797,6 +804,41 @@ export default function ComprasPage() {
     }
   }
 
+  function openImputacionModal(compra) {
+    setImputacionErr("");
+    setCompraImputacionSel(compra);
+    setOpenImputacion(true);
+  }
+
+  async function saveImputacion(payload) {
+    if (!session || !compraImputacionSel) return;
+
+    setImputacionErr("");
+    setSavingImputacion(true);
+
+    try {
+      const res = await fetch(`${API}/compras/${compraImputacionSel.id}`, {
+        method: "PUT",
+        headers: makeHeadersJson(session),
+        body: JSON.stringify(payload),
+      });
+
+      const data = await jsonOrNull(res);
+      if (!res.ok) {
+        throw new Error(data?.error || data?.message || "Error al asignar imputación.");
+      }
+
+      triggerToast("Imputación asignada exitosamente.", "success");
+      setOpenImputacion(false);
+      setCompraImputacionSel(null);
+      await loadCompras({ page, pageSize });
+    } catch (e) {
+      setImputacionErr(e?.message || "Error al guardar imputación.");
+    } finally {
+      setSavingImputacion(false);
+    }
+  }
+
   async function handleRefresh() {
     await Promise.all([loadCompras({ page, pageSize }), loadLookups()]);
   }
@@ -953,6 +995,7 @@ export default function ComprasPage() {
             onOpenRendicion={() => { }} // Dis habilitar vinculación desde aquí
             onUploadPdfClick={(c) => openFilePicker(c.id)}
             onTogglePaid={toggleCompraPago}
+            onOpenImputacion={openImputacionModal}
             fmtDateDMY={fmtDateDMY}
             toCLP={toCLP}
             getVincPct={getVincPct}
@@ -1076,6 +1119,21 @@ export default function ComprasPage() {
         fmtDateDMY={fmtDateDMY}
         toCLP={toCLP}
         sumAsignado={sumAsignado}
+      />
+
+      {/* MODAL ASIGNAR IMPUTACIÓN / CENTRO DE COSTO */}
+      <AsignarImputacionModal
+        open={openImputacion}
+        onClose={() => {
+          setOpenImputacion(false);
+          setCompraImputacionSel(null);
+          setImputacionErr("");
+        }}
+        compraSel={compraImputacionSel}
+        proyectos={proyectos}
+        onSave={saveImputacion}
+        saving={savingImputacion}
+        error={imputacionErr}
       />
 
       {/* ===== MODAL CONFIRMACION DE PAGO ===== */}

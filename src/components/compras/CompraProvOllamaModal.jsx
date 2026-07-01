@@ -659,25 +659,45 @@ export default function CompraProvOllamaModal({
                     <span>2. Destino e Imputación</span>
                   </div>
 
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-2">
                     <label className="text-xs font-bold text-slate-700">Destino Principal *</label>
-                    <select
-                      className="w-full h-11 px-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-900 focus:border-[#1e3a8a] text-xs"
-                      value={destino}
-                      onChange={(e) => setDestino(e.target.value)}
-                      required
-                    >
-                      <option value="PROYECTO">PROYECTO</option>
-                      <option value="ADMINISTRACION">ADMINISTRACION</option>
-                      <option value="TALLER">TALLER</option>
-                    </select>
+                    <div className="grid grid-cols-3 gap-2 mt-1">
+                      {[
+                        { val: "PROYECTO", lab: "Proyecto", icon: "construction" },
+                        { val: "TALLER", lab: "Taller", icon: "precision_manufacturing" },
+                        { val: "ADMINISTRACION", lab: "Admin", icon: "corporate_fare" }
+                      ].map((opt) => (
+                        <button
+                          key={opt.val}
+                          type="button"
+                          onClick={() => {
+                            setDestino(opt.val);
+                            if (opt.val !== "PROYECTO") setProyectoId("");
+                            else setCentroCosto("");
+                          }}
+                          className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all cursor-pointer ${
+                            destino === opt.val
+                              ? "bg-indigo-50/70 text-[#1e3a8a] border-[#1e3a8a] shadow-sm font-bold"
+                              : "bg-slate-50 text-slate-600 border-transparent hover:border-slate-200"
+                          }`}
+                        >
+                          <span
+                            className="material-symbols-outlined mb-1 text-lg"
+                            style={{ fontVariationSettings: destino === opt.val ? "'FILL' 1" : "" }}
+                          >
+                            {opt.icon}
+                          </span>
+                          <span className="text-[10px] font-bold uppercase tracking-tight">{opt.lab}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   {destino === "PROYECTO" ? (
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5 mt-2">
                       <label className="text-xs font-bold text-slate-700">Proyecto *</label>
                       <select
-                        className="w-full h-11 px-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-900 focus:border-[#1e3a8a] text-xs"
+                        className="w-full h-11 px-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-900 focus:border-[#1e3a8a] text-xs transition-all"
                         value={proyectoId}
                         onChange={(e) => setProyectoId(e.target.value)}
                         required={destino === "PROYECTO"}
@@ -691,18 +711,24 @@ export default function CompraProvOllamaModal({
                       </select>
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5 mt-2">
                       <label className="text-xs font-bold text-slate-700">Centro de Costo *</label>
-                      <select
-                        className="w-full h-11 px-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-900 focus:border-[#1e3a8a] text-xs"
-                        value={centroCosto}
-                        onChange={(e) => setCentroCosto(e.target.value)}
-                        required={destino !== "PROYECTO"}
-                      >
-                        <option value="">Seleccione centro</option>
-                        <option value="PMC">PMC</option>
-                        <option value="PUQ">PUQ</option>
-                      </select>
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        {["PMC", "PUQ"].map((cc) => (
+                          <button
+                            key={cc}
+                            type="button"
+                            onClick={() => setCentroCosto(cc)}
+                            className={`py-2.5 rounded-lg text-xs font-bold transition-all border-2 cursor-pointer ${
+                              centroCosto === cc
+                                ? "bg-[#1e3a8a] text-white border-[#1e3a8a]"
+                                : "bg-slate-50 text-slate-600 border-transparent hover:border-slate-200"
+                            }`}
+                          >
+                            {cc === "PMC" ? "Puerto Montt" : "Punta Arenas"}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
