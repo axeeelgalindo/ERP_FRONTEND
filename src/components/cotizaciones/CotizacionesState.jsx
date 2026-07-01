@@ -2,7 +2,7 @@
 
 import { Box, Typography, CircularProgress, Alert } from "@mui/material";
 
-export default function CotizacionesState({ status, loading, err, empty }) {
+export default function CotizacionesState({ status, loading, err, empty, emptyMessage }) {
   if (status === "loading") {
     return (
       <Box
@@ -22,7 +22,7 @@ export default function CotizacionesState({ status, loading, err, empty }) {
     return (
       <Box sx={{ p: 3 }}>
         <Typography variant="h6">
-          Debes iniciar sesión para ver cotizaciones.
+          Debes iniciar sesión para ver esta información.
         </Typography>
       </Box>
     );
@@ -38,7 +38,7 @@ export default function CotizacionesState({ status, loading, err, empty }) {
 
       {empty && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          No hay cotizaciones registradas aún.
+          {emptyMessage || "No hay cotizaciones registradas aún."}
         </Alert>
       )}
     </>

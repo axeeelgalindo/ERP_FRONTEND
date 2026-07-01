@@ -582,6 +582,7 @@ export default function ServiciosArriendosPage() {
           loading={loading}
           err={err}
           empty={!loading && !filtered.length && !err}
+          emptyMessage="No hay servicios registrados aún."
         />
 
         {/* Tabla */}
