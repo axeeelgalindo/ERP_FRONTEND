@@ -307,7 +307,7 @@ export default function CompraProvOllamaModal({
         unidad: it.unidad || "Uni",
         precioUnitario: Number(it.precioUnitario ?? 0),
         descuento: Number(it.descuento ?? 0),
-        impuesto: Number(it.impuesto ?? 0),
+        impuesto: it.impuesto !== null && it.impuesto !== undefined ? Number(it.impuesto) : null,
         totalLinea: Number(it.totalLinea ?? 0),
         origen: "Detectado por Ollama",
       }));
@@ -364,7 +364,7 @@ export default function CompraProvOllamaModal({
         unidad: "Uni",
         precioUnitario: 0,
         descuento: 0,
-        impuesto: 0,
+        impuesto: null,
         totalLinea: 0,
         origen: "Manual",
       },
@@ -374,10 +374,13 @@ export default function CompraProvOllamaModal({
   // --- Cálculos de Totales ---
   const calculatedSubtotal = items.reduce((sum, it) => sum + Number(it.totalLinea || 0), 0);
   const calculatedDescuento = items.reduce((sum, it) => sum + Number(it.descuento || 0), 0);
-  const calculatedImpuestos = items.reduce(
-    (sum, it) => sum + Number(it.impuesto || (it.totalLinea * 0.19)),
-    0
-  );
+  const isCLP = moneda === "CLP";
+  const calculatedImpuestos = items.reduce((sum, it) => {
+    const hasCustomImpuesto = it.impuesto !== null && it.impuesto !== undefined && it.impuesto !== "";
+    const defaultTax = isCLP ? (Number(it.totalLinea || 0) * 0.19) : 0;
+    const taxVal = hasCustomImpuesto ? Number(it.impuesto) : defaultTax;
+    return sum + (isNaN(taxVal) ? 0 : taxVal);
+  }, 0);
   const calculatedTotal = calculatedSubtotal + calculatedImpuestos;
 
   // --- Validación del Formulario ---
@@ -1042,8 +1045,14 @@ export default function CompraProvOllamaModal({
                           <input
                             type="number"
                             className="w-full h-10 px-3 border border-slate-200 rounded-lg text-xs bg-white text-slate-800 text-right focus:border-[#1e3a8a] focus:ring-1 focus:ring-[#1e3a8a] outline-none transition-all"
-                            value={it.impuesto || 0}
-                            onChange={(e) => handleItemChange(it.id, "impuesto", Number(e.target.value))}
+                            value={
+                              it.impuesto !== null && it.impuesto !== undefined && it.impuesto !== ""
+                                ? it.impuesto
+                                : Math.round(isCLP ? Number(it.totalLinea || 0) * 0.19 : 0)
+                            }
+                            onChange={(e) =>
+                              handleItemChange(it.id, "impuesto", e.target.value === "" ? null : Number(e.target.value))
+                            }
                             min="0"
                           />
                         </div>

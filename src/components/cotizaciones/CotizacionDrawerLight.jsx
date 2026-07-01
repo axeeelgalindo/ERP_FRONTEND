@@ -584,7 +584,7 @@ export default function CotizacionDrawerLight({
                 {formatCLP(totals.total)}
               </p>
               <p className="text-[11px] text-blue-600/70 mt-1">
-                IVA: {formatCLP(totals.iva)}
+                IVA: {c?.sin_iva ? "Exento" : formatCLP(totals.iva)}
               </p>
             </div>
           </div>
@@ -697,6 +697,11 @@ export default function CotizacionDrawerLight({
                           <p className="font-medium">
                             {it.descripcion || it.Item || it?.producto?.nombre || "—"}
                           </p>
+                          {it.comentario ? (
+                            <p className="text-xs text-blue-500 font-semibold mt-1 italic">
+                              Comentario: {it.comentario}
+                            </p>
+                          ) : null}
                         </td>
 
                         <td className="px-4 py-4 text-center">
@@ -749,9 +754,11 @@ export default function CotizacionDrawerLight({
                     </tr>
                     <tr className="border-t border-slate-200">
                       <td className="px-4 py-3 text-left text-slate-500" colSpan={4}>
-                        IVA 19%
+                        {c?.sin_iva ? "IVA 0%" : "IVA 19%"}
                       </td>
-                      <td className="px-4 py-3 text-right">+ {formatCLP(totals.iva)}</td>
+                      <td className="px-4 py-3 text-right">
+                        {c?.sin_iva ? "Exento" : `+ ${formatCLP(totals.iva)}`}
+                      </td>
                     </tr>
                     <tr className="border-t border-slate-200">
                       <td className="px-4 py-3 text-left text-slate-500" colSpan={4}>

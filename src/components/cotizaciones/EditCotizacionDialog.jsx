@@ -12,6 +12,8 @@ import {
   MenuItem,
   TextField,
   Typography,
+  Switch,
+  FormControlLabel,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -41,6 +43,7 @@ const emptyGlosa = () => ({
   monto: 0,
   manual: true,
   orden: 0,
+  comentario: "",
 });
 
 /**
@@ -59,6 +62,7 @@ function normalizeGlosasClient(glosas = []) {
       descripcion: String(g?.descripcion || "").trim().slice(0, 250),
       monto: round0(g?.monto || 0),
       manual: g?.manual ?? true,
+      comentario: g?.comentario || "",
     }))
     .filter((g) => g.descripcion.length > 0); // 👈 si está vacía, la quitamos
 
@@ -100,8 +104,38 @@ export default function EditCotizacionDialog({
   const [proyectoId, setProyectoId] = useState("");
   const [proyectos, setProyectos] = useState([]);
 
+  // nuevos campos para suscripciones
+  const [esSuscripcion, setEsSuscripcion] = useState(false);
+  const [moneda, setMoneda] = useState("CLP");
+  const [ciclosMensuales, setCiclosMensuales] = useState(12);
+  const [valorUFManual, setValorUFManual] = useState("");
+  const [valorUF, setValorUF] = useState(37700);
+
   // ✅ para saber si el usuario tocó glosas manualmente
   const [glosasTouched, setGlosasTouched] = useState(false);
+
+  const [sinIva, setSinIva] = useState(false);
+
+  // ========= cargar valor UF =========
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      try {
+        const res = await fetch("https://mindicador.cl/api/uf");
+        if (res.ok) {
+          const data = await res.json();
+          const val = data?.serie?.[0]?.valor;
+          if (val) setValorUF(Number(val));
+        }
+      } catch (e) {
+        console.error("Error fetching UF in client:", e);
+      }
+    })();
+  }, [open]);
+
+  const activeUF = useMemo(() => {
+    return valorUFManual ? Number(valorUFManual) : valorUF;
+  }, [valorUFManual, valorUF]);
 
   // ========= cargar usuarios y proyectos =========
   useEffect(() => {
@@ -133,9 +167,36 @@ export default function EditCotizacionDialog({
     })();
   }, [open, session]);
 
-  // ========= cargar cotización completa =========
+  // ========= cargar cotización completa (o resetear para creación) =========
   useEffect(() => {
-    if (!open || !cotizacionId || !session) return;
+    if (!open || !session) return;
+
+    if (!cotizacionId) {
+      // Modo creación! Resetear campos
+      setClienteId("");
+      setResponsableId("");
+      setAsunto("");
+      setVigenciaDias(15);
+      setTerminos("");
+      setAcuerdoPago("");
+      setVentaIds([]);
+      setGlosas([emptyGlosa()]);
+      setVendedorId("");
+      setDescuentoPct("");
+      setProyectoId("");
+      setFechaDocumento(new Date().toISOString().split("T")[0]);
+      
+      // Suscripción por defecto en creación
+      setEsSuscripcion(true);
+      setMoneda("UF");
+      setCiclosMensuales(12);
+      setValorUFManual("");
+      setSinIva(false);
+      
+      setGlosasTouched(false);
+      setCot(null);
+      return;
+    }
 
     (async () => {
       try {
@@ -180,24 +241,29 @@ export default function EditCotizacionDialog({
           setFechaDocumento("");
         }
 
+        setEsSuscripcion(!!data?.es_suscripcion);
+        setMoneda(data?.moneda || "CLP");
+        setCiclosMensuales(Number(data?.ciclos_mensuales ?? 12));
+        setValorUFManual(data?.valor_uf_documento ? String(data.valor_uf_documento) : "");
+        setSinIva(!!data?.sin_iva);
+
         const vIds = Array.isArray(data?.ventas)
           ? data.ventas.map((v) => String(v.id))
           : [];
         setVentaIds(vIds);
 
         const gs = Array.isArray(data?.glosas) ? data.glosas : [];
-        const normalized = normalizeGlosasClient(
-          gs.map((g) => ({
-            descripcion: g.descripcion || "",
-            monto: g.monto || 0,
-            manual: g.manual ?? true,
-            cantidad: Number(g.cantidad || 1),
-            precio_unitario: Number(g.precio_unitario || g.monto || 0),
-          }))
-        );
+        const mappedGlosas = gs.map((g) => ({
+          descripcion: g.descripcion || "",
+          monto: g.monto || 0,
+          monto_uf: g.monto_uf !== null && g.monto_uf !== undefined ? Number(g.monto_uf) : "",
+          manual: g.manual ?? true,
+          cantidad: Number(g.cantidad || 1),
+          precio_unitario: Number(g.precio_unitario || g.monto || 0),
+          comentario: g.comentario || "",
+        }));
 
-        // ✅ si no hay glosas válidas, dejamos 1 vacía por ahora
-        setGlosas(normalized.length ? normalized : [emptyGlosa()]);
+        setGlosas(mappedGlosas.length ? mappedGlosas : [emptyGlosa()]);
       } catch (e) {
         setErr(e?.message || "Error cargando cotización");
       } finally {
@@ -238,7 +304,6 @@ export default function EditCotizacionDialog({
       const principal = responsables.find((r) => r.es_principal);
       setResponsableId(String(principal?.id || responsables[0].id));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clienteId, open, responsables.length]);
 
   // ========= ventas disponibles =========
@@ -246,8 +311,14 @@ export default function EditCotizacionDialog({
     return Array.isArray(cot?.ventas) ? cot.ventas : [];
   }, [cot]);
 
-  // ========= subtotal neto desde ventas seleccionadas =========
+  // ========= subtotal neto desde ventas seleccionadas (CLP) o glosas =========
   const subtotalNeto = useMemo(() => {
+    if (esSuscripcion) {
+      // Para suscripciones, se calcula de las glosas
+      return round0(
+        glosas.reduce((acc, g) => acc + round0(g.monto || 0), 0)
+      );
+    }
     if (!ventasDisponibles.length || !ventaIds.length) return 0;
     const setIds = new Set(ventaIds.map(String));
     return round0(
@@ -255,11 +326,18 @@ export default function EditCotizacionDialog({
         .filter((v) => setIds.has(String(v.id)))
         .reduce((acc, v) => acc + calcTotalVenta(v), 0)
     );
-  }, [ventasDisponibles, ventaIds]);
+  }, [ventasDisponibles, ventaIds, esSuscripcion, glosas]);
 
-  // ========= Auto-ajuste SOLO cuando hay ventas =========
+  // ========= subtotal neto en UF (si corresponde) =========
+  const subtotalNetoUF = useMemo(() => {
+    if (moneda !== "UF") return 0;
+    return glosas.reduce((acc, g) => acc + Number(g.monto_uf || 0), 0);
+  }, [glosas, moneda]);
+
+  // ========= Auto-ajuste SOLO cuando hay ventas y no es suscripción =========
   useEffect(() => {
     if (!open) return;
+    if (esSuscripcion) return;
     if (!hasVentas(ventaIds)) return; // ✅ SOLO si hay ventas
     if (subtotalNeto <= 0) return;
     if (glosasTouched) return;
@@ -296,44 +374,59 @@ export default function EditCotizacionDialog({
 
       return prev; // varias glosas: no tocamos
     });
-  }, [open, subtotalNeto, asunto, glosasTouched, ventaIds]);
+  }, [open, subtotalNeto, asunto, glosasTouched, ventaIds, esSuscripcion]);
 
   const sumG = useMemo(() => sumGlosas(glosas), [glosas]);
 
   // ========= Validación glosas: 2 modos =========
   const glosasOk = useMemo(() => {
-    const normalized = normalizeGlosasClient(glosas);
+    const normalized = glosas.filter((g) => String(g.descripcion).trim().length > 0);
 
-    // si está todo vacío, lo consideramos OK (en submit la autogeneramos)
-    if (normalized.length === 0) return true;
+    // si está todo vacío, no es válido (en submit requerimos al menos una)
+    if (normalized.length === 0) return false;
 
     // no negativos
     if (normalized.some((g) => round0(g.monto) < 0)) return false;
 
+    // si es suscripción en UF, validar que tengan monto_uf > 0
+    if (esSuscripcion && moneda === "UF") {
+      if (normalized.some((g) => !g.monto_uf || Number(g.monto_uf) <= 0)) return false;
+    }
+
     // ✅ con ventas => suma debe ser EXACTA al subtotal
-    if (hasVentas(ventaIds)) {
+    if (!esSuscripcion && hasVentas(ventaIds)) {
       if (subtotalNeto <= 0) return false;
       return sumGlosas(normalized) === subtotalNeto;
     }
 
-    // ✅ sin ventas => el total lo definen las glosas (permitimos > 0)
+    // ✅ sin ventas / suscripción => el total lo definen las glosas
     const suma = sumGlosas(normalized);
-    return suma > 0; // si quieres permitir 0, cambia a: suma >= 0
-  }, [glosas, subtotalNeto, ventaIds]);
+    return suma > 0;
+  }, [glosas, subtotalNeto, ventaIds, esSuscripcion, moneda]);
 
   // ========= handlers glosas =========
   const setGlosa = (idx, patch) => {
     setGlosasTouched(true);
 
-    // ✅ si hay ventas: no permitir que un monto supere el "restante"
     setGlosas((prev) => {
       const next = [...prev];
       const current = { ...next[idx], ...patch, orden: idx };
 
-      // normaliza monto
-      if (patch.monto !== undefined) current.monto = round0(patch.monto);
+      // Si actualizan monto_uf (tarifa UF)
+      if (patch.monto_uf !== undefined) {
+        const valUf = Number(patch.monto_uf || 0);
+        current.monto_uf = valUf;
+        // precio unitario y monto final en CLP
+        current.monto = Math.round(valUf * activeUF);
+        current.precio_unitario = Math.round(valUf * activeUF);
+      }
 
-      if (hasVentas(ventaIds)) {
+      // normaliza monto en CLP
+      if (patch.monto !== undefined) {
+        current.monto = round0(patch.monto);
+      }
+
+      if (!esSuscripcion && hasVentas(ventaIds)) {
         const target = subtotalNeto;
 
         // suma de otros
@@ -382,10 +475,19 @@ export default function EditCotizacionDialog({
       if (!vigenciaDias || vigenciaDias < 1 || vigenciaDias > 365)
         throw new Error("Vigencia debe estar entre 1 y 365 días.");
 
-      const conVentas = hasVentas(ventaIds);
+      const conVentas = !esSuscripcion && hasVentas(ventaIds);
 
       // glosas finales
-      let glosasFinal = normalizeGlosasClient(glosas);
+      let glosasFinal = glosas
+        .map((g) => ({
+          descripcion: String(g?.descripcion || "").trim().slice(0, 250),
+          monto: round0(g?.monto || 0),
+          monto_uf: g?.monto_uf !== "" && g?.monto_uf !== null && g?.monto_uf !== undefined ? Number(g.monto_uf) : null,
+          cantidad: Number(g?.cantidad || 1),
+          precio_unitario: Number(g?.precio_unitario || g?.monto || 0),
+          manual: g?.manual ?? true,
+        }))
+        .filter((g) => g.descripcion.length > 0);
 
       // Si no hay glosas válidas => 1 automática
       if (glosasFinal.length === 0) {
@@ -396,6 +498,9 @@ export default function EditCotizacionDialog({
               250
             ),
             monto: conVentas ? subtotalNeto : 0,
+            monto_uf: null,
+            cantidad: 1,
+            precio_unitario: conVentas ? subtotalNeto : 0,
             manual: true,
             orden: 0,
           },
@@ -418,10 +523,10 @@ export default function EditCotizacionDialog({
           );
         }
       } else {
-        // sin ventas: glosas definen el total, exigir > 0
+        // sin ventas/suscripción: glosas definen el total, exigir > 0
         if (suma <= 0) {
           throw new Error(
-            "En cotizaciones sin ventas, las glosas deben sumar un monto mayor a 0."
+            "Las glosas deben sumar un monto mayor a 0."
           );
         }
       }
@@ -439,21 +544,35 @@ export default function EditCotizacionDialog({
         terminos_condiciones: terminos || null,
         acuerdo_pago: acuerdoPago || null,
 
-        // ✅ puede ser [] (importadas)
-        ventaIds,
+        ventaIds: esSuscripcion ? [] : ventaIds,
 
         glosas: glosasFinal.map((g, i) => ({
           descripcion: g.descripcion,
-          monto: round0(g.monto || 0),
-          cantidad: g.cantidad || 1,
-          precio_unitario: g.precio_unitario || g.monto,
+          monto: g.monto,
+          monto_uf: g.monto_uf,
+          cantidad: g.cantidad,
+          precio_unitario: g.precio_unitario,
           manual: true,
           orden: i,
+          comentario: g.comentario || null,
         })),
+
+        // Nuevos campos
+        es_suscripcion: esSuscripcion,
+        moneda: moneda,
+        ciclos_mensuales: Number(ciclosMensuales || 12),
+        valor_uf_manual: valorUFManual ? Number(valorUFManual) : null,
+        sin_iva: sinIva,
       };
 
-      const res = await fetch(`${API_URL}/cotizaciones/update/${cotizacionId}`, {
-        method: "PUT",
+      const url = cotizacionId 
+        ? `${API_URL}/cotizaciones/update/${cotizacionId}`
+        : `${API_URL}/cotizaciones/add`;
+      
+      const method = cotizacionId ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: makeHeaders(session),
         body: JSON.stringify(payload),
       });
@@ -461,7 +580,7 @@ export default function EditCotizacionDialog({
       const data = await safeJson(res);
       if (!res.ok) {
         throw new Error(
-          data?.error || data?.detalle || "Error actualizando cotización"
+          data?.error || data?.detalle || "Error guardando cotización"
         );
       }
 
@@ -645,32 +764,133 @@ export default function EditCotizacionDialog({
           />
         </Box>
 
+        {/* Toggles: Suscripción y Sin IVA */}
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, bgcolor: "action.hover", p: 1.5, borderRadius: 2, border: "1px dashed", borderColor: "divider" }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={esSuscripcion}
+                  onChange={(e) => {
+                    const val = e.target.checked;
+                    setEsSuscripcion(val);
+                    if (val) {
+                      setMoneda("UF");
+                      setVentaIds([]);
+                    } else {
+                      setMoneda("CLP");
+                    }
+                  }}
+                  color="primary"
+                />
+              }
+              label={
+                <Box>
+                  <Typography sx={{ fontWeight: "bold", fontSize: 14 }}>Suscripción / Recurrente</Typography>
+                  <Typography sx={{ fontSize: 11, color: "text.secondary" }}>Tarifa mensual fijada en UF o CLP.</Typography>
+                </Box>
+              }
+            />
+          </Box>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, bgcolor: "action.hover", p: 1.5, borderRadius: 2, border: "1px dashed", borderColor: "divider" }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={sinIva}
+                  onChange={(e) => setSinIva(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label={
+                <Box>
+                  <Typography sx={{ fontWeight: "bold", fontSize: 14 }}>Sin Impuestos (IVA 0%)</Typography>
+                  <Typography sx={{ fontSize: 11, color: "text.secondary" }}>Elimina el cálculo del 19% de IVA.</Typography>
+                </Box>
+              }
+            />
+          </Box>
+        </Box>
+
+        {/* Campos Condicionales de Suscripción */}
+        {esSuscripcion && (
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr 1fr" }, gap: 2, p: 2, bgcolor: "action.hover", borderRadius: 2 }}>
+            <TextField
+              select
+              size="small"
+              label="Moneda Base"
+              value={moneda}
+              onChange={(e) => {
+                const val = e.target.value;
+                setMoneda(val);
+                if (val === "CLP") {
+                  // clear monto_uf on change
+                  setGlosas((prev) => prev.map((g) => ({ ...g, monto_uf: "" })));
+                } else {
+                  // calculate base monto_uf
+                  setGlosas((prev) => prev.map((g) => ({ ...g, monto_uf: g.monto ? (g.monto / activeUF).toFixed(2) : "" })));
+                }
+              }}
+              fullWidth
+            >
+              <MenuItem value="CLP">CLP (Pesos Chilenos)</MenuItem>
+              <MenuItem value="UF">UF (Unidad de Fomento)</MenuItem>
+            </TextField>
+
+            <TextField
+              size="small"
+              type="number"
+              label="Duración (Meses/Ciclos)"
+              value={ciclosMensuales}
+              onChange={(e) => setCiclosMensuales(Number(e.target.value))}
+              inputProps={{ min: 1 }}
+              fullWidth
+              helperText="Cantidad de meses a facturar"
+            />
+
+            {moneda === "UF" && (
+              <TextField
+                size="small"
+                type="number"
+                label={`Valor UF (Día: ${formatCLP(valorUF)})`}
+                placeholder={`Ref: ${valorUF}`}
+                value={valorUFManual}
+                onChange={(e) => setValorUFManual(e.target.value)}
+                fullWidth
+                helperText="Dejar vacío para usar UF oficial"
+              />
+            )}
+          </Box>
+        )}
+
         {/* Ventas */}
-        <TextField
-          select
-          size="small"
-          label="Ventas relacionadas"
-          fullWidth
-          value={ventaIds}
-          onChange={(e) => {
-            const v = e.target.value;
-            setVentaIds(Array.isArray(v) ? v : [v]);
-          }}
-          SelectProps={{ multiple: true }}
-          helperText={
-            ventasDisponibles.length
-              ? hasVentas(ventaIds)
-                ? `Subtotal neto preview: ${formatCLP(subtotalNeto)}`
-                : "Cotización sin ventas (importada). El total se define por las glosas."
-              : "No hay ventas disponibles en la cotización."
-          }
-        >
-          {(ventasDisponibles || []).map((v) => (
-            <MenuItem key={v.id} value={v.id}>
-              Venta #{v.numero ?? "—"} · {formatCLP(calcTotalVenta(v))}
-            </MenuItem>
-          ))}
-        </TextField>
+        {!esSuscripcion && (
+          <TextField
+            select
+            size="small"
+            label="Ventas relacionadas"
+            fullWidth
+            value={ventaIds}
+            onChange={(e) => {
+              const v = e.target.value;
+              setVentaIds(Array.isArray(v) ? v : [v]);
+            }}
+            SelectProps={{ multiple: true }}
+            helperText={
+              ventasDisponibles.length
+                ? hasVentas(ventaIds)
+                  ? `Subtotal neto preview: ${formatCLP(subtotalNeto)}`
+                  : "Cotización sin ventas (importada). El total se define por las glosas."
+                : "No hay ventas disponibles en la cotización."
+            }
+          >
+            {(ventasDisponibles || []).map((v) => (
+              <MenuItem key={v.id} value={v.id}>
+                Venta #{v.numero ?? "—"} · {formatCLP(calcTotalVenta(v))}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
 
         {/* Glosas */}
         <Box
@@ -693,34 +913,81 @@ export default function EditCotizacionDialog({
               <Box
                 key={idx}
                 sx={{
-                  display: "grid",
-                  gridTemplateColumns: { xs: "1fr", md: "1fr 180px 44px" },
+                  p: 1.5,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 2,
+                  bgcolor: "action.hover",
+                  display: "flex",
+                  flexDirection: "column",
                   gap: 1.2,
-                  alignItems: "center",
                 }}
               >
-                <TextField
-                  size="small"
-                  label={`Descripción #${idx + 1}`}
-                  value={g.descripcion}
-                  onChange={(e) => setGlosa(idx, { descripcion: e.target.value })}
-                  fullWidth
-                />
-                <TextField
-                  size="small"
-                  type="number"
-                  label="Monto"
-                  value={g.monto}
-                  onChange={(e) => setGlosa(idx, { monto: e.target.value })}
-                  fullWidth
-                />
-                <IconButton
-                  onClick={() => removeGlosa(idx)}
-                  disabled={glosas.length === 1}
-                  sx={{ justifySelf: { xs: "start", md: "center" } }}
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: moneda === "UF"
+                      ? { xs: "1fr", md: "1fr 140px 140px 44px" }
+                      : { xs: "1fr", md: "1fr 180px 44px" },
+                    gap: 1.2,
+                    alignItems: "center",
+                  }}
                 >
-                  <DeleteIcon />
-                </IconButton>
+                  <TextField
+                    size="small"
+                    label={`Descripción #${idx + 1}`}
+                    value={g.descripcion}
+                    onChange={(e) => setGlosa(idx, { descripcion: e.target.value })}
+                    fullWidth
+                  />
+                  {moneda === "UF" ? (
+                    <>
+                      <TextField
+                        size="small"
+                        type="number"
+                        label="Tarifa (UF)"
+                        value={g.monto_uf ?? ""}
+                        onChange={(e) => setGlosa(idx, { monto_uf: e.target.value })}
+                        inputProps={{ step: "0.01", min: "0" }}
+                        fullWidth
+                      />
+                      <TextField
+                        size="small"
+                        label="Equiv. CLP"
+                        value={formatCLP(g.monto)}
+                        disabled
+                        fullWidth
+                      />
+                    </>
+                  ) : (
+                    <TextField
+                      size="small"
+                      type="number"
+                      label="Monto"
+                      value={g.monto}
+                      onChange={(e) => setGlosa(idx, { monto: e.target.value })}
+                      fullWidth
+                    />
+                  )}
+                  <IconButton
+                    onClick={() => removeGlosa(idx)}
+                    disabled={glosas.length === 1}
+                    sx={{ justifySelf: { xs: "start", md: "center" } }}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </Box>
+                <Box sx={{ pr: { xs: 0, md: "44px" } }}>
+                  <TextField
+                    size="small"
+                    label="Comentario particular (opcional)"
+                    value={g.comentario || ""}
+                    onChange={(e) => setGlosa(idx, { comentario: e.target.value })}
+                    fullWidth
+                    variant="standard"
+                    placeholder="Nota o comentario particular para este ítem..."
+                  />
+                </Box>
               </Box>
             ))}
           </Box>
@@ -732,24 +999,34 @@ export default function EditCotizacionDialog({
                 color: glosasOk ? "success.main" : "error.main",
               }}
             >
-              {hasVentas(ventaIds) ? (
+              {esSuscripcion ? (
+                <>
+                  {moneda === "UF" ? (
+                    <>
+                      {glosasOk
+                        ? `✅ Total UF: ${Number(subtotalNetoUF).toFixed(2)} UF (~${formatCLP(subtotalNeto)} CLP) mensual por ${ciclosMensuales} meses.`
+                        : "❌ Revisa glosas (las tarifas en UF deben ser mayores a 0)."}
+                    </>
+                  ) : (
+                    <>
+                      {glosasOk
+                        ? `✅ Total CLP: ${formatCLP(subtotalNeto)} mensual por ${ciclosMensuales} meses.`
+                        : "❌ Revisa glosas (monto total debe ser mayor a 0)."}
+                    </>
+                  )}
+                </>
+              ) : hasVentas(ventaIds) ? (
                 <>
                   {subtotalNeto <= 0
                     ? "❌ Subtotal neto es 0 (revisa ventas)."
                     : glosasOk
-                    ? `✅ Glosas cuadran: ${formatCLP(
-                        sumGlosas(normalizeGlosasClient(glosas))
-                      )}`
-                    : `❌ Glosas: ${formatCLP(
-                        sumGlosas(normalizeGlosasClient(glosas))
-                      )} · Subtotal neto: ${formatCLP(subtotalNeto)}`}
+                    ? `✅ Glosas cuadran: ${formatCLP(subtotalNeto)}`
+                    : `❌ Glosas sumadas no cuadran con el subtotal neto (${formatCLP(subtotalNeto)}).`}
                 </>
               ) : (
                 <>
                   {glosasOk
-                    ? `✅ Total por glosas: ${formatCLP(
-                        sumGlosas(normalizeGlosasClient(glosas))
-                      )}`
+                    ? `✅ Total por glosas: ${formatCLP(subtotalNeto)}`
                     : "❌ Revisa glosas (montos no negativos y total > 0)."}
                 </>
               )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, Box, Button, MenuItem, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, MenuItem, TextField, Typography, FormControlLabel, Switch } from "@mui/material";
 import PersonAddAltIcon from "@mui/icons-material/PersonAddAlt";
 
 export default function StepClienteOferta({
@@ -37,6 +37,9 @@ export default function StepClienteOferta({
   ventaIds,
   setVentaIds,
   preselectedVentaIds,
+
+  sinIva,
+  setSinIva,
 }) {
   const listResponsables = Array.isArray(responsables) ? responsables : [];
 
@@ -292,6 +295,24 @@ export default function StepClienteOferta({
                 </MenuItem>
               ))}
             </TextField>
+          </Box>
+
+          <Box sx={{ gridColumn: { xs: "1 / -1", md: "1 / -1" } }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={sinIva}
+                  onChange={(e) => setSinIva(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label={
+                <Box>
+                  <Typography sx={{ fontWeight: "bold", fontSize: 13 }}>Exento de Impuestos (IVA 0%)</Typography>
+                  <Typography sx={{ fontSize: 11, color: "text.secondary" }}>Elimina el cobro del 19% de IVA para esta cotización.</Typography>
+                </Box>
+              }
+            />
           </Box>
         </Box>
       </Box>

@@ -5,23 +5,208 @@ import { useSession } from "next-auth/react";
 
 import { makeHeaders } from "@/lib/api";
 
-// ✅ Mantén tus dialogs actuales
-import EditCotizacionDialog from "@/components/cotizaciones/EditCotizacionDialog";
-import ImportCotizacionPdfDialog from "@/components/cotizaciones/ImportCotizacionPdfDialog";
+import EditServicioArriendoDialog from "@/components/servicios-arriendos/EditServicioArriendoDialog";
+import ServiciosArriendosTable from "@/components/servicios-arriendos/ServiciosArriendosTable";
+import ServicioArriendoDrawer from "@/components/servicios-arriendos/ServicioArriendoDrawer";
 import CotizacionesSnack from "@/components/cotizaciones/CotizacionesSnack";
 import CotizacionesState from "@/components/cotizaciones/CotizacionesState";
-import CotizacionesSummary from "@/components/cotizaciones/CotizacionesSummary";
+
+function clp(v) {
+  const n = Number(v || 0);
+  return n.toLocaleString("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    maximumFractionDigits: 0,
+  });
+}
+
+function clampPct(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(99.99, n));
+}
+
+function ServiciosArriendosSummary({ cotizaciones }) {
+  const curMonth = dayjs().month() + 1;
+  const curYear = dayjs().year();
+  const monthLabel = MESES.find(m => m.val === curMonth)?.label || "";
+
+  const stats = useMemo(() => {
+    const activeContracts = (cotizaciones || []).filter(
+      c => c.es_suscripcion && c.estado === "ACEPTADA" && !c.eliminado
+    );
+
+    const allBillingQuotes = (cotizaciones || []).filter(
+      c => !c.es_suscripcion && !c.eliminado
+    );
+
+    let totalMensualActivo = 0;
+    let facturadoEsteMes = 0;
+    let cobradoEsteMes = 0;
+    let noCobradoEsteMesCount = 0;
+    let noCobradoEsteMesMonto = 0;
+    const noCobradoContractsList = [];
+
+    const isThisMonth = (quote) => {
+      const asuntoLower = String(quote.asunto || "").toLowerCase();
+      const hasAnyMonthInAsunto = MESES.some(m => asuntoLower.includes(m.label.toLowerCase()));
+      if (hasAnyMonthInAsunto) {
+        const label = monthLabel.toLowerCase();
+        return label && asuntoLower.includes(label) && asuntoLower.includes(String(curYear));
+      }
+      const d = quote.fecha_documento ? new Date(quote.fecha_documento) : new Date(quote.creada_en);
+      return d.getFullYear() === curYear && (d.getMonth() + 1) === curMonth;
+    };
+
+    activeContracts.forEach(contract => {
+      const glosasList = contract.glosas || [];
+      const subtotalBruto = glosasList.reduce((acc, g) => acc + Number(g.monto || 0), 0);
+      const descGlosasMonto = glosasList.reduce((acc, g) => {
+        const bruto = Number(g.monto || 0);
+        const pct = clampPct(g.descuento_pct || 0);
+        return acc + (bruto * (pct / 100));
+      }, 0);
+      const subtotalTrasGlosas = subtotalBruto - descGlosasMonto;
+      const descGeneralPct = clampPct(contract.descuento_pct || 0);
+      const descGeneralMonto = subtotalTrasGlosas * (descGeneralPct / 100);
+      const subtotalNeto = contract.subtotal ?? (subtotalTrasGlosas - descGeneralMonto);
+      const iva = contract.iva ?? 0;
+      const totalMensual = subtotalNeto + iva;
+
+      totalMensualActivo += totalMensual;
+
+      const relatedForThisMonth = allBillingQuotes.filter(
+        q => (q.parent_id === contract.id || (contract.proyecto_id && q.proyecto_id === contract.proyecto_id)) && isThisMonth(q)
+      );
+
+      const isPaid = relatedForThisMonth.some(q => q.estado === "PAGADA");
+      const isBilled = relatedForThisMonth.length > 0;
+
+      if (isBilled) {
+        relatedForThisMonth.forEach(q => {
+          facturadoEsteMes += Number(q.total || 0);
+          if (q.estado === "PAGADA") {
+            cobradoEsteMes += Number(q.total || 0);
+          }
+        });
+      }
+
+      if (!isPaid) {
+        noCobradoEsteMesCount++;
+        noCobradoEsteMesMonto += totalMensual;
+        noCobradoContractsList.push(contract);
+      }
+    });
+
+    return {
+      countActive: activeContracts.length,
+      totalMensualActivo,
+      facturadoEsteMes,
+      cobradoEsteMes,
+      noCobradoEsteMesCount,
+      noCobradoEsteMesMonto,
+      noCobradoContractsList
+    };
+  }, [cotizaciones, curMonth, curYear, monthLabel]);
+
+  const cards = [
+    {
+      title: "Contratos Activos",
+      subtitle: "Mensualidad total activa",
+      value: String(stats.countActive),
+      extra: clp(stats.totalMensualActivo),
+      iconBg: "bg-blue-50",
+      iconText: "text-blue-600",
+      icon: "📋",
+    },
+    {
+      title: "Facturado Este Mes",
+      subtitle: `Cobros emitidos en ${monthLabel}`,
+      value: clp(stats.facturadoEsteMes),
+      iconBg: "bg-indigo-50",
+      iconText: "text-indigo-600",
+      icon: "💵",
+    },
+    {
+      title: "Cobrado Este Mes",
+      subtitle: `Abonos recibidos en ${monthLabel}`,
+      value: clp(stats.cobradoEsteMes),
+      valueClass: "text-emerald-600",
+      iconBg: "bg-emerald-50",
+      iconText: "text-emerald-600",
+      icon: "✅",
+    },
+    {
+      title: "No Cobrado Este Mes",
+      subtitle: `Pendiente en ${monthLabel}`,
+      value: String(stats.noCobradoEsteMesCount),
+      extra: clp(stats.noCobradoEsteMesMonto),
+      valueClass: "text-rose-600",
+      iconBg: "bg-rose-50",
+      iconText: "text-rose-600",
+      icon: "⚠️",
+    },
+  ];
+
+  return (
+    <div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {cards.map((c) => (
+          <div
+            key={c.title}
+            className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${c.iconBg} ${c.iconText}`}>
+                <span className="text-[20px]">{c.icon}</span>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-extrabold text-slate-400 tracking-wider leading-tight">
+                  {c.title}
+                </p>
+                <span className="text-[9px] font-medium block text-slate-500 mt-0.5 normal-case tracking-normal">
+                  {c.subtitle}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-2 flex flex-col">
+              <h3 className={`text-2xl font-black tracking-tight ${c.valueClass || "text-slate-800"}`}>
+                {c.value}
+              </h3>
+              {c.extra && (
+                <span className="text-xs text-slate-500 font-semibold mt-1">
+                  Monto: {c.extra}
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {stats.noCobradoContractsList.length > 0 && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-amber-800 font-bold text-sm">
+            <span>⚠️</span>
+            <span>Contratos activos pendientes de pago este mes ({monthLabel} {curYear}):</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {stats.noCobradoContractsList.map(c => (
+              <span key={c.id} className="px-2.5 py-1 bg-white border border-amber-200 rounded-lg text-xs font-semibold text-slate-700">
+                Contrato #{c.numero ? (c.numero >= 1000000 ? c.numero - 1000000 : c.numero) : ""} — {c.cliente?.nombre} ({clp(c.total)})
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
-
-// ✅ Nuevos componentes (los creas abajo)
-import CotizacionesTableLight from "@/components/cotizaciones/CotizacionesTableLight";
-import CotizacionDrawerLight from "@/components/cotizaciones/CotizacionDrawerLight";
-import ImportRcvPanel from "@/components/compras/ImportRcvPanel";
-import ReporteCotizacionesModal from "@/components/cotizaciones/ReporteCotizacionesModal";
 
 const MESES = [
   { val: 1, label: "Enero" },
@@ -51,26 +236,7 @@ async function safeJson(res) {
   }
 }
 
-function pickEmpresaId(session) {
-  const u = session?.user || session || {};
-  return u.empresaId ?? u.empresa_id ?? u.empresa?.id ?? u.empresa ?? null;
-}
-
-function pickToken(session) {
-  const u = session?.user || session || {};
-  return u.accessToken || session?.accessToken || "";
-}
-
-function makeHeadersMultipart(session) {
-  const token = pickToken(session);
-  const empresaId = pickEmpresaId(session);
-  return {
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(empresaId ? { "x-empresa-id": String(empresaId) } : {}),
-  };
-}
-
-export default function CotizacionesPage() {
+export default function ServiciosArriendosPage() {
   const { data: session, status } = useSession();
 
   const [cotizaciones, setCotizaciones] = useState([]);
@@ -94,15 +260,8 @@ export default function CotizacionesPage() {
   // Dialogs
   const [openEdit, setOpenEdit] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [openImport, setOpenImport] = useState(false);
-  const [openReport, setOpenReport] = useState(false);
 
-  // RCV Import
-  const [importing, setImporting] = useState(false);
-  const [importErr, setImportErr] = useState("");
-  const [importResult, setImportResult] = useState(null);
-
-  // Snackbar (mantienes tu snack MUI)
+  // Snackbar
   const [snack, setSnack] = useState({
     open: false,
     severity: "success",
@@ -136,13 +295,13 @@ export default function CotizacionesPage() {
       const data = await safeJson(res);
       if (!res.ok) {
         throw new Error(
-          data?.error || data?.detalle || "Error al listar cotizaciones",
+          data?.error || data?.detalle || "Error al listar servicios/arriendos",
         );
       }
 
       setCotizaciones(Array.isArray(data) ? data : []);
     } catch (e) {
-      setErr(e?.message || "Error al cargar cotizaciones");
+      setErr(e?.message || "Error al cargar servicios/arriendos");
     } finally {
       setLoading(false);
     }
@@ -171,10 +330,8 @@ export default function CotizacionesPage() {
       fetchCotizaciones();
       fetchClientes();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
-  // ✅ IMPORTANTE: tu updateEstado (igual)
   const updateEstado = async (cotizacionId, estado, extra = {}) => {
     try {
       const res = await fetch(
@@ -194,15 +351,15 @@ export default function CotizacionesPage() {
       }
 
       if (estado === "ACEPTADA")
-        showSnack("success", "Cotización aceptada. Proyecto creado/iniciado.");
+        showSnack("success", "Servicio/Arriendo aceptado. Contrato activo.");
       else if (estado === "RECHAZADA")
-        showSnack("success", "Cotización rechazada.");
+        showSnack("success", "Servicio/Arriendo rechazado/cancelado.");
       else showSnack("success", `Estado actualizado a ${estado}`);
 
       setCotizaciones((prev) =>
         prev.map((c) => {
           if (c.id !== cotizacionId) return c;
-          return { ...c, ...data, items: data.items ?? c.items ?? [] };
+          return { ...c, ...data, glosas: data.glosas ?? c.glosas ?? [] };
         }),
       );
     } catch (e) {
@@ -223,43 +380,11 @@ export default function CotizacionesPage() {
         throw new Error(data?.error || data?.detalle || "Error al eliminar");
       }
 
-      showSnack("success", "Cotización eliminada");
-      // Actualizar lista local
+      showSnack("success", "Servicio/Arriendo eliminado");
       setCotizaciones((prev) => prev.filter((c) => c.id !== id));
       setOpenDrawer(false);
     } catch (e) {
       showSnack("error", e?.message || "Error al eliminar");
-    }
-  };
-
-  const handleImportRCV = async (file) => {
-    try {
-      setImporting(true);
-      setImportErr("");
-      setImportResult(null);
-
-      const fd = new FormData();
-      fd.append("file", file);
-
-      const res = await fetch(`${API_URL}/cotizaciones/import/rcv`, {
-        method: "POST",
-        headers: makeHeadersMultipart(session),
-        body: fd,
-      });
-
-      const data = await safeJson(res);
-      if (!res.ok) {
-        throw new Error(data?.error || data?.detalle || "Error en importación");
-      }
-
-      setImportResult(data);
-      showSnack("success", `Importación exitosa: ${data.linked} vinculados, ${data.created} creados.`);
-      fetchCotizaciones();
-    } catch (e) {
-      setImportErr(e.message);
-      showSnack("error", e.message);
-    } finally {
-      setImporting(false);
     }
   };
 
@@ -271,8 +396,8 @@ export default function CotizacionesPage() {
 
   const filtered = useMemo(() => {
     return (cotizaciones || []).filter((c) => {
-      // Excluir suscripciones/arriendos del módulo estándar de cotizaciones
-      if (c.es_suscripcion) return false;
+      // Filtrar SOLO suscripciones/arriendos
+      if (!c.es_suscripcion) return false;
 
       // Filtro mes/año
       if (filterMonth !== "" || filterYear !== "") {
@@ -318,10 +443,10 @@ export default function CotizacionesPage() {
 
   return (
     <div className="bg-slate-50 min-h-[calc(100vh-0px)]">
-      {/* Header como el ejemplo */}
+      {/* Header */}
       <div className="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-6 md:px-8">
         <div className="flex items-center gap-4">
-          <h2 className="text-xl font-bold">Cotizaciones</h2>
+          <h2 className="text-xl font-bold">Servicios / Arriendos Recurrentes</h2>
         </div>
 
         <div className="flex items-center gap-3">
@@ -333,18 +458,13 @@ export default function CotizacionesPage() {
           </button>
 
           <button
-            onClick={() => setOpenReport(true)}
-            disabled={filtered.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg text-sm font-medium transition-colors shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            onClick={() => {
+              setEditingId(null);
+              setOpenEdit(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
           >
-            <span>📊</span> Reporte General
-          </button>
-
-          <button
-            onClick={() => setOpenImport(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors"
-          >
-            <span className="text-lg">⬆</span> Importar PDF
+            <span className="text-lg">＋</span> Nuevo Servicio/Arriendo
           </button>
         </div>
       </div>
@@ -352,22 +472,21 @@ export default function CotizacionesPage() {
       {/* Contenido */}
       <div className="p-6 md:p-8">
         <p className="text-slate-500 mb-6">
-          Gestiona estados, revisa detalle y exporta a PDF de manera centralizada.
+          Modulo especializado de contratos, servicios mensuales y arriendos recurrentes.
         </p>
 
-        <CotizacionesSummary cotizaciones={filtered} filterEstado={filterEstado} />
+        <ServiciosArriendosSummary cotizaciones={cotizaciones} />
 
         {/* Filtros */}
         <div className="mb-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-
-          {/* Nº COT */}
+          {/* Nº DOC */}
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-bold">#</span>
             <input
               value={fNumero}
               onChange={(e) => setFNumero(e.target.value)}
               className="w-full pl-7 pr-4 h-[46px] border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all"
-              placeholder="Nº Cotización"
+              placeholder="Nº Contrato"
               type="text"
             />
           </div>
@@ -398,12 +517,9 @@ export default function CotizacionesPage() {
               className="w-full h-[46px] px-3 pr-9 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all appearance-none cursor-pointer"
             >
               <option value="">Todos los estados</option>
-              <option value="COTIZACION">Cotización</option>
-              <option value="ACEPTADA">Aceptada</option>
-              <option value="RECHAZADA">Rechazada</option>
-              <option value="ORDEN_VENTA">Orden de Venta</option>
-              <option value="ENTREGADO">Entregado</option>
-              <option value="POR_FACTURAR">Por Facturar</option>
+              <option value="COTIZACION">Borrador de Servicio</option>
+              <option value="ACEPTADA">Proyecto Andando</option>
+              <option value="RECHAZADA">Servicio Cancelado</option>
               <option value="FACTURADA">Facturada</option>
               <option value="PAGADA">Pagada</option>
             </select>
@@ -448,7 +564,7 @@ export default function CotizacionesPage() {
         {/* Conteo + limpiar */}
         <div className="flex items-center justify-between mb-5">
           <span className="text-xs text-slate-400">
-            {filtered.length} resultado{filtered.length !== 1 ? "s" : ""}
+            {filtered.length} contrato{filtered.length !== 1 ? "s" : ""}
           </span>
           {hasFilters && (
             <button
@@ -458,20 +574,6 @@ export default function CotizacionesPage() {
               <span>✕</span> Limpiar filtros
             </button>
           )}
-        </div>
-
-        {/* Import RCV Section */}
-        <div className="mb-8">
-          <ImportRcvPanel
-            importing={importing}
-            importErr={importErr}
-            importResult={importResult}
-            onImportFile={handleImportRCV}
-            onClear={() => {
-              setImportErr("");
-              setImportResult(null);
-            }}
-          />
         </div>
 
         {/* Estado general (loading/error/empty) */}
@@ -484,21 +586,21 @@ export default function CotizacionesPage() {
 
         {/* Tabla */}
         {!loading && filtered.length > 0 && (
-          <CotizacionesTableLight
-            cotizaciones={filtered}
-            onRowClick={(cot) => {
-              setSelectedId(cot.id);
+          <ServiciosArriendosTable
+            servicios={filtered}
+            onRowClick={(serv) => {
+              setSelectedId(serv.id);
               setOpenDrawer(true);
             }}
-            onEdit={(id) => openEditCot(id)}
           />
         )}
       </div>
 
-      {/* Drawer + Overlay */}
-      <CotizacionDrawerLight
+      {/* Drawer */}
+      <ServicioArriendoDrawer
         open={openDrawer}
-        cotizacion={selected}
+        servicio={selected}
+        allCotizaciones={cotizaciones}
         onClose={() => setOpenDrawer(false)}
         onEdit={(id) => openEditCot(id)}
         onUpdateEstado={updateEstado}
@@ -507,33 +609,17 @@ export default function CotizacionesPage() {
         onRefresh={() => fetchCotizaciones()}
       />
 
-      {/* Dialogs que ya tienes */}
-      <ImportCotizacionPdfDialog
-        open={openImport}
-        onClose={() => setOpenImport(false)}
-        session={session}
-        clientes={clientes}
-        showSnack={showSnack}
-        onCreated={() => fetchCotizaciones()}
-      />
-
-      <EditCotizacionDialog
+      {/* Dialogo Edición/Creación */}
+      <EditServicioArriendoDialog
         open={openEdit}
         onClose={() => setOpenEdit(false)}
         session={session}
         cotizacionId={editingId}
         clientes={clientes}
         onUpdated={() => {
-          showSnack("success", "Cotización actualizada");
+          showSnack("success", "Servicio/Arriendo guardado correctamente");
           fetchCotizaciones();
         }}
-      />
-
-      <ReporteCotizacionesModal
-        open={openReport}
-        onClose={() => setOpenReport(false)}
-        cotizaciones={filtered}
-        session={session}
       />
 
       <CotizacionesSnack snack={snack} onClose={closeSnack} />

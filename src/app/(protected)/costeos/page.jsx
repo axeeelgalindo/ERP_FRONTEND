@@ -7,8 +7,10 @@ import { useRouter } from "next/navigation";
 import VentasHeader from "@/components/ventas/VentasHeader";
 import VentasSummary from "@/components/ventas/VentasSummary";
 import VentasTable from "@/components/ventas/VentasTable";
+import CosteosDashboard from "@/components/ventas/CosteosDashboard";
 
 import NuevaVentaDialog from "@/components/ventas/NuevaVentaDialog";
+import ReporteCosteoModal from "@/components/ventas/ReporteCosteoModal";
 
 // ✅ usa SOLO el nuevo modal (paso a paso)
 import { CotizacionFromVentasDialog } from "@/components/ventas/cotizacion";
@@ -42,11 +44,22 @@ export default function VentasPage() {
     status,
   });
 
+  const [viewMode, setViewMode] = useState("list"); // "list" | "dashboard"
   const [openNew, setOpenNew] = useState(false);
 
   // ✅ EDIT
   const [openEdit, setOpenEdit] = useState(false);
   const [ventaIdEditing, setVentaIdEditing] = useState(null);
+
+  // Reporte Costeo Modal
+  const [openReport, setOpenReport] = useState(false);
+  const [ventaReport, setVentaReport] = useState(null);
+
+  const onOpenReport = useCallback((venta) => {
+    if (!venta?.id) return;
+    setVentaReport(venta);
+    setOpenReport(true);
+  }, []);
 
   // Cotización
   const [openCot, setOpenCot] = useState(false);
@@ -105,16 +118,51 @@ export default function VentasPage() {
           onOpenCotizacion={openCotManual}
         />
 
-        <VentasSummary ventas={ventas} />
+        {/* View Selector Toggle (List vs Dashboard) */}
+        <div className="flex bg-slate-100 p-1 rounded-xl w-fit mb-6 border border-slate-200/50">
+          <button
+            onClick={() => setViewMode("list")}
+            className={`px-6 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 hover:cursor-pointer ${
+              viewMode === "list"
+                ? "bg-white text-blue-600 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            <span>📋</span> Listado de Costeos
+          </button>
+          <button
+            onClick={() => setViewMode("dashboard")}
+            className={`px-6 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 hover:cursor-pointer ${
+              viewMode === "dashboard"
+                ? "bg-white text-blue-600 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            <span>📊</span> Dashboard Ejecutivo
+          </button>
+        </div>
 
-        <VentasTable
-          ventas={ventas}
-          error={errorVentas}
-          loading={loadingVentas}
-          onCreateCotizacionFromVenta={onCreateCotizacionFromVenta}
-          onEditVenta={onEditVenta}
-          onDisableVenta={onDisableVenta}
-        />
+        {viewMode === "list" ? (
+          <>
+            <VentasSummary ventas={ventas} />
+            <VentasTable
+              ventas={ventas}
+              error={errorVentas}
+              loading={loadingVentas}
+              onCreateCotizacionFromVenta={onCreateCotizacionFromVenta}
+              onEditVenta={onEditVenta}
+              onDisableVenta={onDisableVenta}
+              onOpenReport={onOpenReport}
+              session={session}
+            />
+          </>
+        ) : (
+          <CosteosDashboard
+            ventas={ventas}
+            onOpenReport={onOpenReport}
+            session={session}
+          />
+        )}
       </div>
 
       {/* FAB mobile */}
@@ -174,6 +222,17 @@ export default function VentasPage() {
         session={session}
         empresaIdFromToken={empresaIdFromToken}
         onDisabled={fetchVentas}
+      />
+
+      {/* Reporte de costeo */}
+      <ReporteCosteoModal
+        open={openReport}
+        onClose={() => {
+          setOpenReport(false);
+          setVentaReport(null);
+        }}
+        venta={ventaReport}
+        session={session}
       />
     </main>
   );

@@ -149,6 +149,8 @@ export default function CotizacionFromVentasDialog({
   // ✅ descuento general cotización
   const [descuentoPct, setDescuentoPct] = useState("");
 
+  const [sinIva, setSinIva] = useState(false);
+
   const emptyGlosa = () => ({
     descripcion: "",
     cantidad: 1,
@@ -157,6 +159,7 @@ export default function CotizacionFromVentasDialog({
     manual: false,
     orden: 0,
     descuento_pct: 0, // descuento por glosa
+    comentario: "",
   });
 
   const [glosas, setGlosas] = useState([emptyGlosa()]);
@@ -174,6 +177,7 @@ export default function CotizacionFromVentasDialog({
     setTerminos("");
     setAcuerdoPago("");
     setVigenciaDias(15);
+    setSinIva(false);
 
     setVentaIds(preselectedVentaIds?.length ? preselectedVentaIds : []);
     setDescuentoPct("");
@@ -218,8 +222,8 @@ export default function CotizacionFromVentasDialog({
   }, [subtotalNetoGlosas, descuentoPct]);
 
   const iva = useMemo(
-    () => round0(subtotalFinal * Number(ivaRate || 0)),
-    [subtotalFinal, ivaRate]
+    () => sinIva ? 0 : round0(subtotalFinal * Number(ivaRate || 0)),
+    [subtotalFinal, ivaRate, sinIva]
   );
 
   const totalFinal = useMemo(
@@ -597,8 +601,10 @@ export default function CotizacionFromVentasDialog({
             manual: !!g.manual,
             orden: i,
             descuento_pct: clampPct(g.descuento_pct),
+            comentario: g.comentario || null,
           };
         }),
+        sin_iva: sinIva,
       };
 
       const res = await fetch(`${API_URL}/cotizaciones/add`, {
@@ -688,6 +694,8 @@ export default function CotizacionFromVentasDialog({
             hasGlosaDiscount={hasGlosaDiscount}
             conflict={conflict}
             conflictMsg={conflictMsg}
+            sinIva={sinIva}
+            setSinIva={setSinIva}
           />
         ) : null}
 

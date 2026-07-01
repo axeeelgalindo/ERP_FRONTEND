@@ -8,6 +8,7 @@ import BorderColorRoundedIcon from "@mui/icons-material/BorderColorRounded";
 
 //icons
 import DeleteForeverRoundedIcon from "@mui/icons-material/DeleteForeverRounded";
+import { exportGeneralPDF } from "./utils/exportGeneralPDF";
 
 function clp(v) {
   const n = Number(v || 0);
@@ -72,9 +73,12 @@ export default function VentasTable({
   onCreateCotizacionFromVenta,
   onEditVenta,
   onDisableVenta,
+  onOpenReport,
+  session,
 }) {
   // Tabs arriba (Costeos / Cotizaciones) -> Cotizaciones placeholder
   const [tab, setTab] = useState("costeos"); // "costeos" | "cotizaciones"
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   // filtros (no endpoint aún, solo UI)
   const [range, setRange] = useState("mes"); // todo | mes | porMes | dia
@@ -254,6 +258,25 @@ export default function VentasTable({
             <span className="text-[18px]">⚙️</span> Estado
           </button>
 
+          <button
+            onClick={() => exportGeneralPDF(filtered, range, q, session, setExportingPdf)}
+            disabled={exportingPdf || filtered.length === 0}
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white px-4 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/20 hover:scale-[1.02] active:scale-95 transition disabled:scale-100 disabled:opacity-60 hover:cursor-pointer"
+            title="Descargar Reporte General de Costeos (PDF)"
+          >
+            {exportingPdf ? (
+              <>
+                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                <span>Generando...</span>
+              </>
+            ) : (
+              <>
+                <span>📊</span>
+                <span>Reporte General</span>
+              </>
+            )}
+          </button>
+
           {/* Dropdown placeholder */}
           {estadoOpen ? (
             <div className="absolute right-0 top-[46px] z-20 w-56 bg-white  border border-slate-200  rounded-xl shadow-lg p-2">
@@ -372,6 +395,15 @@ export default function VentasTable({
                         title="Ver / Crear cotización"
                       >
                         📄
+                      </button>
+
+                      {/* Botón Reporte de Costeo */}
+                      <button
+                        onClick={() => onOpenReport?.(venta)}
+                        className="p-2.5 text-indigo-600 bg-indigo-600/10 hover:bg-indigo-600 hover:text-white rounded-xl transition hover:cursor-pointer flex items-center justify-center"
+                        title="Ver Reporte de Costeo"
+                      >
+                        📊
                       </button>
 
                       {/* Botón menú ⋮ */}

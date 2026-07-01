@@ -94,7 +94,10 @@ export default function CotizacionGlosasTable({ glosas = [], subtotal, cotizacio
             />
 
             <Field label="Subtotal (neto)" value={formatCLP(c.subtotal)} />
-            <Field label="IVA" value={formatCLP(c.iva)} />
+            <Field
+              label="IVA"
+              value={c?.sin_iva ? `${formatCLP(0)} (Exento)` : formatCLP(c?.iva)}
+            />
             <Field label="Total" value={formatCLP(c.total)} />
           </Box>
 
@@ -199,6 +202,21 @@ export default function CotizacionGlosasTable({ glosas = [], subtotal, cotizacio
                       >
                         {String(g.descripcion || "").trim() || "-"}
                       </Typography>
+
+                      {g.comentario ? (
+                        <Typography
+                          variant="caption"
+                          color="info.main"
+                          sx={{
+                            fontWeight: 600,
+                            fontStyle: "italic",
+                            whiteSpace: "pre-wrap",
+                            mt: 0.5,
+                          }}
+                        >
+                          Comentario: {g.comentario}
+                        </Typography>
+                      ) : null}
 
                       {g.id ? (
                         <Typography

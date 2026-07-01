@@ -368,6 +368,18 @@ export default function StepGlosasTotales({
                 </Typography>
               </Box>
 
+              <Box sx={{ width: "100%", mt: 1, pr: 6 }}>
+                <TextField
+                  variant="standard"
+                  size="small"
+                  label="Comentario particular (opcional)"
+                  value={g.comentario || ""}
+                  onChange={(e) => setGlosa(idx, { comentario: e.target.value })}
+                  fullWidth
+                  placeholder="Escribe un comentario o nota para este ítem..."
+                />
+              </Box>
+
               <IconButton
                 onClick={() => removeGlosa(idx)}
                 sx={{ mt: 1.4, ml: "auto" }}
