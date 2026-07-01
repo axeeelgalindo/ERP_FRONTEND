@@ -446,7 +446,7 @@ export default function ServiciosArriendosPage() {
       {/* Header */}
       <div className="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-6 md:px-8">
         <div className="flex items-center gap-4">
-          <h2 className="text-xl font-bold">Servicios / Arriendos Recurrentes</h2>
+          <h2 className="text-xl font-bold">Servicios</h2>
         </div>
 
         <div className="flex items-center gap-3">
