@@ -22,6 +22,7 @@ import CotizacionesTableLight from "@/components/cotizaciones/CotizacionesTableL
 import CotizacionDrawerLight from "@/components/cotizaciones/CotizacionDrawerLight";
 import ImportRcvPanel from "@/components/compras/ImportRcvPanel";
 import ReporteCotizacionesModal from "@/components/cotizaciones/ReporteCotizacionesModal";
+import * as XLSX from "xlsx";
 
 const MESES = [
   { val: 1, label: "Enero" },
@@ -263,6 +264,325 @@ export default function CotizacionesPage() {
     }
   };
 
+  const downloadReporteFinanciero = () => {
+    try {
+      if (!cotizaciones.length) {
+        showSnack("warning", "No hay datos para exportar");
+        return;
+      }
+
+      // Helper para calcular la fecha de pago de cotización variable (7 días después del fin del proyecto)
+      const getPaymentDate = (c) => {
+        const p = c.proyecto;
+        let date = null;
+        if (p) {
+          const rawDate = p.fecha_fin_real || p.fecha_fin_plan;
+          if (rawDate) {
+            date = new Date(rawDate);
+          }
+        }
+        if (!date) {
+          // Si no tiene fecha fin de proyecto, usamos fecha del documento o de creación
+          const baseDate = c.fecha_documento || c.creada_en;
+          date = new Date(baseDate);
+        }
+        const paymentDate = new Date(date);
+        paymentDate.setDate(paymentDate.getDate() + 7);
+        return paymentDate;
+      };
+
+      // 1. Filtrar las cotizaciones activas y no eliminadas
+      // Ingresos Variables: cotizaciones aceptadas/completadas (no en borrador y no rechazada) que tienen proyecto
+      const variables = cotizaciones.filter(c => {
+        if (c.es_suscripcion || c.eliminado) return false;
+        const isAccepted = c.estado !== 'COTIZACION' && c.estado !== 'RECHAZADA';
+        const hasProject = !!c.proyecto_id || !!c.proyecto;
+        return isAccepted && hasProject;
+      });
+
+      // Ingresos Fijos: servicios/arriendos recurrentes (es_suscripcion === true) no rechazados/eliminados
+      const fijos = cotizaciones.filter(c => c.es_suscripcion && !c.eliminado && c.estado !== 'RECHAZADA');
+
+      // 2. Determinar los meses presentes en el sistema
+      const yearMonthsSet = new Set();
+
+      variables.forEach(c => {
+        const payDate = getPaymentDate(c);
+        const y = payDate.getFullYear();
+        const m = String(payDate.getMonth() + 1).padStart(2, '0');
+        yearMonthsSet.add(`${y}-${m}`);
+      });
+
+      fijos.forEach(c => {
+        if (c.fecha_inicio_plan) {
+          const start = new Date(c.fecha_inicio_plan);
+          let end = c.fecha_fin_plan ? new Date(c.fecha_fin_plan) : null;
+          if (!end && c.ciclos_mensuales) {
+            end = new Date(start);
+            end.setMonth(start.getMonth() + c.ciclos_mensuales - 1);
+          }
+          if (!end) {
+            end = new Date(start);
+            end.setMonth(start.getMonth() + 11);
+          }
+          
+          let current = new Date(start.getFullYear(), start.getMonth(), 1);
+          const limit = new Date(end.getFullYear(), end.getMonth(), 1);
+          
+          while (current <= limit) {
+            const y = current.getFullYear();
+            const m = String(current.getMonth() + 1).padStart(2, '0');
+            yearMonthsSet.add(`${y}-${m}`);
+            current.setMonth(current.getMonth() + 1);
+          }
+        }
+      });
+
+      // Ordenar cronológicamente
+      const sortedYearMonths = Array.from(yearMonthsSet).sort();
+
+      // Si no hay meses, usar por defecto el año actual
+      if (sortedYearMonths.length === 0) {
+        const currentYear = new Date().getFullYear();
+        for (let m = 1; m <= 12; m++) {
+          const mStr = String(m).padStart(2, '0');
+          sortedYearMonths.push(`${currentYear}-${mStr}`);
+        }
+      }
+
+      const monthNamesSpanish = [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+      ];
+
+      const getLabel = (ym) => {
+        const [y, m] = ym.split("-");
+        const monthName = monthNamesSpanish[parseInt(m, 10) - 1];
+        return `${monthName} ${y}`;
+      };
+
+      const currCell = (val) => {
+        if (val === 0) return { v: 0, t: "n", z: "$#,##0" };
+        if (!val) return { v: "", t: "s" };
+        return { v: Number(val), t: "n", z: "$#,##0" };
+      };
+
+      const mapEstado = (est) => {
+        const map = {
+          COTIZACION: "Cotización",
+          ACEPTADA: "Aceptada",
+          ORDEN_VENTA: "Orden de Venta",
+          ENTREGADO: "Entregado",
+          POR_FACTURAR: "Por Facturar",
+          FACTURADA: "Facturada",
+          PAGADA: "Pagada",
+          RECHAZADA: "Rechazada"
+        };
+        return map[est] || est || "";
+      };
+
+      const isMonthActive = (contract, ymKey) => {
+        if (!contract.fecha_inicio_plan) return false;
+        const start = new Date(contract.fecha_inicio_plan);
+        const startKey = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
+        
+        let end = contract.fecha_fin_plan ? new Date(contract.fecha_fin_plan) : null;
+        if (!end && contract.ciclos_mensuales) {
+          end = new Date(start);
+          end.setMonth(start.getMonth() + contract.ciclos_mensuales - 1);
+        }
+        if (!end) {
+          end = new Date(start);
+          end.setMonth(start.getMonth() + 11);
+        }
+        const endKey = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}`;
+        
+        return ymKey >= startKey && ymKey <= endKey;
+      };
+
+      const rows = [];
+      const merges = [];
+
+      // Título Principal
+      merges.push({ s: { r: rows.length, c: 0 }, e: { r: rows.length, c: 5 } });
+      rows.push([{ v: "REPORTE FINANCIERO - PLANIFICACIÓN DE INGRESOS", t: "s" }]);
+      rows.push([]);
+
+      // --- SECCIÓN 1: INGRESOS VARIABLES ---
+      merges.push({ s: { r: rows.length, c: 0 }, e: { r: rows.length, c: 5 } });
+      rows.push([{ v: "INGRESOS VARIABLES (Proyectos aceptados, estimado 7 días post-término)", t: "s" }]);
+      
+      const headersVar = [
+        "ESTADO",
+        "COT",
+        "CLIENTE",
+        "DETALLE",
+        "DETALLE INGRESOS VARIABLE $",
+        "MONTO neto"
+      ];
+      sortedYearMonths.forEach(ym => {
+        headersVar.push(getLabel(ym));
+      });
+      rows.push(headersVar.map(h => ({ v: h, t: "s" })));
+
+      const varTotalsByMonth = {};
+      sortedYearMonths.forEach(ym => {
+        varTotalsByMonth[ym] = 0;
+      });
+      let varTotalMontoNeto = 0;
+
+      variables.forEach(c => {
+        const payDate = getPaymentDate(c);
+        const ymKey = `${payDate.getFullYear()}-${String(payDate.getMonth() + 1).padStart(2, '0')}`;
+        const subtotal = c.subtotal || 0;
+
+        const row = [
+          { v: mapEstado(c.estado), t: "s" },
+          { v: c.numero || "", t: "n" },
+          { v: c.cliente?.nombre || "", t: "s" },
+          { v: c.asunto || "", t: "s" },
+          { v: (c.glosas || []).map(g => g.descripcion).filter(Boolean).join(" / ") || c.asunto || "", t: "s" },
+          currCell(subtotal)
+        ];
+
+        sortedYearMonths.forEach(ym => {
+          if (ym === ymKey) {
+            row.push(currCell(subtotal));
+            varTotalsByMonth[ym] += subtotal;
+            varTotalMontoNeto += subtotal;
+          } else {
+            row.push({ v: "", t: "s" });
+          }
+        });
+
+        rows.push(row);
+      });
+
+      // Fila de Totales de Variables
+      const totalRowVar = [
+        { v: "", t: "s" },
+        { v: "", t: "s" },
+        { v: "TOTAL", t: "s" },
+        { v: "", t: "s" },
+        { v: "", t: "s" },
+        currCell(varTotalMontoNeto)
+      ];
+      sortedYearMonths.forEach(ym => {
+        totalRowVar.push(currCell(varTotalsByMonth[ym]));
+      });
+      rows.push(totalRowVar);
+
+      rows.push([]);
+      rows.push([]);
+
+      // --- SECCIÓN 2: INGRESOS FIJOS ---
+      merges.push({ s: { r: rows.length, c: 0 }, e: { r: rows.length, c: 5 } });
+      rows.push([{ v: "INGRESOS FIJOS (Servicios y arriendos recurrentes)", t: "s" }]);
+
+      const headersFijos = [
+        "ESTADO",
+        "COT",
+        "CLIENTE",
+        "DETALLE",
+        "DETALLE INGRESOS FIJOS $",
+        "MONTO"
+      ];
+      sortedYearMonths.forEach(ym => {
+        headersFijos.push(getLabel(ym));
+      });
+      rows.push(headersFijos.map(h => ({ v: h, t: "s" })));
+
+      const fijosTotalsByMonth = {};
+      sortedYearMonths.forEach(ym => {
+        fijosTotalsByMonth[ym] = 0;
+      });
+      let fijosTotalMonto = 0;
+
+      fijos.forEach(c => {
+        const subtotal = c.subtotal || 0;
+
+        const row = [
+          { v: mapEstado(c.estado), t: "s" },
+          { v: c.numero || "", t: "n" },
+          { v: c.cliente?.nombre || "", t: "s" },
+          { v: c.asunto || "", t: "s" },
+          { v: (c.glosas || []).map(g => g.descripcion).filter(Boolean).join(" / ") || c.asunto || "", t: "s" },
+          currCell(subtotal)
+        ];
+
+        sortedYearMonths.forEach(ym => {
+          if (isMonthActive(c, ym)) {
+            row.push(currCell(subtotal));
+            fijosTotalsByMonth[ym] += subtotal;
+            fijosTotalMonto += subtotal;
+          } else {
+            row.push({ v: "", t: "s" });
+          }
+        });
+
+        rows.push(row);
+      });
+
+      // Fila de Totales de Fijos
+      const totalRowFijos = [
+        { v: "", t: "s" },
+        { v: "", t: "s" },
+        { v: "TOTAL", t: "s" },
+        { v: "", t: "s" },
+        { v: "", t: "s" },
+        currCell(fijosTotalMonto)
+      ];
+      sortedYearMonths.forEach(ym => {
+        totalRowFijos.push(currCell(fijosTotalsByMonth[ym]));
+      });
+      rows.push(totalRowFijos);
+
+      rows.push([]);
+      rows.push([]);
+
+      // --- SECCIÓN 3: TOTAL GENERAL ---
+      merges.push({ s: { r: rows.length, c: 0 }, e: { r: rows.length, c: 5 } });
+      rows.push([{ v: "TOTAL INGRESOS (VARIABLES + FIJOS)", t: "s" }]);
+
+      const totalIngresosRow = [
+        { v: "", t: "s" },
+        { v: "", t: "s" },
+        { v: "TOTAL GENERAL", t: "s" },
+        { v: "", t: "s" },
+        { v: "", t: "s" },
+        currCell(varTotalMontoNeto + fijosTotalMonto)
+      ];
+      sortedYearMonths.forEach(ym => {
+        totalIngresosRow.push(currCell(varTotalsByMonth[ym] + fijosTotalsByMonth[ym]));
+      });
+      rows.push(totalIngresosRow);
+
+      // Crear workbook
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+
+      // Asignar merges
+      ws['!merges'] = merges;
+
+      // Anchura de columnas
+      ws['!cols'] = [
+        { wch: 18 }, // ESTADO
+        { wch: 10 }, // COT
+        { wch: 30 }, // CLIENTE
+        { wch: 30 }, // DETALLE
+        { wch: 40 }, // DETALLE INGRESOS
+        { wch: 18 }, // MONTO neto
+        ...sortedYearMonths.map(() => ({ wch: 16 })) // meses
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, "Reporte Financiero");
+      XLSX.writeFile(wb, `Reporte_Financiero_${dayjs().format("YYYY-MM-DD")}.xlsx`);
+      showSnack("success", "Reporte financiero descargado");
+    } catch (e) {
+      showSnack("error", "Error al exportar: " + e.message);
+    }
+  };
+
   // Selección actual para el drawer
   const selected = useMemo(
     () => cotizaciones.find((c) => c.id === selectedId) || null,
@@ -338,6 +658,14 @@ export default function CotizacionesPage() {
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg text-sm font-medium transition-colors shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <span>📊</span> Reporte General
+          </button>
+
+          <button
+            onClick={downloadReporteFinanciero}
+            disabled={cotizaciones.length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-lg text-sm font-medium transition-colors shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <span>💵</span> Reporte Financiero
           </button>
 
           <button

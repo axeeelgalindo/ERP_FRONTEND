@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import CotizacionPDFButtonLight from "@/components/cotizaciones/CotizacionPDFButtonLight";
 import CotizacionPDFButton from "./CotizacionPDFButton";
-import { fechaCL, formatCLP } from "@/components/cotizaciones/utils/utils";
+import { fechaCL, formatCLP, formatMoney } from "@/components/cotizaciones/utils/utils";
 import { IconButton } from "@mui/material";
 import { MoreVerticalIcon } from "lucide-react";
 import CotizacionActionsMenu from "@/components/cotizaciones/CotizacionActionsMenu";
@@ -119,15 +119,15 @@ export default function CotizacionesTableLight({
                   </td>
 
                   <td className="px-6 py-4 text-sm text-right font-medium">
-                    {formatCLP(c.subtotal)}
+                    {formatMoney(c.subtotal, c.moneda)}
                   </td>
 
                   <td className="px-6 py-4 text-sm text-right text-slate-600">
-                    {formatCLP(c.iva)}
+                    {formatMoney(c.iva, c.moneda)}
                   </td>
 
                   <td className="px-6 py-4 text-sm text-right font-bold">
-                    {formatCLP(c.total)}
+                    {formatMoney(c.total, c.moneda)}
                   </td>
 
                   <td className="px-6 py-4 text-center">

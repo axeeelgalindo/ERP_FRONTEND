@@ -40,6 +40,8 @@ export default function StepClienteOferta({
 
   sinIva,
   setSinIva,
+  moneda = "CLP",
+  setMoneda,
 }) {
   const listResponsables = Array.isArray(responsables) ? responsables : [];
 
@@ -201,7 +203,7 @@ export default function StepClienteOferta({
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr 1fr" },
             gap: 2,
           }}
         >
@@ -257,6 +259,33 @@ export default function StepClienteOferta({
                   : "Aplica sobre el subtotal neto de glosas (antes de IVA)"
               }
             />
+          </Box>
+
+          {/* ✅ Selección de Moneda */}
+          <Box>
+            <Typography
+              sx={{
+                fontSize: 11,
+                fontWeight: 1000,
+                color: "text.secondary",
+                letterSpacing: ".12em",
+                textTransform: "uppercase",
+                mb: 1,
+              }}
+            >
+              Moneda
+            </Typography>
+            <TextField
+              select
+              size="small"
+              value={moneda}
+              onChange={(e) => setMoneda(e.target.value)}
+              fullWidth
+            >
+              <MenuItem value="CLP">Pesos (CLP)</MenuItem>
+              <MenuItem value="UF">UF</MenuItem>
+              <MenuItem value="USD">Dólares (USD)</MenuItem>
+            </TextField>
           </Box>
 
           <Box sx={{ gridColumn: { xs: "1 / -1", md: "1 / -1" } }}>

@@ -26,6 +26,7 @@ import {
   estadoColor,
   fechaCL,
   formatCLP,
+  formatMoney,
   nextEstados,
 } from "@/components/cotizaciones/utils/utils";
 
@@ -163,19 +164,19 @@ export default function CotizacionesDesktopTable({
 
                     <TableCell align="right">
                       <Typography fontWeight={900}>
-                        {formatCLP(c.subtotal)}
+                        {formatMoney(c.subtotal, c.moneda)}
                       </Typography>
                     </TableCell>
 
                     <TableCell align="right">
                       <Typography fontWeight={900}>
-                        {formatCLP(c.iva)}
+                        {formatMoney(c.iva, c.moneda)}
                       </Typography>
                     </TableCell>
 
                     <TableCell align="right">
                       <Typography fontWeight={900}>
-                        {formatCLP(c.total)}
+                        {formatMoney(c.total, c.moneda)}
                       </Typography>
                     </TableCell>
 

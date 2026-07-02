@@ -10,7 +10,7 @@ import {
   Button,
 } from "@mui/material";
 
-import { formatCLP } from "@/components/ventas/utils/money";
+import { formatCLP, formatMoney } from "@/components/ventas/utils/money";
 
 export default function GeneralInfoSection({
   theme,
@@ -126,7 +126,7 @@ export default function GeneralInfoSection({
           <option value="">-- Sin vincular --</option>
           {form.ordenesVenta.map((ov) => (
             <option key={ov.id} value={ov.id}>
-              #{ov.numero} - {ov.cliente?.nombre || "Sin cliente"} ({formatCLP(ov.total || 0)})
+              #{ov.numero} - {ov.cliente?.nombre || "Sin cliente"} ({formatMoney(ov.total || 0, ov.moneda || "CLP")})
             </option>
           ))}
         </Box>
@@ -135,7 +135,7 @@ export default function GeneralInfoSection({
           <Box sx={{ mt: 1.5, display: "grid", gap: 1 }}>
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "primary.main" }}>
-                Presupuesto Cotización: {formatCLP(form.selectedOrdenVenta.total || 0)}
+                Presupuesto Cotización: {formatMoney(form.selectedOrdenVenta.total || 0, form.selectedOrdenVenta.moneda || "CLP")}
               </Typography>
               
               <Button 
@@ -173,7 +173,7 @@ export default function GeneralInfoSection({
                 fontWeight: 1000, 
                 color: form.isOverQuoteLimit ? "error.main" : "success.main" 
               }}>
-                {formatCLP(form.remainingBudget || 0)}
+                {formatMoney(form.remainingBudget || 0, form.selectedOrdenVenta.moneda || "CLP")}
               </Typography>
             </Box>
 

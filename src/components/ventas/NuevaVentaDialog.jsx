@@ -16,7 +16,7 @@ import { useTheme } from "@mui/material/styles";
 import CloseIcon from "@mui/icons-material/Close";
 import AddShoppingCartIcon from "@mui/icons-material/AddShoppingCart";
 
-import { formatCLP } from "@/components/ventas/utils/money";
+import { formatCLP, formatMoney } from "@/components/ventas/utils/money";
 import {
   DetalleItemsSection,
   useVentaForm,
@@ -207,6 +207,39 @@ export default function NuevaVentaDialog({
                         mb: 0.5,
                       }}
                     >
+                      Moneda
+                    </Typography>
+
+                    <Box
+                      component="select"
+                      value={form.moneda || "CLP"}
+                      onChange={(e) => form.setMoneda(e.target.value)}
+                      style={{
+                        width: "100%",
+                        borderRadius: 12,
+                        border: "1px solid rgba(15,23,42,.12)",
+                        padding: "10px 12px",
+                        outline: "none",
+                        fontFamily: "inherit",
+                        fontSize: 13,
+                        background: "#fff",
+                      }}
+                    >
+                      <option value="CLP">Pesos (CLP)</option>
+                      <option value="UF">Unidad de Fomento (UF)</option>
+                      <option value="USD">Dólar Americano (USD)</option>
+                    </Box>
+                  </Box>
+
+                  <Box>
+                    <Typography
+                      sx={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "text.secondary",
+                        mb: 0.5,
+                      }}
+                    >
                       % Utilidad Objetivo
                     </Typography>
 
@@ -278,7 +311,7 @@ export default function NuevaVentaDialog({
                       <option value="">-- Sin vincular --</option>
                       {form.ordenesVenta.map((ov) => (
                         <option key={ov.id} value={ov.id}>
-                          #{ov.numero} - {ov.cliente?.nombre || "Sin cliente"} ({formatCLP(ov.total || 0)})
+                          #{ov.numero} - {ov.cliente?.nombre || "Sin cliente"} ({formatMoney(ov.total || 0, ov.moneda || "CLP")})
                         </option>
                       ))}
                     </Box>
@@ -287,7 +320,7 @@ export default function NuevaVentaDialog({
                         <Box sx={{ mt: 1.5, display: "grid", gap: 1 }}>
                           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "primary.main" }}>
-                              Presupuesto Cotización: {formatCLP(form.selectedOrdenVenta.total || 0)}
+                              Presupuesto Cotización: {formatMoney(form.selectedOrdenVenta.total || 0, form.selectedOrdenVenta.moneda || "CLP")}
                             </Typography>
                             
                             <Button 
@@ -305,7 +338,7 @@ export default function NuevaVentaDialog({
                               Ajustar para calzar
                             </Button>
                           </Box>
-
+ 
                           <Box 
                             sx={{ 
                               p: 1.25, 
@@ -325,7 +358,7 @@ export default function NuevaVentaDialog({
                               fontWeight: 1000, 
                               color: form.isOverQuoteLimit ? "error.main" : "success.main" 
                             }}>
-                              {formatCLP(form.remainingBudget || 0)}
+                              {formatMoney(form.remainingBudget || 0, form.selectedOrdenVenta.moneda || "CLP")}
                             </Typography>
                           </Box>
 
@@ -520,7 +553,7 @@ export default function NuevaVentaDialog({
                     <Typography
                       sx={{ fontSize: 26, fontWeight: 1000, mt: 0.5 }}
                     >
-                      {formatCLP(form.preview?.total || 0)}
+                      {formatMoney(form.preview?.total || 0, form.moneda || "CLP")}
                     </Typography>
 
                     {/* ✅ NUEVO: extraCosteo visible */}
@@ -528,7 +561,7 @@ export default function NuevaVentaDialog({
                       <Typography
                         sx={{ fontSize: 12, color: "text.disabled", mt: 0.75 }}
                       >
-                        Incluye extra costeo: <b>{formatCLP(extraCosteo)}</b>
+                        Incluye extra costeo: <b>{formatMoney(extraCosteo, form.moneda || "CLP")}</b>
                       </Typography>
                     )}
                   </Box>
@@ -553,16 +586,8 @@ export default function NuevaVentaDialog({
                         mt: 0.5,
                       }}
                     >
-                      {formatCLP(form.preview?.costo || 0)}
+                      {formatMoney(form.preview?.costo || 0, form.moneda || "CLP")}
                     </Typography>
-
-                    {/* 
-                    {extraCosteo > 0 && (
-                      <Typography sx={{ fontSize: 12, color: "text.disabled", mt: 0.5 }}>
-                        Extra (passthrough): <b>{formatCLP(extraCosteo)}</b>
-                      </Typography>
-                    )}
-                        */}
                   </Box>
 
                   <Box
@@ -598,7 +623,7 @@ export default function NuevaVentaDialog({
                             mt: 0.5,
                           }}
                         >
-                          {formatCLP(form.preview?.utilidad || 0)}
+                          {formatMoney(form.preview?.utilidad || 0, form.moneda || "CLP")}
                         </Typography>
                       </Box>
 
@@ -668,6 +693,7 @@ export default function NuevaVentaDialog({
               preview={form.preview}
               remainingBudget={form.remainingBudget}
               formErr={form.formErr}
+              moneda={form.moneda}
             />
           </Box>
         </Box>

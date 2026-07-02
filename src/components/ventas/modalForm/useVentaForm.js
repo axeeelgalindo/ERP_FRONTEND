@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { makeHeaders } from "@/lib/api";
 import { safeJson } from "@/components/ventas/utils/safeJson";
-import { formatCLP } from "@/components/ventas/utils/money";
+import { formatCLP, formatMoney } from "@/components/ventas/utils/money";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -24,6 +24,7 @@ export default function useVentaForm({
 
   // ✅ NUEVO: descuento general
   const [descuentoPct, setDescuentoPct] = useState("");
+  const [moneda, setMoneda] = useState("CLP");
 
   // ✅ tipo día por costeo
   const [isFeriado, setIsFeriado] = useState(false);
@@ -127,16 +128,30 @@ export default function useVentaForm({
     return n;
   };
 
-  const onlyDigits = (s) => String(s ?? "").replace(/[^\d]/g, "");
   const parseCLPToNumberString = (s) => {
-    const digits = onlyDigits(s);
-    return digits ? String(Number(digits)) : "";
+    if (moneda === "CLP") {
+      const digits = String(s ?? "").replace(/[^\d]/g, "");
+      return digits ? String(Number(digits)) : "";
+    } else {
+      const clean = String(s ?? "")
+        .replace(/[^0-9.,]/g, "")
+        .replace(/,/g, ".");
+      const parts = clean.split(".");
+      if (parts.length > 2) {
+        return parts[0] + "." + parts.slice(1).join("");
+      }
+      return clean;
+    }
   };
 
   const toCLPDisplay = (sOrNumber) => {
     const n = Number(sOrNumber);
     if (!Number.isFinite(n)) return "";
-    return formatCLP(n);
+    if (moneda === "CLP") {
+      return formatMoney(n, "CLP");
+    } else {
+      return String(Number(n.toFixed(4)));
+    }
   };
 
   const getManualPUNumber = (det) => {
@@ -197,6 +212,7 @@ export default function useVentaForm({
 
     // ✅ NUEVO
     setDescuentoPct("");
+    setMoneda("CLP");
 
     setIsFeriado(false);
     setIsUrgencia(false);
@@ -467,6 +483,12 @@ export default function useVentaForm({
         setDescuentoPct("");
       }
 
+      if (data?.moneda) {
+        setMoneda(data.moneda);
+      } else {
+        setMoneda("CLP");
+      }
+
       if (data?.utilidadObjetivoPct != null) {
         const utilidadNum = Number(data.utilidadObjetivoPct);
         setUtilidadPctObjetivo(Number.isFinite(utilidadNum) ? String(utilidadNum) : "");
@@ -622,417 +644,6 @@ export default function useVentaForm({
                   const marginMult = (1 - targetU);
                   const maxVentaNetoValue = maxVentaForThisLine / (descIMult * descGMult);
                   const maxCant = (maxVentaNetoValue - cif) * marginMult / (costoUnit * alphaMult);
-                 if (requestedCant > maxCant) {
-                   merged.cantidad = Math.max(1, Math.floor(maxCant * 100) / 100);
-                 }
-               }
-             } else {
-               const manualPU = getManualPUNumber(merged);
-               costoUnit = manualPU;
-               if (costoUnit > 0) {
-                 const requestedCant = Number(patch.cantidad) || 0;
-                 const maxCant = maxVentaForThisLine / (costoUnit * factor);
-                 if (requestedCant > maxCant) {
-                   merged.cantidad = Math.max(1, Math.floor(maxCant * 100) / 100);
-                 }
-               }
-             }
-          } 
-          
-          if (patch.costoUnitarioManual !== undefined && merged.modo === "COMPRA") {
-            const requestedPU = getManualPUNumber({ costoUnitarioManual: patch.costoUnitarioManual });
-            const cant = (merged.cantidad !== null && merged.cantidad !== undefined && merged.cantidad !== "") ? Number(merged.cantidad) : 1;
-            const targetU = (utilidadPctObjetivo === "" || utilidadPctObjetivo == null) ? 0 : Number(utilidadPctObjetivo) / 100;
-            const marginDivisor = (1 - targetU);
-            
-            // maxPU = (maxVentaLine/desc) * (1 - Margin) / (Cant * Alpha * k)
-            const maxVentaNeto = maxVentaForThisLine / (descIMult * descGMult);
-            const maxPU = (maxVentaNeto * marginDivisor) / (cant * alphaMult * k);
-            
-            if (requestedPU > maxPU) {
-              const cappedPU = Math.max(0, Math.floor(maxPU));
-              merged.costoUnitarioManual = toCLPDisplay(cappedPU);
-            }
-          }
-        }
-      }
-
-      next[idx] = merged;
-      return next;
-    });
-  };
-
-  const addDetalle = () =>
-    setDetalles((prev) => [...prev, { ...emptyDet(), tipoItemId: tipoItemHH?.id || "" }]);
-
-  const removeDetalle = (idx) => setDetalles((prev) => prev.filter((_, i) => i !== idx));
-
-  // ===========================
-  // EXTRA POR COSTEO (1 vez)
-  // ===========================
-  const extraCosteo = useMemo(() => {
-    const pickValor = (keys) => {
-      const found =
-        tipoDias.find((t) => keys.includes(normalizeText(t?.codigo))) ||
-        tipoDias.find((t) => keys.includes(normalizeText(t?.nombre))) ||
-        null;
-      const v = found ? Number(found.valor ?? 0) : 0;
-      return Number.isFinite(v) ? v : 0;
-    };
-
-    const vFeriado = pickValor(["FERIADO", "FESTIVO"]);
-    const vUrgencia = pickValor(["URGENCIA", "URGENTE"]);
-
-    return (isFeriado ? vFeriado : 0) + (isUrgencia ? vUrgencia : 0);
-  }, [tipoDias, isFeriado, isUrgencia]);
-
-  const selectedOrdenVenta = useMemo(() => {
-    if (!ordenVentaId) return null;
-    return (
-      ordenesVenta.find((ov) => String(ov.id) === String(ordenVentaId)) || null
-    );
-  }, [ordenVentaId, ordenesVenta]);
-
-  // ===========================
-  // ✅ PREVIEW (igual backend: post-k y luego descuentos)
-  // ===========================
-  const preview = useMemo(() => {
-    const descG = normalizeDescPctUI(descuentoPct);
-    const descGMult = 1 - descG / 100;
-
-    const uniqueProcessedEmployees = new Set();
-
-    const linesBase = (detalles || []).map((d) => {
-      const cantidad = (d?.cantidad !== null && d?.cantidad !== undefined && d?.cantidad !== "") ? Number(d.cantidad) : 1;
-      const alphaPct = normalizeAlphaPctUI(d?.alphaPct);
-      const alphaMult = 1 + alphaPct / 100;
-
-      let costoSinAlpha = 0;
-
-      let cifLine = 0;
-      if (d?.modo === "HH") {
-        const hh = findHHForEmpleado(d?.empleadoId);
-        const costoHH = hh?.costoHH != null ? Number(hh.costoHH) : 0;
-        const cifValue = getHHCIFValue(hh);
-        
-        const empId = d.empleadoId;
-        if (empId && !uniqueProcessedEmployees.has(empId)) {
-          uniqueProcessedEmployees.add(empId);
-          cifLine = cifValue;
-        } else {
-          cifLine = 0;
-        }
-
-        costoSinAlpha = cantidad > 0 ? costoHH * cantidad : 0;
-      } else {
-        const manualPU = getManualPUNumber(d);
-        const costoUnit = Number.isFinite(manualPU) ? manualPU : 0;
-        costoSinAlpha = costoUnit * cantidad;
-      }
-
-      const costoBase = costoSinAlpha * alphaMult;
-      const ventaBaseActual = costoBase;
-
-      const descI = normalizeDescPctUI(d?.descuentoPct);
-      const descIMult = 1 - descI / 100;
-
-      return { costoBase, ventaBaseActual, descI, descIMult, cifLine };
-    });
-
-    const totalCostoBase = linesBase.reduce((acc, x) => acc + (Number(x.costoBase) || 0), 0);
-    const totalVentaActualBase = linesBase.reduce(
-      (acc, x) => acc + (Number(x.ventaBaseActual) || 0),
-      0,
-    );
-
-    const uPct = utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo);
-    const targetU = uPct != null && Number.isFinite(uPct) && uPct >= 0 ? uPct / 100 : 0;
-    const marginDivisor = (1 - targetU) || 1;
-
-    const totalCostoFinalBase = linesBase.reduce((acc, x) => acc + (Number(x.costoBase) || 0), 0);
-    const totalCIFUnique = linesBase.reduce((acc, x) => acc + (Number(x.cifLine) || 0), 0);
-    
-    // VentaTarget = (CostTotal / (1 - Margin)) + CIFUnique
-    const totalVentaTarget = (totalCostoFinalBase / marginDivisor) + totalCIFUnique;
-
-    let k = 1;
-    if (totalCostoFinalBase > 0) {
-      k = totalVentaTarget / totalCostoFinalBase;
-    }
-
-    const kk = Number.isFinite(k) ? k : 1;
-
-    const lines = linesBase.map((x) => {
-      const costoTotal = Number(x.costoBase) || 0;
-
-      const bruto = (costoTotal / marginDivisor) + (x.cifLine || 0);
-
-      // descuentos: item + general
-      const neto = bruto * (x.descIMult ?? 1) * descGMult;
-
-      const utilidad = neto - costoTotal;
-      const pct = neto > 0 ? (utilidad / neto) * 100 : 0;
-
-      return { costoTotal, ventaTotal: neto, ventaBruta: bruto, utilidad, pct };
-    });
-
-    const totalVentaBaseBruta = totalVentaActualBase * kk;
-    const totalVentaBaseNeta = lines.reduce((acc, l) => acc + (Number(l.ventaTotal) || 0), 0);
-
-    const extraBruto = Number(extraCosteo || 0);
-    // ✅ igual que backend: el descuento general afecta el extra
-    const extraNeto = extraBruto * descGMult;
-
-    const totalCostoFinal = totalCostoBase + extraNeto;
-    const totalVentaFinal = totalVentaBaseNeta + extraNeto;
-
-    const utilidad = totalVentaFinal - totalCostoFinal;
-    const pct = totalVentaFinal > 0 ? (utilidad / totalVentaFinal) * 100 : 0;
-
-    return {
-      k: kk,
-      total: totalVentaFinal,
-      costo: totalCostoFinal,
-      utilidad,
-      pct,
-      lines,
-      extraCosteo: extraNeto,
-      extraCosteoBruto: extraBruto,
-      baseVentaBruta: totalVentaBaseBruta,
-      baseVenta: totalVentaBaseNeta,
-      baseCosto: totalCostoBase,
-      descuentoGeneralPct: descG,
-    };
-  }, [
-    detalles,
-    empleados,
-    utilidadPctObjetivo,
-    descuentoPct,
-    extraCosteo,
-    findHHForEmpleado,
-  ]);
-
-  const isOverQuoteLimit = useMemo(() => {
-    if (!selectedOrdenVenta || !preview.total) return false;
-    // damos un margen de 1 peso por redondeos
-    return preview.total > (selectedOrdenVenta.total || 0) + 1;
-  }, [selectedOrdenVenta, preview.total]);
-
-  const remainingBudget = useMemo(() => {
-    if (!selectedOrdenVenta || !preview.total) return null;
-    return (selectedOrdenVenta.total || 0) - preview.total;
-  }, [selectedOrdenVenta, preview.total]);
-
-  const adjustToQuote = () => {
-    if (!selectedOrdenVenta || !preview.baseCosto) return;
-
-    const targetTotal = selectedOrdenVenta.total || 0;
-    const totalCosto = preview.baseCosto || 0;
-    
-    // ✅ Cálculo de Markup basado en el nuevo modelo:
-    // ProfitGoal = TargetTotal - TotalCosto
-    // markup = ProfitGoal / TotalCostoNeto (sin CIF)
-    
-    const profitGoal = targetTotal - totalCosto;
-    const totalNeto = (detalles || []).reduce((acc, d) => {
-      const cantidad = (d.cantidad !== null && d.cantidad !== undefined && d.cantidad !== "") ? Number(d.cantidad) : 1;
-      const alphaMult = 1 + normalizeAlphaPctUI(d.alphaPct) / 100;
-      if (d.modo === "HH") {
-        const hh = findHHForEmpleado(d.empleadoId);
-        return acc + ((hh?.costoHH || 0) * cantidad * alphaMult);
-      }
-      const manualPU = getManualPUNumber(d);
-      return acc + (manualPU * cantidad * alphaMult);
-    }, 0);
-
-    if (totalNeto > 0) {
-      const markupPct = (profitGoal / totalNeto) * 100;
-      setUtilidadPctObjetivo(Math.max(0, markupPct).toFixed(2));
-    }
-  };
-
-  const validateForm = () => {
-    if (!detalles.length) return "Debes agregar al menos un ítem.";
-
-    const hasHH = detalles.some((d) => d?.modo === "HH");
-    if (hasHH && !hhPeriodoKey) return "Selecciona la Fecha HH (Período).";
-
-    if (isOverQuoteLimit) {
-      return `El total del costeo (${formatCLP(preview.total)}) supera el total de la cotización vinculada (${formatCLP(selectedOrdenVenta.total)}).`;
-    }
-
-    if (utilidadPctObjetivo !== "") {
-      const u = Number(utilidadPctObjetivo);
-      if (!Number.isFinite(u) || u < 0) return "% utilidad objetivo inválido (>= 0).";
-      if (u >= 100) return "% utilidad objetivo inválido (< 100).";
-    }
-
-    // ✅ NUEVO: validar descuento general
-    if (descuentoPct !== "") {
-      const dg = Number(descuentoPct);
-      if (!Number.isFinite(dg) || dg < 0) return "% descuento general inválido (>= 0).";
-      if (dg >= 100) return "% descuento general inválido (< 100).";
-    }
-
-    for (let i = 0; i < detalles.length; i++) {
-      const d = detalles[i];
-      if (!d.descripcion?.trim()) return `Ítem #${i + 1}: Falta descripción.`;
-
-      const cant = Number(d.cantidad);
-      if (!cant || cant <= 0) return `Ítem #${i + 1}: Cantidad inválida.`;
-
-      const alphaPct = normalizeAlphaPctUI(d.alphaPct);
-      if (!Number.isFinite(alphaPct) || alphaPct < 0)
-        return `Ítem #${i + 1}: Ajuste % (alpha) inválido.`;
-
-      // ✅ NUEVO: validar descuento item
-      const di = d.descuentoPct === "" ? 0 : Number(d.descuentoPct ?? 0);
-      if (!Number.isFinite(di) || di < 0) return `Ítem #${i + 1}: Descuento % inválido.`;
-      if (di >= 100) return `Ítem #${i + 1}: Descuento % inválido (< 100).`;
-
-      if (d.modo === "HH") {
-        if (!d.empleadoId) return `Ítem #${i + 1}: Selecciona empleado.`;
-        const hh = findHHForEmpleado(d.empleadoId);
-        if (!hh) return `Ítem #${i + 1}: Falta HH del período para este empleado.`;
-      } else {
-        if (!d.tipoItemId) return `Ítem #${i + 1}: Selecciona Tipo ítem.`;
-
-        const manualClean = parseCLPToNumberString(d.costoUnitarioManual);
-        const manualPU = manualClean ? Number(manualClean) : null;
-
-        const tieneManual =
-          manualPU != null && Number.isFinite(manualPU) && manualPU > 0;
-        if (!tieneManual)
-          return `Ítem #${i + 1}: En COMPRA debes ingresar un Precio Unitario manual.`;
-      }
-    }
-
-    return "";
-  };
-
-  const submitVenta = async ({ onClose, onCreated }) => {
-    const msg = validateForm();
-    if (msg) {
-      setFormErr(msg);
-      return false;
-    }
-
-    try {
-      setSaving(true);
-      setFormErr("");
-
-      const payload = {
-        ordenVentaId: ordenVentaId || null,
-        descripcion: descripcionVenta || null,
-        utilidadObjetivoBase: "VENTA_ACTUAL",
-        utilidadPctObjetivo:
-          utilidadPctObjetivo === "" ? null : Number(utilidadPctObjetivo),
-
-        // ✅ NUEVO
-        descuentoPct: descuentoPct === "" ? 0 : Number(descuentoPct),
-
-        isFeriado: !!isFeriado,
-        isUrgencia: !!isUrgencia,
-
-        detalles: detalles.map((d) => {
-          const alpha = normalizeAlphaPctUI(d.alphaPct);
-          const descLine = normalizeDescPctUI(d.descuentoPct);
-
-          if (d.modo === "HH") {
-            const hh = findHHForEmpleado(d.empleadoId);
-            return {
-              descripcion: d.descripcion,
-              cantidad: Number(d.cantidad) || 1,
-              modo: "HH",
-              tipoItemId: null,
-              tipoDiaId: d.tipoDiaId || null,
-              alpha,
-
-              // ✅ NUEVO
-              descuentoPct: descLine,
-
-              empleadoId: d.empleadoId || null,
-              hhEmpleadoId: hh?.id || null,
-              compraId: null,
-              costoUnitarioManual: null,
-            };
-          }
-
-          const manualClean = parseCLPToNumberString(d.costoUnitarioManual);
-          const manualNumber =
-            manualClean && Number(manualClean) > 0 ? Number(manualClean) : null;
-
-          return {
-            descripcion: d.descripcion,
-            cantidad: Number(d.cantidad) || 1,
-            modo: "COMPRA",
-            tipoItemId: d.tipoItemId || null,
-            tipoDiaId: d.tipoDiaId || null,
-            alpha,
-
-            // ✅ NUEVO
-            descuentoPct: descLine,
-
-            empleadoId: null,
-            hhEmpleadoId: null,
-            compraId: null,
-            costoUnitarioManual: manualNumber,
-          };
-        }),
-      };
-
-      const url = isEdit ? `${API_URL}/ventas/${ventaId}` : `${API_URL}/ventas/add`;
-      const method = isEdit ? "PUT" : "POST";
-
-      const res = await fetch(url, {
-        method,
-        headers: makeHeaders(session, empresaIdFromToken),
-        body: JSON.stringify(payload),
-      });
-
-      const data = await safeJson(res);
-      if (!res.ok) {
-        console.log("❌ save venta error", res.status, data, payload);
-        throw new Error(
-          data?.detalle || data?.error || data?.message || "Error al guardar venta",
-        );
-      }
-
-      onClose?.();
-      await onCreated?.();
-      return true;
-    } catch (e) {
-      setFormErr(e?.message || "Error al guardar venta");
-      console.error("Error al guardar venta:", e);
-      return false;
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return {
-    isEdit,
-
-    saving,
-    formErr,
-    setFormErr,
-
-    descripcionVenta,
-    setDescripcionVenta,
-    ordenVentaId,
-    setOrdenVentaId,
-    utilidadPctObjetivo,
-    setUtilidadPctObjetivo,
-
-    // ✅ NUEVO
-    descuentoPct,
-    setDescuentoPct,
-
-    isFeriado,
-    setIsFeriado,
-    isUrgencia,
-    setIsUrgencia,
-    extraCosteo,
 
     hhPeriodos,
     hhPeriodoKey,

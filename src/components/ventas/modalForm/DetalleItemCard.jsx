@@ -15,7 +15,7 @@ import {
 import { useTheme } from "@mui/material/styles";
 import DeleteIcon from "@mui/icons-material/Delete";
 
-import { formatCLP } from "@/components/ventas/utils/money";
+import { formatCLP, formatMoney } from "@/components/ventas/utils/money";
 
 export default function DetalleItemCard({
   idx,
@@ -42,6 +42,7 @@ export default function DetalleItemCard({
   anio,
   previewLine,
   remainingBudget, // ✅ NUEVO
+  moneda = "CLP",
 }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -372,11 +373,11 @@ export default function DetalleItemCard({
                         Subtotal
                       </Typography>
                       <Typography sx={{ fontWeight: 900, color: "primary.main" }}>
-                        {formatCLP(subtotal)}
+                        {formatMoney(subtotal, moneda)}
                       </Typography>
                       {remainingBudget !== null && (
                         <Typography sx={{ fontSize: 9, color: "text.disabled", mt: 0.25, textAlign: "right" }}>
-                          Máx. disponible (Venta): {formatCLP(lineVentaTotal + remainingBudget)}
+                          Máx. disponible (Venta): {formatMoney(lineVentaTotal + remainingBudget, moneda)}
                         </Typography>
                       )}
                     </Box>
@@ -396,8 +397,9 @@ export default function DetalleItemCard({
                       value={
                         det.empleadoId
                           ? hhSelected
-                            ? `${formatCLP(hhSelectedCostoHH)} | CIF: ${formatCLP(
+                            ? `${formatMoney(hhSelectedCostoHH, "CLP")} | CIF: ${formatMoney(
                                 hhSelectedCIF,
+                                "CLP",
                               )}`
                             : "-"
                           : "-"
@@ -576,7 +578,7 @@ export default function DetalleItemCard({
                         Subtotal
                       </Typography>
                       <Typography sx={{ fontWeight: 900, color: "primary.main" }}>
-                        {formatCLP(subtotal)}
+                        {formatMoney(subtotal, moneda)}
                       </Typography>
                     </Box>
                   </Box>

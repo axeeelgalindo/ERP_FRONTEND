@@ -32,6 +32,7 @@ export default function DetalleItemsSection({
   preview,
   remainingBudget, // ✅ NUEVO
   formErr,
+  moneda,
 }) {
   return (
     <Box sx={{ p: 2.5 }}>
@@ -81,6 +82,7 @@ export default function DetalleItemsSection({
             anio={anio}
             previewLine={preview?.lines?.[idx]}
             remainingBudget={remainingBudget}
+            moneda={moneda}
           />
         ))}
 

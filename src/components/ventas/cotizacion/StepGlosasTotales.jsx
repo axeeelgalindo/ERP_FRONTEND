@@ -15,12 +15,33 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 
-import { formatCLP } from "@/components/ventas/utils/money";
+import { formatCLP, formatMoney } from "@/components/ventas/utils/money";
 
-const round0 = (n) => Math.round(Number(n || 0));
+const roundMoney = (n, moneda = "CLP") => {
+  const val = Number(n || 0);
+  if (moneda === "CLP") return Math.round(val);
+  if (moneda === "UF") return Number(val.toFixed(4));
+  if (moneda === "USD") return Number(val.toFixed(2));
+  return Math.round(val);
+};
 
-function formatCLPNumberOnly(n) {
+function formatMoneyNumberOnly(n, moneda = "CLP") {
   if (n == null || Number.isNaN(Number(n))) return "";
+  if (moneda === "CLP") {
+    return Number(n).toLocaleString("es-CL", { maximumFractionDigits: 0 });
+  }
+  if (moneda === "UF") {
+    return Number(n).toLocaleString("es-CL", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 4,
+    });
+  }
+  if (moneda === "USD") {
+    return Number(n).toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
   return Number(n).toLocaleString("es-CL", { maximumFractionDigits: 0 });
 }
 
@@ -48,17 +69,18 @@ export default function StepGlosasTotales({
   conflict = false,
   conflictMsg = "",
   onImportFromCosteos,
+  moneda = "CLP",
 }) {
   const manualSum = useMemo(
-    () => glosas.reduce((acc, g) => acc + (g.manual ? round0(g.monto) : 0), 0),
-    [glosas]
+    () => glosas.reduce((acc, g) => acc + (g.manual ? roundMoney(g.monto, moneda) : 0), 0),
+    [glosas, moneda]
   );
 
   const maxForIdx = (idx) => {
-    const t = round0(subtotalNeto);
+    const t = roundMoney(subtotalNeto, moneda);
     const othersManual = glosas.reduce((acc, g, i) => {
       if (i === idx) return acc;
-      return acc + (g.manual ? round0(g.monto) : 0);
+      return acc + (g.manual ? roundMoney(g.monto, moneda) : 0);
     }, 0);
 
     const max = t - othersManual;
@@ -90,21 +112,26 @@ export default function StepGlosasTotales({
 
   const handlePrecioUnitarioChange = (idx) => (e) => {
     const raw = e.target.value;
-    const digits = onlyDigits(raw);
-
-    if (digits === "") {
-      setGlosa(idx, { precio_unitario: "" });
-      return;
+    let value = 0;
+    if (moneda === "CLP") {
+      const digits = String(raw || "").replace(/[^\d]/g, "");
+      value = digits ? parseInt(digits, 10) : 0;
+    } else {
+      const clean = String(raw || "")
+        .replace(/[^0-9.,]/g, "")
+        .replace(/,/g, ".");
+      const parts = clean.split(".");
+      const finalStr = parts.length > 2 ? parts[0] + "." + parts.slice(1).join("") : clean;
+      value = finalStr ? parseFloat(finalStr) : 0;
     }
 
-    let value = parseInt(digits, 10);
     if (!Number.isFinite(value)) value = 0;
     if (value < 0) value = 0;
 
     const maxMonto = maxForIdx(idx);
     const c = Number(glosas[idx].cantidad) || 1;
     if (value * c > maxMonto) {
-      value = Math.floor(maxMonto / c);
+      value = maxMonto / c;
     }
 
     setGlosa(idx, { precio_unitario: value });
@@ -181,12 +208,12 @@ export default function StepGlosasTotales({
         {glosas.map((g, idx) => {
           const max = maxForIdx(idx);
 
-          const bruto = round0(g.monto || 0);
+          const bruto = roundMoney(g.monto || 0, moneda);
           const descPct = clampPct(g.descuento_pct || 0);
-          const descMonto = round0(bruto * (descPct / 100));
-          const neto = round0(bruto - descMonto);
+          const descMonto = roundMoney(bruto * (descPct / 100), moneda);
+          const neto = roundMoney(bruto - descMonto, moneda);
 
-          const showValue = formatCLPNumberOnly(g.monto);
+          const showValue = formatMoneyNumberOnly(g.monto, moneda);
 
           return (
             <Box
@@ -268,27 +295,28 @@ export default function StepGlosasTotales({
                   type="text"
                   value={
                     g.manual
-                      ? formatCLPNumberOnly(g.precio_unitario)
-                      : formatCLPNumberOnly(
-                        round0((g.monto || 0) / (Number(g.cantidad) || 1))
+                      ? (moneda === "CLP" ? formatMoneyNumberOnly(g.precio_unitario, moneda) : g.precio_unitario)
+                      : formatMoneyNumberOnly(
+                        roundMoney((g.monto || 0) / (Number(g.cantidad) || 1), moneda),
+                        moneda
                       )
                   }
                   onChange={handlePrecioUnitarioChange(idx)}
                   fullWidth
                   inputProps={{
-                    inputMode: "numeric",
+                    inputMode: "decimal",
                     style: { textAlign: "right", fontWeight: 800 },
                   }}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start" sx={{ mr: 0.5 }}>
-                        $
+                        {moneda === "USD" ? "USD$" : moneda === "UF" ? "UF" : "$"}
                       </InputAdornment>
                     ),
                   }}
                   helperText={
                     g.manual
-                      ? `Máx Total: ${formatCLP(max)}`
+                      ? `Máx Total: ${formatMoney(max, moneda)}`
                       : "Auto (remanente)"
                   }
                 />
@@ -351,11 +379,11 @@ export default function StepGlosasTotales({
                 </Typography>
 
                 <Typography sx={{ fontSize: 13, fontWeight: 900, mt: 0.8 }}>
-                  Subtotal: {formatCLP(bruto)}
+                  Subtotal: {formatMoney(bruto, moneda)}
                 </Typography>
 
                 <Typography sx={{ fontSize: 13, fontWeight: 900, mt: 0.4 }}>
-                  Neto: {formatCLP(neto)}{" "}
+                  Neto: {formatMoney(neto, moneda)}{" "}
                   {descMonto > 0 && (
                     <span style={{ fontWeight: 700, color: "rgba(0,0,0,.55)" }}>
                       (-{descPct}%)
@@ -393,7 +421,7 @@ export default function StepGlosasTotales({
       </Box>
 
       <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-        Manual: {formatCLP(manualSum)} / Subtotal bruto ventas: {formatCLP(subtotalNeto)}
+        Manual: {formatMoney(manualSum, moneda)} / Subtotal bruto ventas: {formatMoney(subtotalNeto, moneda)}
       </Typography>
 
       {glosaErr ? (

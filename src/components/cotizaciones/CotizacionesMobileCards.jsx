@@ -21,6 +21,7 @@ import {
   estadoColor,
   fechaCL,
   formatCLP,
+  formatMoney,
   nextEstados,
 } from "@/components/cotizaciones/utils/utils";
 
@@ -106,7 +107,7 @@ export default function CotizacionesMobileCards({
                       color={estadoColor(estado)}
                       variant="outlined"
                     />
-                    <Typography fontWeight={900}>{formatCLP(c.total)}</Typography>
+                    <Typography fontWeight={900}>{formatMoney(c.total, c.moneda)}</Typography>
 
                     <Box onClick={(e) => e.stopPropagation()}>
                       <Tooltip title="Acciones">

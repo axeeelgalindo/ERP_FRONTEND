@@ -14,7 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 
-import { estadoColor, fechaCL, formatCLP } from "@/components/cotizaciones/utils/utils";
+import { estadoColor, fechaCL, formatCLP, formatMoney } from "@/components/cotizaciones/utils/utils";
 
 function Field({ label, value }) {
   return (
@@ -93,12 +93,12 @@ export default function CotizacionGlosasTable({ glosas = [], subtotal, cotizacio
               }
             />
 
-            <Field label="Subtotal (neto)" value={formatCLP(c.subtotal)} />
+            <Field label="Subtotal (neto)" value={formatMoney(c.subtotal, c.moneda)} />
             <Field
               label="IVA"
-              value={c?.sin_iva ? `${formatCLP(0)} (Exento)` : formatCLP(c?.iva)}
+              value={c?.sin_iva ? `${formatMoney(0, c.moneda)} (Exento)` : formatMoney(c?.iva, c.moneda)}
             />
-            <Field label="Total" value={formatCLP(c.total)} />
+            <Field label="Total" value={formatMoney(c.total, c.moneda)} />
           </Box>
 
           {(c.asunto || c.terminos_condiciones || c.acuerdo_pago) ? (
@@ -246,7 +246,7 @@ export default function CotizacionGlosasTable({ glosas = [], subtotal, cotizacio
                     align="right"
                     sx={{ fontWeight: 900, whiteSpace: "nowrap" }}
                   >
-                    {formatCLP(g.monto)}
+                    {formatMoney(g.monto, c?.moneda)}
                   </TableCell>
                 </TableRow>
               );
@@ -270,7 +270,7 @@ export default function CotizacionGlosasTable({ glosas = [], subtotal, cotizacio
             {typeof sub !== "undefined" ? (
               <>
                 {" "}
-                — Subtotal: <strong>{formatCLP(sub)}</strong>
+                — Subtotal: <strong>{formatMoney(sub, c?.moneda)}</strong>
               </>
             ) : null}
           </Typography>

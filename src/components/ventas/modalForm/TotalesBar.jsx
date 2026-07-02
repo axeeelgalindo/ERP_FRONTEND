@@ -2,9 +2,9 @@
 "use client";
 
 import { Box, Typography } from "@mui/material";
-import { formatCLP } from "@/components/ventas/utils/money";
+import { formatCLP, formatMoney } from "@/components/ventas/utils/money";
 
-export default function TotalesBar({ theme, preview }) {
+export default function TotalesBar({ theme, preview, moneda = "CLP" }) {
   return (
     <Box
       sx={{
@@ -54,7 +54,7 @@ export default function TotalesBar({ theme, preview }) {
             Venta
           </Typography>
           <Typography sx={{ fontWeight: 900 }}>
-            {formatCLP(preview.total)}
+            {formatMoney(preview.total, moneda)}
           </Typography>
         </Box>
 
@@ -82,7 +82,7 @@ export default function TotalesBar({ theme, preview }) {
             Costo
           </Typography>
           <Typography sx={{ fontWeight: 800, color: "text.secondary" }}>
-            {formatCLP(preview.costo)}
+            {formatMoney(preview.costo, moneda)}
           </Typography>
         </Box>
 
@@ -117,7 +117,7 @@ export default function TotalesBar({ theme, preview }) {
             </Typography>
           </Box>
           <Typography sx={{ fontWeight: 900, color: "success.main" }}>
-            {formatCLP(preview.utilidad)}
+            {formatMoney(preview.utilidad, moneda)}
           </Typography>
         </Box>
       </Box>

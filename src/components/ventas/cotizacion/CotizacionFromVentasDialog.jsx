@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { Alert, Box, Dialog } from "@mui/material";
 
 import { safeJson } from "@/components/ventas/utils/safeJson";
-import { formatCLP } from "@/components/ventas/utils/money";
+import { formatCLP, formatMoney } from "@/components/ventas/utils/money";
 
 import CotizacionStepperHeader from "./CotizacionStepperHeader";
 import CotizacionFooterTotals from "./CotizacionFooterTotals";
@@ -16,7 +16,13 @@ import StepGlosasTotales from "./StepGlosasTotales";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-const round0 = (n) => Math.round(Number(n || 0));
+const roundMoney = (n, moneda) => {
+  const val = Number(n || 0);
+  if (moneda === "CLP") return Math.round(val);
+  if (moneda === "UF") return Number(val.toFixed(4));
+  if (moneda === "USD") return Number(val.toFixed(2));
+  return Math.round(val);
+};
 
 function calcTotalVenta(v) {
   return (v?.detalles || []).reduce(
@@ -34,19 +40,20 @@ const clampPct = (v) => {
 };
 
 // Distribuye MONTOS BRUTOS para cuadrar con subtotalBase (ventas)
-function distributeGlosasBrutas(glosas, subtotalBase) {
-  const t = round0(subtotalBase);
+function distributeGlosasBrutas(glosas, subtotalBase, moneda) {
+  const t = roundMoney(subtotalBase, moneda);
 
   const manualSum = glosas.reduce(
-    (acc, g) => acc + (g.manual ? round0(g.monto || 0) : 0),
+    (acc, g) => acc + (g.manual ? roundMoney(g.monto || 0, moneda) : 0),
     0
   );
 
   if (manualSum > t) {
     return {
       glosas,
-      error: `La suma manual (${formatCLP(manualSum)}) supera el subtotal base (${formatCLP(
-        t
+      error: `La suma manual (${formatMoney(manualSum, moneda)}) supera el subtotal base (${formatMoney(
+        t,
+        moneda
       )}).`,
     };
   }
@@ -56,32 +63,35 @@ function distributeGlosasBrutas(glosas, subtotalBase) {
     .filter((i) => i !== -1);
 
   if (autosIdx.length === 0) {
-    if (manualSum !== t) {
+    if (Math.abs(manualSum - t) > 0.01) {
       return {
         glosas,
-        error: `Falta cuadrar el subtotal base: manual ${formatCLP(
-          manualSum
-        )} vs subtotal ${formatCLP(t)}.`,
+        error: `Falta cuadrar el subtotal base: manual ${formatMoney(
+          manualSum,
+          moneda
+        )} vs subtotal ${formatMoney(t, moneda)}.`,
       };
     }
     return {
-      glosas: glosas.map((g) => ({ ...g, monto: round0(g.monto || 0) })),
+      glosas: glosas.map((g) => ({ ...g, monto: roundMoney(g.monto || 0, moneda) })),
       error: "",
     };
   }
 
   const rem = t - manualSum;
-  const base = Math.floor(rem / autosIdx.length);
-  const ajuste = rem - base * autosIdx.length;
+  const base = rem / autosIdx.length;
+  const baseRounded = roundMoney(base, moneda);
+  const totalAutoCalculated = baseRounded * autosIdx.length;
+  const ajuste = rem - totalAutoCalculated;
 
   const next = glosas.map((g) =>
-    g.manual ? { ...g, monto: round0(g.monto || 0) } : { ...g, monto: base }
+    g.manual ? { ...g, monto: roundMoney(g.monto || 0, moneda) } : { ...g, monto: baseRounded }
   );
 
   const lastAuto = autosIdx[autosIdx.length - 1];
   next[lastAuto] = {
     ...next[lastAuto],
-    monto: round0(next[lastAuto].monto + ajuste),
+    monto: roundMoney(next[lastAuto].monto + ajuste, moneda),
   };
 
   return { glosas: next, error: "" };
@@ -165,6 +175,8 @@ export default function CotizacionFromVentasDialog({
   const [glosas, setGlosas] = useState([emptyGlosa()]);
   const [glosaErr, setGlosaErr] = useState("");
 
+  const [moneda, setMoneda] = useState("CLP");
+
   useEffect(() => {
     if (!open) return;
 
@@ -178,6 +190,7 @@ export default function CotizacionFromVentasDialog({
     setAcuerdoPago("");
     setVigenciaDias(15);
     setSinIva(false);
+    setMoneda("CLP");
 
     setVentaIds(preselectedVentaIds?.length ? preselectedVentaIds : []);
     setDescuentoPct("");
@@ -192,52 +205,65 @@ export default function CotizacionFromVentasDialog({
     [ventas]
   );
 
+  // Auto-detect currency from first selected Venta
+  useEffect(() => {
+    if (!open) return;
+    if (ventaIds.length > 0 && ventasDisponibles.length > 0) {
+      const firstSelected = ventasDisponibles.find(v => String(v.id) === String(ventaIds[0]));
+      if (firstSelected?.moneda) {
+        setMoneda(firstSelected.moneda);
+      }
+    }
+  }, [ventaIds, ventasDisponibles, open]);
+
   // ✅ subtotal BASE desde ventas (sin descuentos)
   const subtotalBase = useMemo(() => {
     if (!ventasDisponibles.length || !ventaIds.length) return 0;
     const setIds = new Set(ventaIds.map(String));
-    return round0(
+    return roundMoney(
       ventasDisponibles
         .filter((v) => setIds.has(String(v.id)))
-        .reduce((acc, v) => acc + calcTotalVenta(v), 0)
+        .reduce((acc, v) => acc + calcTotalVenta(v), 0),
+      moneda
     );
-  }, [ventasDisponibles, ventaIds]);
+  }, [ventasDisponibles, ventaIds, moneda]);
 
   // ✅ subtotal neto de glosas aplicando descuento por glosa
   const subtotalNetoGlosas = useMemo(() => {
-    return round0(
+    return roundMoney(
       (glosas || []).reduce((acc, g) => {
-        const bruto = round0(g.monto || 0);
+        const bruto = roundMoney(g.monto || 0, moneda);
         const d = clampPct(g.descuento_pct);
-        const neto = round0(bruto * (1 - d / 100));
+        const neto = bruto * (1 - d / 100);
         return acc + neto;
-      }, 0)
+      }, 0),
+      moneda
     );
-  }, [glosas]);
+  }, [glosas, moneda]);
 
   // ✅ aplicar descuento general al subtotal neto glosas
   const subtotalFinal = useMemo(() => {
     const dG = clampPct(descuentoPct);
-    return round0(subtotalNetoGlosas * (1 - dG / 100));
-  }, [subtotalNetoGlosas, descuentoPct]);
+    return roundMoney(subtotalNetoGlosas * (1 - dG / 100), moneda);
+  }, [subtotalNetoGlosas, descuentoPct, moneda]);
 
   const iva = useMemo(
-    () => sinIva ? 0 : round0(subtotalFinal * Number(ivaRate || 0)),
-    [subtotalFinal, ivaRate, sinIva]
+    () => sinIva ? 0 : roundMoney(subtotalFinal * Number(ivaRate || 0), moneda),
+    [subtotalFinal, ivaRate, sinIva, moneda]
   );
 
   const totalFinal = useMemo(
-    () => round0(subtotalFinal + iva),
-    [subtotalFinal, iva]
+    () => roundMoney(subtotalFinal + iva, moneda),
+    [subtotalFinal, iva, moneda]
   );
 
   // ✅ suma BRUTA glosas (debe cuadrar con subtotalBase)
   const sumGlosasBrutas = useMemo(
-    () => round0(glosas.reduce((acc, g) => acc + round0(g.monto || 0), 0)),
-    [glosas]
+    () => roundMoney(glosas.reduce((acc, g) => acc + roundMoney(g.monto || 0, moneda), 0), moneda),
+    [glosas, moneda]
   );
 
-  const okCuadra = !glosaErr && subtotalBase > 0 && sumGlosasBrutas === subtotalBase;
+  const okCuadra = !glosaErr && subtotalBase > 0 && Math.abs(sumGlosasBrutas - subtotalBase) <= 0.01;
 
   // =========================================================
   // ✅ REGLA: NO SE PUEDE DESCUENTO GENERAL + DESCUENTO GLOSA
@@ -280,11 +306,11 @@ export default function CotizacionFromVentasDialog({
   useEffect(() => {
     if (!open) return;
     setGlosas((prev) => {
-      const { glosas: dist, error } = distributeGlosasBrutas(prev, subtotalBase);
+      const { glosas: dist, error } = distributeGlosasBrutas(prev, subtotalBase, moneda);
       setGlosaErr(error);
       return dist;
     });
-  }, [subtotalBase, open]);
+  }, [subtotalBase, open, moneda]);
 
   const setGlosa = (idx, patch) => {
     setGlosas((prev) => {
@@ -303,7 +329,7 @@ export default function CotizacionFromVentasDialog({
         }
         if (updated.manual) {
           const actualC = Number(updated.cantidad) || 1;
-          updated.monto = round0(actualC * (Number(updated.precio_unitario) || 0));
+          updated.monto = roundMoney(actualC * (Number(updated.precio_unitario) || 0), moneda);
         }
       }
 
@@ -312,10 +338,10 @@ export default function CotizacionFromVentasDialog({
         const raw = patch.precio_unitario;
         const hasValue = String(raw ?? "").trim() !== "";
         updated.manual = hasValue;
-        updated.precio_unitario = hasValue ? round0(raw) : "";
+        updated.precio_unitario = hasValue ? roundMoney(raw, moneda) : "";
         if (hasValue) {
           const actualC = Number(updated.cantidad) || 1;
-          updated.monto = round0(actualC * updated.precio_unitario);
+          updated.monto = roundMoney(actualC * updated.precio_unitario, moneda);
         } else {
           updated.monto = 0;
         }
@@ -328,7 +354,7 @@ export default function CotizacionFromVentasDialog({
 
       next[idx] = updated;
 
-      const { glosas: dist, error } = distributeGlosasBrutas(next, subtotalBase);
+      const { glosas: dist, error } = distributeGlosasBrutas(next, subtotalBase, moneda);
       setGlosaErr(error);
       return dist;
     });
@@ -337,7 +363,7 @@ export default function CotizacionFromVentasDialog({
   const addGlosa = () => {
     setGlosas((prev) => {
       const next = [...prev, emptyGlosa()].map((g, i) => ({ ...g, orden: i }));
-      const { glosas: dist, error } = distributeGlosasBrutas(next, subtotalBase);
+      const { glosas: dist, error } = distributeGlosasBrutas(next, subtotalBase, moneda);
       setGlosaErr(error);
       return dist;
     });
@@ -350,7 +376,7 @@ export default function CotizacionFromVentasDialog({
         ...g,
         orden: i,
       }));
-      const { glosas: dist, error } = distributeGlosasBrutas(next, subtotalBase);
+      const { glosas: dist, error } = distributeGlosasBrutas(next, subtotalBase, moneda);
       setGlosaErr(error);
       return dist;
     });
@@ -366,8 +392,8 @@ export default function CotizacionFromVentasDialog({
 
     const importedGlosas = allDetalles.map((d, i) => {
       const cant = Number(d.cantidad) || 1;
-      const totalItem = round0(Number(d.total ?? d.ventaTotal) || 0);
-      const pu = round0(totalItem / cant);
+      const totalItem = roundMoney(Number(d.total ?? d.ventaTotal) || 0, moneda);
+      const pu = roundMoney(totalItem / cant, moneda);
       return {
         descripcion: d.descripcion || "",
         cantidad: cant,
@@ -381,15 +407,15 @@ export default function CotizacionFromVentasDialog({
 
     const sum = importedGlosas.reduce((acc, g) => acc + g.monto, 0);
     const diff = subtotalBase - sum;
-    if (diff !== 0 && importedGlosas.length > 0) {
+    if (Math.abs(diff) > 0.01 && importedGlosas.length > 0) {
       const lastIdx = importedGlosas.length - 1;
-      importedGlosas[lastIdx].monto += diff;
+      importedGlosas[lastIdx].monto = roundMoney(importedGlosas[lastIdx].monto + diff, moneda);
       const cant = importedGlosas[lastIdx].cantidad || 1;
-      importedGlosas[lastIdx].precio_unitario = round0(importedGlosas[lastIdx].monto / cant);
+      importedGlosas[lastIdx].precio_unitario = roundMoney(importedGlosas[lastIdx].monto / cant, moneda);
     }
 
     setGlosas(importedGlosas);
-    const { error } = distributeGlosasBrutas(importedGlosas, subtotalBase);
+    const { error } = distributeGlosasBrutas(importedGlosas, subtotalBase, moneda);
     setGlosaErr(error);
   };
 
@@ -538,10 +564,11 @@ export default function CotizacionFromVentasDialog({
         return `Glosa #${i + 1}: Descuento % inválido (<100).`;
     }
     if (glosaErr) return glosaErr;
-    if (sumGlosasBrutas !== subtotalBase) {
-      return `Las glosas BRUTAS suman ${formatCLP(
-        sumGlosasBrutas
-      )} y el subtotal base es ${formatCLP(subtotalBase)}.`;
+    if (Math.abs(sumGlosasBrutas - subtotalBase) > 0.01) {
+      return `Las glosas BRUTAS suman ${formatMoney(
+        sumGlosasBrutas,
+        moneda
+      )} y el subtotal base es ${formatMoney(subtotalBase, moneda)}.`;
     }
     return "";
   };
@@ -596,8 +623,8 @@ export default function CotizacionFromVentasDialog({
           return {
             descripcion: String(g.descripcion || "").trim(),
             cantidad: c,
-            precio_unitario: g.manual ? Number(g.precio_unitario || 0) : round0((g.monto || 0) / c),
-            monto: round0(g.monto || 0), // BRUTO
+            precio_unitario: g.manual ? Number(g.precio_unitario || 0) : roundMoney((g.monto || 0) / c, moneda),
+            monto: roundMoney(g.monto || 0, moneda), // BRUTO
             manual: !!g.manual,
             orden: i,
             descuento_pct: clampPct(g.descuento_pct),
@@ -605,6 +632,7 @@ export default function CotizacionFromVentasDialog({
           };
         }),
         sin_iva: sinIva,
+        moneda,
       };
 
       const res = await fetch(`${API_URL}/cotizaciones/add`, {
@@ -696,6 +724,8 @@ export default function CotizacionFromVentasDialog({
             conflictMsg={conflictMsg}
             sinIva={sinIva}
             setSinIva={setSinIva}
+            moneda={moneda}
+            setMoneda={setMoneda}
           />
         ) : null}
 
@@ -722,6 +752,7 @@ export default function CotizacionFromVentasDialog({
             conflict={conflict}
             conflictMsg={conflictMsg}
             onImportFromCosteos={handleImportFromCosteos}
+            moneda={moneda}
           />
         ) : null}
       </Box>
@@ -732,9 +763,9 @@ export default function CotizacionFromVentasDialog({
         onNext={next}
         onCreate={submit}
         saving={saving}
-        subtotalNetoLabel={formatCLP(subtotalFinal)}
-        ivaLabel={formatCLP(iva)}
-        totalLabel={formatCLP(totalFinal)}
+        subtotalNetoLabel={formatMoney(subtotalFinal, moneda)}
+        ivaLabel={formatMoney(iva, moneda)}
+        totalLabel={formatMoney(totalFinal, moneda)}
       />
     </Dialog>
   );

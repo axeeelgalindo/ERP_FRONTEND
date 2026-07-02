@@ -21,7 +21,7 @@ import AddIcon from "@mui/icons-material/Add";
 
 import { makeHeaders } from "@/lib/api";
 import { safeJson } from "@/components/ventas/utils/safeJson";
-import { formatCLP } from "@/components/ventas/utils/money";
+import { formatCLP, formatMoney } from "@/components/ventas/utils/money";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -517,9 +517,10 @@ export default function EditCotizacionDialog({
         }
         if (suma !== subtotalNeto) {
           throw new Error(
-            `Las glosas deben sumar el subtotal neto (${formatCLP(
-              subtotalNeto
-            )}). Actualmente suman ${formatCLP(suma)}.`
+            `Las glosas deben sumar el subtotal neto (${formatMoney(
+              subtotalNeto,
+              moneda
+            )}). Actualmente suman ${formatMoney(suma, moneda)}.`
           );
         }
       } else {
@@ -720,11 +721,11 @@ export default function EditCotizacionDialog({
           ))}
         </TextField>
 
-        {/* Asunto + Vigencia + Fecha + Descuento */}
+        {/* Asunto + Vigencia + Fecha + Descuento + Moneda */}
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "1fr 140px 145px 120px" },
+            gridTemplateColumns: { xs: "1fr", md: "1fr 140px 145px 120px 120px" },
             gap: 2,
           }}
         >
@@ -762,6 +763,26 @@ export default function EditCotizacionDialog({
             inputProps={{ min: 0, max: 100, step: 0.1 }}
             fullWidth
           />
+          <TextField
+            select
+            size="small"
+            label="Moneda"
+            value={moneda}
+            onChange={(e) => {
+              const val = e.target.value;
+              setMoneda(val);
+              if (val === "CLP" || val === "USD") {
+                setGlosas((prev) => prev.map((g) => ({ ...g, monto_uf: "" })));
+              } else if (val === "UF") {
+                setGlosas((prev) => prev.map((g) => ({ ...g, monto_uf: g.monto ? (g.monto / activeUF).toFixed(4) : "" })));
+              }
+            }}
+            fullWidth
+          >
+            <MenuItem value="CLP">Pesos (CLP)</MenuItem>
+            <MenuItem value="UF">UF</MenuItem>
+            <MenuItem value="USD">Dólares (USD)</MenuItem>
+          </TextField>
         </Box>
 
         {/* Toggles: Suscripción y Sin IVA */}
@@ -814,29 +835,7 @@ export default function EditCotizacionDialog({
 
         {/* Campos Condicionales de Suscripción */}
         {esSuscripcion && (
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr 1fr" }, gap: 2, p: 2, bgcolor: "action.hover", borderRadius: 2 }}>
-            <TextField
-              select
-              size="small"
-              label="Moneda Base"
-              value={moneda}
-              onChange={(e) => {
-                const val = e.target.value;
-                setMoneda(val);
-                if (val === "CLP") {
-                  // clear monto_uf on change
-                  setGlosas((prev) => prev.map((g) => ({ ...g, monto_uf: "" })));
-                } else {
-                  // calculate base monto_uf
-                  setGlosas((prev) => prev.map((g) => ({ ...g, monto_uf: g.monto ? (g.monto / activeUF).toFixed(2) : "" })));
-                }
-              }}
-              fullWidth
-            >
-              <MenuItem value="CLP">CLP (Pesos Chilenos)</MenuItem>
-              <MenuItem value="UF">UF (Unidad de Fomento)</MenuItem>
-            </TextField>
-
+          <Box sx={{ display: "grid", gridTemplateColumns: moneda === "UF" ? { xs: "1fr", md: "1fr 1fr" } : { xs: "1fr" }, gap: 2, p: 2, bgcolor: "action.hover", borderRadius: 2 }}>
             <TextField
               size="small"
               type="number"
@@ -1004,13 +1003,13 @@ export default function EditCotizacionDialog({
                   {moneda === "UF" ? (
                     <>
                       {glosasOk
-                        ? `✅ Total UF: ${Number(subtotalNetoUF).toFixed(2)} UF (~${formatCLP(subtotalNeto)} CLP) mensual por ${ciclosMensuales} meses.`
+                        ? `✅ Total UF: ${Number(subtotalNetoUF).toFixed(4)} UF (~${formatMoney(subtotalNeto, "CLP")} CLP) mensual por ${ciclosMensuales} meses.`
                         : "❌ Revisa glosas (las tarifas en UF deben ser mayores a 0)."}
                     </>
                   ) : (
                     <>
                       {glosasOk
-                        ? `✅ Total CLP: ${formatCLP(subtotalNeto)} mensual por ${ciclosMensuales} meses.`
+                        ? `✅ Total ${moneda}: ${formatMoney(subtotalNeto, moneda)} mensual por ${ciclosMensuales} meses.`
                         : "❌ Revisa glosas (monto total debe ser mayor a 0)."}
                     </>
                   )}
@@ -1020,13 +1019,13 @@ export default function EditCotizacionDialog({
                   {subtotalNeto <= 0
                     ? "❌ Subtotal neto es 0 (revisa ventas)."
                     : glosasOk
-                    ? `✅ Glosas cuadran: ${formatCLP(subtotalNeto)}`
-                    : `❌ Glosas sumadas no cuadran con el subtotal neto (${formatCLP(subtotalNeto)}).`}
+                    ? `✅ Glosas cuadran: ${formatMoney(subtotalNeto, moneda)}`
+                    : `❌ Glosas sumadas no cuadran con el subtotal neto (${formatMoney(subtotalNeto, moneda)}).`}
                 </>
               ) : (
                 <>
                   {glosasOk
-                    ? `✅ Total por glosas: ${formatCLP(subtotalNeto)}`
+                    ? `✅ Total por glosas: ${formatMoney(subtotalNeto, moneda)}`
                     : "❌ Revisa glosas (montos no negativos y total > 0)."}
                 </>
               )}

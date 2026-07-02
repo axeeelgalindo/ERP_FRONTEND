@@ -13,9 +13,9 @@ import {
   Chip,
 } from "@mui/material";
 
-import { formatCLP } from "@/components/cotizaciones/utils/utils";
+import { formatCLP, formatMoney } from "@/components/cotizaciones/utils/utils";
 
-export default function CotizacionItemsTable({ items = [] }) {
+export default function CotizacionItemsTable({ items = [], moneda = "CLP" }) {
   return (
     <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
       <Table size="small">
@@ -48,9 +48,9 @@ export default function CotizacionItemsTable({ items = [] }) {
                   {it.descripcion || "-"}
                 </TableCell>
                 <TableCell align="right">{it.cantidad}</TableCell>
-                <TableCell align="right">{formatCLP(it.precioUnitario)}</TableCell>
+                <TableCell align="right">{formatMoney(it.precioUnitario, moneda)}</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 900 }}>
-                  {formatCLP(it.total)}
+                  {formatMoney(it.total, moneda)}
                 </TableCell>
               </TableRow>
             );

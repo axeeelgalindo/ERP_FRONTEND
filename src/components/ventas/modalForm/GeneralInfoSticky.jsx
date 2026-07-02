@@ -1,7 +1,7 @@
 "use client";
 
 import { Box, TextField, Typography } from "@mui/material";
-import { formatCLP } from "@/components/ventas/utils/money";
+import { formatCLP, formatMoney } from "@/components/ventas/utils/money";
 
 export default function GeneralInfoSticky({
   theme,
@@ -10,6 +10,7 @@ export default function GeneralInfoSticky({
   utilidadPctObjetivo,
   setUtilidadPctObjetivo,
   preview,
+  moneda = "CLP",
 }) {
   const pct =
     preview?.total > 0
@@ -143,7 +144,7 @@ export default function GeneralInfoSticky({
             Venta
           </Typography>
           <Typography sx={{ fontWeight: 900 }}>
-            {formatCLP(preview?.total || 0)}
+            {formatMoney(preview?.total || 0, moneda)}
           </Typography>
         </Box>
 
@@ -172,7 +173,7 @@ export default function GeneralInfoSticky({
             Costo
           </Typography>
           <Typography sx={{ fontWeight: 800, color: "text.secondary" }}>
-            {formatCLP(preview?.costo || 0)}
+            {formatMoney(preview?.costo || 0, moneda)}
           </Typography>
         </Box>
 
@@ -213,7 +214,7 @@ export default function GeneralInfoSticky({
           
 
           <Typography sx={{ fontWeight: 900, color: "success.main" }}>
-            {formatCLP(preview?.utilidad || 0)}
+            {formatMoney(preview?.utilidad || 0, moneda)}
           </Typography>
         </Box>
       </Box>

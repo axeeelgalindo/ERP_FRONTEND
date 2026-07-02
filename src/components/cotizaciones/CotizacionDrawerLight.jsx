@@ -36,7 +36,7 @@ import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 
 import CotizacionPDFButton from "./CotizacionPDFButton";
 import NuevoPagoDialog from "./NuevoPagoDialog";
-import { fechaCL, formatCLP, nextEstados } from "@/components/cotizaciones/utils/utils";
+import { fechaCL, formatCLP, formatMoney, nextEstados } from "@/components/cotizaciones/utils/utils";
 
 function Badge({ children }) {
   return (
@@ -555,16 +555,16 @@ export default function CotizacionDrawerLight({
               <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">
                 Subtotal (Bruto)
               </p>
-              <p className="text-lg font-bold">{formatCLP(totals.subtotalBruto)}</p>
+              <p className="text-lg font-bold">{formatMoney(totals.subtotalBruto, c?.moneda)}</p>
             </div>
 
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
               <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">
                 Descuento
               </p>
-              <p className="text-lg font-bold">{formatCLP(totals.descuentoTotal)}</p>
+              <p className="text-lg font-bold">{formatMoney(totals.descuentoTotal, c?.moneda)}</p>
               <p className="text-[11px] text-slate-500 mt-1">
-                Glosas: {formatCLP(totals.descGlosasMonto)} · General: {formatCLP(totals.descGeneralMonto)}
+                Glosas: {formatMoney(totals.descGlosasMonto, c?.moneda)} · General: {formatMoney(totals.descGeneralMonto, c?.moneda)}
                 {totals.descGeneralPct > 0 ? ` (${totals.descGeneralPct}%)` : ""}
               </p>
             </div>
@@ -573,7 +573,7 @@ export default function CotizacionDrawerLight({
               <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">
                 Subtotal (Neto)
               </p>
-              <p className="text-lg font-bold">{formatCLP(totals.subtotalNeto)}</p>
+              <p className="text-lg font-bold">{formatMoney(totals.subtotalNeto, c?.moneda)}</p>
             </div>
 
             <div className="p-4 bg-blue-600/5 rounded-2xl border border-blue-600/10">
@@ -581,10 +581,10 @@ export default function CotizacionDrawerLight({
                 Total
               </p>
               <p className="text-lg font-bold text-blue-600">
-                {formatCLP(totals.total)}
+                {formatMoney(totals.total, c?.moneda)}
               </p>
               <p className="text-[11px] text-blue-600/70 mt-1">
-                IVA: {c?.sin_iva ? "Exento" : formatCLP(totals.iva)}
+                IVA: {c?.sin_iva ? "Exento" : formatMoney(totals.iva, c?.moneda)}
               </p>
             </div>
           </div>
@@ -713,11 +713,11 @@ export default function CotizacionDrawerLight({
 
 
                         <td className="px-4 py-4 text-right font-medium">
-                          {formatCLP(desc)} {pct > 0 ? <span className="text-xs text-slate-400">({pct}%)</span> : null}
+                          {formatMoney(desc, c?.moneda)} {pct > 0 ? <span className="text-xs text-slate-400">({pct}%)</span> : null}
                         </td>
 
                         <td className="px-4 py-4 text-right font-bold">
-                          {formatCLP(neto)}
+                          {formatMoney(neto, c?.moneda)}
                         </td>
                       </tr>
                     );
@@ -738,33 +738,33 @@ export default function CotizacionDrawerLight({
                       <td className="px-4 py-3 text-left text-slate-500" colSpan={4}>
                         Subtotal
                       </td>
-                      <td className="px-4 py-3 text-right">{formatCLP(totals.subtotalBruto)}</td>
+                      <td className="px-4 py-3 text-right">{formatMoney(totals.subtotalBruto, c?.moneda)}</td>
                     </tr>
                     <tr className="border-t border-slate-200">
                       <td className="px-4 py-3 text-left text-slate-500" colSpan={4}>
                         Descuento
                       </td>
-                      <td className="px-4 py-3 text-right">-{formatCLP(totals.descuentoTotal)}</td>
+                      <td className="px-4 py-3 text-right">-{formatMoney(totals.descuentoTotal, c?.moneda)}</td>
                     </tr>
                     <tr className="border-t border-slate-200">
                       <td className="px-4 py-3 text-left text-slate-500" colSpan={4}>
                         Subtotal Neto
                       </td>
-                      <td className="px-4 py-3 text-right">+{formatCLP(totals.subtotalNeto)}</td>
+                      <td className="px-4 py-3 text-right">+{formatMoney(totals.subtotalNeto, c?.moneda)}</td>
                     </tr>
                     <tr className="border-t border-slate-200">
                       <td className="px-4 py-3 text-left text-slate-500" colSpan={4}>
                         {c?.sin_iva ? "IVA 0%" : "IVA 19%"}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {c?.sin_iva ? "Exento" : `+ ${formatCLP(totals.iva)}`}
+                        {c?.sin_iva ? "Exento" : `+ ${formatMoney(totals.iva, c?.moneda)}`}
                       </td>
                     </tr>
                     <tr className="border-t border-slate-200">
                       <td className="px-4 py-3 text-left text-slate-500" colSpan={4}>
                         Total
                       </td>
-                      <td className="px-4 py-3 text-right">{formatCLP(totals.total)}</td>
+                      <td className="px-4 py-3 text-right">{formatMoney(totals.total, c?.moneda)}</td>
                     </tr>
                   </tfoot>
                 ) : null}
@@ -845,7 +845,7 @@ export default function CotizacionDrawerLight({
                           )}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <div className="font-bold text-green-600">{formatCLP(pago.monto)}</div>
+                          <div className="font-bold text-green-600">{formatMoney(pago.monto, c?.moneda)}</div>
                           {totals.total > 0 && (
                             <div className="text-[10px] text-slate-400 font-bold mt-0.5">
                               {((pago.monto / totals.total) * 100).toFixed(1)}%
@@ -864,18 +864,18 @@ export default function CotizacionDrawerLight({
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-green-700 text-base">
-                        {formatCLP(totals.totalPagado)}
+                        {formatMoney(totals.totalPagado, c?.moneda)}
                       </td>
                     </tr>
                     <tr className="border-t border-slate-200 bg-white">
                       <td className="px-4 py-3 text-right text-slate-500" colSpan={2}>
                         Restante a Pagar
                         <span className="text-[10px] uppercase block mt-0.5 text-slate-400 font-bold">
-                          del total de {formatCLP(totals.total)}
+                          del total de {formatMoney(totals.total, c?.moneda)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-rose-600 text-base">
-                        {formatCLP(totals.restanteAPagar)}
+                        {formatMoney(totals.restanteAPagar, c?.moneda)}
                       </td>
                     </tr>
                   </tfoot>
@@ -883,7 +883,7 @@ export default function CotizacionDrawerLight({
             ) : (
               <div className="p-6 bg-slate-50 border border-slate-200 border-dashed rounded-xl text-center flex flex-col items-center gap-2">
                 <span className="text-slate-500 text-sm">No hay pagos registrados para esta cotización.</span>
-                <span className="font-semibold text-rose-600 text-sm">Restante a pagar: {formatCLP(totals.total)}</span>
+                <span className="font-semibold text-rose-600 text-sm">Restante a pagar: {formatMoney(totals.total, c?.moneda)}</span>
               </div>
             )}
           </div>
