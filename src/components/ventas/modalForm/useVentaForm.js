@@ -29,6 +29,7 @@ export default function useVentaForm({
   // ✅ tipo día por costeo
   const [isFeriado, setIsFeriado] = useState(false);
   const [isUrgencia, setIsUrgencia] = useState(false);
+  const [esProyectado, setEsProyectado] = useState(false);
 
   const now = useMemo(() => new Date(), []);
   const [anio, setAnio] = useState(String(now.getFullYear()));
@@ -216,6 +217,7 @@ export default function useVentaForm({
 
     setIsFeriado(false);
     setIsUrgencia(false);
+    setEsProyectado(false);
 
     setHhPeriodoKey("");
     setHhRegistros([]);
@@ -474,6 +476,7 @@ export default function useVentaForm({
 
       setIsFeriado(!!data?.isFeriado);
       setIsUrgencia(!!data?.isUrgencia);
+      setEsProyectado(!!data?.esProyectado);
 
       // ✅ NUEVO: descuento general
       if (data?.descuentoPct != null) {
@@ -938,6 +941,7 @@ export default function useVentaForm({
 
         isFeriado: !!isFeriado,
         isUrgencia: !!isUrgencia,
+        esProyectado: !!esProyectado,
 
         detalles: detalles.map((d) => {
           const alpha = normalizeAlphaPctUI(d.alphaPct);
@@ -1028,6 +1032,8 @@ export default function useVentaForm({
     setIsFeriado,
     isUrgencia,
     setIsUrgencia,
+    esProyectado,
+    setEsProyectado,
     extraCosteo,
     hhPeriodos,
     hhPeriodoKey,

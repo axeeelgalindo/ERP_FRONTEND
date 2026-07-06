@@ -69,17 +69,19 @@ export default function CotizacionesSummary({ cotizaciones, filterEstado }) {
       let cVentaReal = 0;
       let cCostoReal = 0;
 
-      for (const v of ventas) {
-        const vVenta = (v.detalles || []).reduce(
-          (acc, d) => acc + (Number(d.ventaTotal ?? d.total) || 0),
-          0
-        );
-        const vCosto = (v.detalles || []).reduce(
-          (acc, d) => acc + (Number(d.costoTotal) || 0),
-          0
-        );
-        cVentaReal += vVenta;
-        cCostoReal += vCosto;
+      if (c.estado !== "COTIZACION" && c.estado !== "RECHAZADA") {
+        for (const v of ventas) {
+          const vVenta = (v.detalles || []).reduce(
+            (acc, d) => acc + (Number(d.ventaTotal ?? d.total) || 0),
+            0
+          );
+          const vCosto = (v.detalles || []).reduce(
+            (acc, d) => acc + (Number(d.costoTotal) || 0),
+            0
+          );
+          cVentaReal += vVenta;
+          cCostoReal += vCosto;
+        }
       }
 
       totalVentaRealAll += cVentaReal;

@@ -19,6 +19,7 @@ import { CotizacionFromVentasDialog } from "@/components/ventas/cotizacion";
 import { VentaDeleteDialog } from "@/components/ventas/modalForm";
 
 import { useVentas } from "@/components/ventas/hooks/useVentas";
+import { exportGeneralPDF } from "@/components/ventas/utils/exportGeneralPDF";
 
 export default function VentasPage() {
   const { data: session, status } = useSession();
@@ -46,6 +47,106 @@ export default function VentasPage() {
 
   const [viewMode, setViewMode] = useState("list"); // "list" | "dashboard"
   const [openNew, setOpenNew] = useState(false);
+
+  // Filtros unificados
+  const [q, setQ] = useState("");
+  const [filterEstado, setFilterEstado] = useState("");
+  const [periodo, setPeriodo] = useState("todo");
+  const [refDate, setRefDate] = useState(new Date());
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  const availableYears = useMemo(() => {
+    const years = new Set([new Date().getFullYear()]);
+    (ventas || []).forEach(v => {
+      const d = v.fecha ? new Date(v.fecha) : null;
+      if (d) years.add(d.getFullYear());
+    });
+    return Array.from(years).sort((a, b) => b - a);
+  }, [ventas]);
+
+  const handleScaleSelect = (scale) => {
+    setPeriodo(scale);
+    setRefDate(new Date());
+  };
+
+  const handleYearSelect = (e) => {
+    const nd = new Date(refDate);
+    nd.setFullYear(Number(e.target.value));
+    setRefDate(nd);
+  };
+
+  const handleMonthSelect = (e) => {
+    const nd = new Date(refDate);
+    nd.setMonth(Number(e.target.value));
+    setRefDate(nd);
+  };
+
+  const handleWeekSelect = (e) => {
+    const offset = Number(e.target.value);
+    const nd = new Date();
+    nd.setDate(nd.getDate() + (offset * 7));
+    setRefDate(nd);
+  };
+
+  const filteredVentas = useMemo(() => {
+    return (ventas || []).filter((v) => {
+      // 1. Filtro fecha
+      if (periodo !== "todo") {
+        const d = v.fecha ? new Date(v.fecha) : null;
+        if (!d) return false;
+        if (periodo === "semanal") {
+          const refD = new Date(refDate);
+          const day = refD.getDay();
+          const diff = refD.getDate() - day + (day === 0 ? -6 : 1);
+          const start = new Date(refD.setDate(diff));
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(start);
+          end.setDate(start.getDate() + 6);
+          end.setHours(23, 59, 59, 999);
+          if (d < start || d > end) return false;
+        } else if (periodo === "mensual") {
+          if (d.getFullYear() !== refDate.getFullYear() || d.getMonth() !== refDate.getMonth()) return false;
+        } else if (periodo === "anual") {
+          if (d.getFullYear() !== refDate.getFullYear()) return false;
+        }
+      }
+
+      // 2. Filtro estado (vinculado a cotización o proyectado)
+      if (filterEstado) {
+        if (filterEstado === "PROYECTADO") {
+          if (!v.esProyectado) return false;
+        } else if (filterEstado === "SIN_COTIZACION") {
+          if (v.ordenVenta || v.ordenVentaId) return false;
+        } else {
+          if (v.ordenVenta?.estado !== filterEstado) return false;
+        }
+      }
+
+      // 3. Filtro texto (q)
+      if (q.trim()) {
+        const qq = q.trim().toLowerCase();
+        const desc = String(v?.descripcion || "").toLowerCase();
+        const num = String(v?.numero ?? "").toLowerCase();
+        const id = String(v?.id || "").toLowerCase();
+        const client = String(v?.Cliente?.nombre || v?.Cliente?.rut || "").toLowerCase();
+        if (!desc.includes(qq) && !num.includes(qq) && !id.includes(qq) && !client.includes(qq)) return false;
+      }
+
+      return true;
+    });
+  }, [ventas, periodo, refDate, filterEstado, q]);
+
+  const hasFilters = periodo !== "todo" || filterEstado !== "" || q !== "";
+  const clearFilters = () => {
+    setQ("");
+    setFilterEstado("");
+    setPeriodo("todo");
+    setRefDate(new Date());
+  };
+
+  const handleExportPdf = () => {
+    exportGeneralPDF(filteredVentas, periodo === "todo" ? "todo" : "filtrado", q, session, setExportingPdf);
+  };
 
   // ✅ EDIT
   const [openEdit, setOpenEdit] = useState(false);
@@ -142,23 +243,189 @@ export default function VentasPage() {
           </button>
         </div>
 
+        {/* KPIs Summary Cards at the top of the content */}
+        <VentasSummary ventas={filteredVentas} />
+
+        {/* Unified Filters for Costeos */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            {/* Search Input */}
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔎</span>
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className="w-full pl-9 pr-4 h-[46px] border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all"
+                placeholder="Buscar descripción, ID o cliente..."
+                type="text"
+              />
+            </div>
+
+            {/* Status Select */}
+            <div className="relative">
+              <select
+                value={filterEstado}
+                onChange={(e) => setFilterEstado(e.target.value)}
+                className="w-full h-[46px] px-3 pr-9 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all appearance-none cursor-pointer"
+              >
+                <option value="">Todos los estados</option>
+                <option value="PROYECTADO">Proyectados</option>
+                <option value="SIN_COTIZACION">Sin Cotización</option>
+                <option value="COTIZACION">Cotización</option>
+                <option value="ACEPTADA">Aceptada</option>
+                <option value="RECHAZADA">Rechazada</option>
+                <option value="ORDEN_VENTA">Orden de Venta</option>
+                <option value="ENTREGADO">Entregado</option>
+                <option value="POR_FACTURAR">Por Facturar</option>
+                <option value="FACTURADA">Facturada</option>
+                <option value="PAGADA">Pagada</option>
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">▾</span>
+            </div>
+
+            {/* Date Filters Trigger scale */}
+            <nav className="flex bg-slate-100 p-1 rounded-xl w-full h-[46px] items-center">
+              <button
+                onClick={() => handleScaleSelect("todo")}
+                className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition ${
+                  periodo === "todo" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Todos
+              </button>
+              <button
+                onClick={() => handleScaleSelect("semanal")}
+                className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition ${
+                  periodo === "semanal" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Semana
+              </button>
+              <button
+                onClick={() => handleScaleSelect("mensual")}
+                className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition ${
+                  periodo === "mensual" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Mes
+              </button>
+              <button
+                onClick={() => handleScaleSelect("anual")}
+                className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition ${
+                  periodo === "anual" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Año
+              </button>
+            </nav>
+
+            {/* General Report Button */}
+            <button
+              onClick={handleExportPdf}
+              disabled={exportingPdf || filteredVentas.length === 0}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white h-[46px] rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/10 hover:scale-[1.01] active:scale-95 transition disabled:scale-100 disabled:opacity-60 hover:cursor-pointer w-full text-sm"
+              title="Descargar Reporte General de Costeos (PDF)"
+            >
+              {exportingPdf ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                  <span>Generando...</span>
+                </>
+              ) : (
+                <>
+                  <span>📊</span>
+                  <span>Reporte General</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Conditional Dropdowns Row */}
+          {periodo !== "todo" && (
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+              {periodo === "semanal" && (
+                <div className="relative w-full sm:w-44">
+                  <select
+                    onChange={handleWeekSelect}
+                    defaultValue={0}
+                    className="w-full h-[40px] px-3 pr-9 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all appearance-none cursor-pointer font-medium"
+                  >
+                    <option value={0}>Esta semana</option>
+                    <option value={-1}>Semana pasada</option>
+                    <option value={-2}>Hace 2 semanas</option>
+                    <option value={-3}>Hace 3 semanas</option>
+                    <option value={-4}>Hace 4 semanas</option>
+                  </select>
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">▾</span>
+                </div>
+              )}
+
+              {periodo === "mensual" && (
+                <div className="relative w-full sm:w-40">
+                  <select
+                    value={refDate.getMonth()}
+                    onChange={handleMonthSelect}
+                    className="w-full h-[40px] px-3 pr-9 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all appearance-none cursor-pointer font-medium"
+                  >
+                    {["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"].map((m, i) => (
+                      <option key={i} value={i}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">▾</span>
+                </div>
+              )}
+
+              {(periodo === "mensual" || periodo === "anual") && (
+                <div className="relative w-full sm:w-32">
+                  <select
+                    value={refDate.getFullYear()}
+                    onChange={handleYearSelect}
+                    className="w-full h-[40px] px-3 pr-9 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all appearance-none cursor-pointer font-medium"
+                  >
+                    {availableYears.map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">▾</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Clean filters link */}
+          {hasFilters && (
+            <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100">
+              <span className="text-xs text-slate-400">
+                {filteredVentas.length} costeo{filteredVentas.length !== 1 ? "s" : ""} encontrado{filteredVentas.length !== 1 ? "s" : ""}
+              </span>
+              <button
+                onClick={clearFilters}
+                className="text-xs font-semibold text-slate-500 hover:text-rose-600 transition-colors flex items-center gap-1"
+              >
+                <span>✕</span> Limpiar filtros
+              </button>
+            </div>
+          )}
+        </div>
+
         {viewMode === "list" ? (
-          <>
-            <VentasSummary ventas={ventas} />
-            <VentasTable
-              ventas={ventas}
-              error={errorVentas}
-              loading={loadingVentas}
-              onCreateCotizacionFromVenta={onCreateCotizacionFromVenta}
-              onEditVenta={onEditVenta}
-              onDisableVenta={onDisableVenta}
-              onOpenReport={onOpenReport}
-              session={session}
-            />
-          </>
+          <VentasTable
+            ventas={filteredVentas}
+            error={errorVentas}
+            loading={loadingVentas}
+            onCreateCotizacionFromVenta={onCreateCotizacionFromVenta}
+            onEditVenta={onEditVenta}
+            onDisableVenta={onDisableVenta}
+            onOpenReport={onOpenReport}
+            session={session}
+          />
         ) : (
           <CosteosDashboard
-            ventas={ventas}
+            ventas={filteredVentas}
             onOpenReport={onOpenReport}
             session={session}
           />

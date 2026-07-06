@@ -110,8 +110,15 @@ export default function CotizacionesTableLight({
                     {fechaCL(c.fecha_documento || c.creada_en)}
                   </td>
 
-                  <td className="px-6 py-4 text-sm font-medium">
-                    {c.cliente?.nombre || "Sin cliente"}
+                  <td className="px-6 py-4 text-sm">
+                    <div className="font-semibold text-slate-800">
+                      {c.cliente?.nombre || "Sin cliente"}
+                    </div>
+                    {c.asunto && (
+                      <div className="text-xs text-slate-500 mt-0.5 max-w-xs truncate">
+                        {c.asunto}
+                      </div>
+                    )}
                   </td>
 
                   <td className="px-6 py-4">

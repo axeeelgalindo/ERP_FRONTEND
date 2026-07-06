@@ -80,11 +80,6 @@ export default function VentasTable({
   const [tab, setTab] = useState("costeos"); // "costeos" | "cotizaciones"
   const [exportingPdf, setExportingPdf] = useState(false);
 
-  // filtros (no endpoint aún, solo UI)
-  const [range, setRange] = useState("mes"); // todo | mes | porMes | dia
-  const [q, setQ] = useState("");
-  const [estadoOpen, setEstadoOpen] = useState(false);
-
   // paginación
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -104,27 +99,8 @@ export default function VentasTable({
     let out = list;
     if (tab === "cotizaciones") out = out.filter((v) => isCot(v));
 
-    // rango: mes actual (real), y otros solo UI
-    if (range === "mes") {
-      const now = new Date();
-      out = out.filter((v) =>
-        inMonth(v?.fecha, now.getFullYear(), now.getMonth()),
-      );
-    }
-
-    // búsqueda: por descripcion / numero / id (simple)
-    const qq = q.trim().toLowerCase();
-    if (qq) {
-      out = out.filter((v) => {
-        const desc = String(v?.descripcion || "").toLowerCase();
-        const num = String(v?.numero ?? "").toLowerCase();
-        const id = String(v?.id || "").toLowerCase();
-        return desc.includes(qq) || num.includes(qq) || id.includes(qq);
-      });
-    }
-
     return out;
-  }, [ventas, tab, range, q]);
+  }, [ventas, tab]);
 
   const paged = useMemo(() => {
     const start = page * rowsPerPage;
@@ -134,7 +110,7 @@ export default function VentasTable({
   useEffect(() => {
     // si cambia el filtro/busqueda, vuelve a 0 para evitar páginas vacías
     setPage(0);
-  }, [tab, range, q, rowsPerPage]);
+  }, [tab, rowsPerPage]);
 
   const showingFrom = filtered.length === 0 ? 0 : page * rowsPerPage + 1;
   const showingTo = Math.min(filtered.length, (page + 1) * rowsPerPage);
@@ -161,14 +137,15 @@ export default function VentasTable({
   return (
     <div>
       {/* Filtros / Toolbar (plantilla) */}
-      <div className="bg-white  p-5 rounded-2xl border border-slate-200  shadow-sm mb-6 flex flex-col lg:flex-row gap-6 lg:items-center">
-        <div className="flex bg-slate-100  p-1 rounded-xl">
+      {/* 
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-6 flex items-center justify-between">
+        <div className="flex bg-slate-100 p-1 rounded-xl">
           <button
             onClick={() => setTab("costeos")}
-            className={`flex-1 lg:flex-none px-6 py-2 rounded-lg text-sm transition ${
+            className={`px-6 py-2 rounded-lg text-sm transition ${
               tab === "costeos"
-                ? "font-semibold bg-white  text-blue-600 shadow-sm"
-                : "font-medium text-slate-500  hover:text-slate-700 "
+                ? "font-semibold bg-white text-blue-600 shadow-sm"
+                : "font-medium text-slate-500 hover:text-slate-700"
             }`}
           >
             Costeos
@@ -176,120 +153,17 @@ export default function VentasTable({
 
           <button
             onClick={() => setTab("cotizaciones")}
-            className={`flex-1 lg:flex-none px-6 py-2 rounded-lg text-sm transition ${
+            className={`px-6 py-2 rounded-lg text-sm transition ${
               tab === "cotizaciones"
-                ? "font-semibold bg-white  text-blue-600 shadow-sm"
-                : "font-medium text-slate-500  hover:text-slate-700 "
+                ? "font-semibold bg-white text-blue-600 shadow-sm"
+                : "font-medium text-slate-500 hover:text-slate-700"
             }`}
-            title="Placeholder (solo UI por ahora)"
           >
             Cotizaciones
           </button>
         </div>
-
-        <div className="hidden lg:block w-px h-8 bg-slate-200 " />
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setRange("todo")}
-            className={`px-4 py-2 text-sm rounded-lg border transition ${
-              range === "todo"
-                ? "font-semibold text-blue-600 bg-blue-600/10 border-blue-600/20"
-                : "font-medium text-slate-600  bg-slate-50  border-slate-200  hover:border-blue-600/50"
-            }`}
-          >
-            Todo
-          </button>
-
-          <button
-            onClick={() => setRange("mes")}
-            className={`px-4 py-2 text-sm rounded-lg border transition ${
-              range === "mes"
-                ? "font-semibold text-blue-600 bg-blue-600/10 border-blue-600/20"
-                : "font-medium text-slate-600  bg-slate-50  border-slate-200  hover:border-blue-600/50"
-            }`}
-          >
-            Mes actual
-          </button>
-
-          <button
-            onClick={() => setRange("porMes")}
-            className={`px-4 py-2 text-sm rounded-lg border transition ${
-              range === "porMes"
-                ? "font-semibold text-blue-600 bg-blue-600/10 border-blue-600/20"
-                : "font-medium text-slate-600  bg-slate-50  border-slate-200  hover:border-blue-600/50"
-            }`}
-            title="UI lista (conectar luego)"
-          >
-            Por Mes
-          </button>
-
-          <button
-            onClick={() => setRange("dia")}
-            className={`px-4 py-2 text-sm rounded-lg border transition ${
-              range === "dia"
-                ? "font-semibold text-blue-600 bg-blue-600/10 border-blue-600/20"
-                : "font-medium text-slate-600  bg-slate-50  border-slate-200  hover:border-blue-600/50"
-            }`}
-            title="UI lista (conectar luego)"
-          >
-            Día
-          </button>
-        </div>
-
-        <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
-            🔎
-          </span>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50  border border-transparent rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600/20 "
-            placeholder="Buscar por descripción, ID o cliente..."
-            type="text"
-          />
-        </div>
-
-        <div className="flex gap-2 relative">
-          <button
-            onClick={() => setEstadoOpen((s) => !s)}
-            className="bg-slate-50  px-4 py-2.5 rounded-xl text-slate-600  font-medium flex items-center gap-2 hover:bg-slate-100  transition border border-transparent"
-          >
-            <span className="text-[18px]">⚙️</span> Estado
-          </button>
-
-          <button
-            onClick={() => exportGeneralPDF(filtered, range, q, session, setExportingPdf)}
-            disabled={exportingPdf || filtered.length === 0}
-            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white px-4 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/20 hover:scale-[1.02] active:scale-95 transition disabled:scale-100 disabled:opacity-60 hover:cursor-pointer"
-            title="Descargar Reporte General de Costeos (PDF)"
-          >
-            {exportingPdf ? (
-              <>
-                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                <span>Generando...</span>
-              </>
-            ) : (
-              <>
-                <span>📊</span>
-                <span>Reporte General</span>
-              </>
-            )}
-          </button>
-
-          {/* Dropdown placeholder */}
-          {estadoOpen ? (
-            <div className="absolute right-0 top-[46px] z-20 w-56 bg-white  border border-slate-200  rounded-xl shadow-lg p-2">
-              <button
-                onClick={() => setEstadoOpen(false)}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50  text-sm"
-              >
-                (Pendiente) Conectar estados
-              </button>
-            </div>
-          ) : null}
-        </div>
       </div>
+      */}
 
       {/* Loading */}
       {loading ? (
@@ -334,8 +208,13 @@ export default function VentasTable({
                     </div>
 
                     <div>
-                      <h4 className="font-bold text-lg group-hover:text-blue-600 transition">
+                      <h4 className="font-bold text-lg group-hover:text-blue-600 transition flex items-center gap-2 flex-wrap">
                         {venta.descripcion || "Sin descripción"}
+                        {venta.esProyectado && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200 uppercase tracking-wider">
+                            Proyectado
+                          </span>
+                        )}
                       </h4>
 
                       <p className="text-sm text-slate-500  flex items-center gap-2">

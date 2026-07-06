@@ -514,6 +514,24 @@ export default function NuevaVentaDialog({
                         </Typography>
                       }
                     />
+
+                    <FormControlLabel
+                      sx={{ m: 0 }}
+                      control={
+                        <Switch
+                          checked={!!form.esProyectado}
+                          onChange={(e) =>
+                            form.setEsProyectado(e.target.checked)
+                          }
+                          color="warning"
+                        />
+                      }
+                      label={
+                        <Typography sx={{ fontSize: 12, fontWeight: 800 }}>
+                          Proyectado
+                        </Typography>
+                      }
+                    />
                   </Box>
                   {/* 
                     <Typography sx={{ fontSize: 11, color: "text.disabled" }}>

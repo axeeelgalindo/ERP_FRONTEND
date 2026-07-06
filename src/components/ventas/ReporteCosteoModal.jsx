@@ -1032,6 +1032,12 @@ export default function ReporteCosteoModal({ open, onClose, venta, session }) {
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
+                  <span className="text-slate-400 font-medium">Proyectado:</span>
+                  <span className={`font-bold ${venta.esProyectado ? "text-amber-600 bg-amber-50 px-2 py-0.5 rounded" : "text-slate-500 bg-slate-100 px-2 py-0.5 rounded"}`}>
+                    {venta.esProyectado ? "Sí" : "No"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
                   <span className="text-slate-400 font-medium">Fecha Registro:</span>
                   <span className="font-bold text-slate-700">{fmtDate(venta.createdAt)}</span>
                 </div>

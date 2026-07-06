@@ -505,6 +505,7 @@ export async function exportGeneralPDF(filteredVentas, range, q, session, setBus
     if (range === "mes") rangeLabel = "Mes actual";
     else if (range === "porMes") rangeLabel = "Por Mes";
     else if (range === "dia") rangeLabel = "Día actual";
+    else if (range === "proyectados") rangeLabel = "Sólo Proyectados";
 
     doc.text(`Período / Rango: ${rangeLabel}`, mx, y);
     y += 5;

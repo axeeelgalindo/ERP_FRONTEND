@@ -28,6 +28,8 @@ export default function GeneralInfoSection({
   setIsFeriado,
   isUrgencia,
   setIsUrgencia,
+  esProyectado,
+  setEsProyectado,
 
   // ✅ si estás usando "form" adentro, necesitas pasarlo
   form,
@@ -285,6 +287,17 @@ export default function GeneralInfoSection({
             />
           }
           label="Urgencia"
+        />
+
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={!!esProyectado}
+              onChange={(e) => setEsProyectado(e.target.checked)}
+              color="warning"
+            />
+          }
+          label="Proyectado"
         />
 
         <Typography sx={{ fontSize: 12, color: "text.secondary" }}>

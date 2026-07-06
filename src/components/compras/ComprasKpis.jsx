@@ -30,7 +30,7 @@ export default function ComprasKpis({
   totalMes,
   pendientesRendicion,
   sinPdf,
-  sinVincularCosteo,
+  sinVincularCotizacion,
 }) {
   // icons simples (no dependemos de Material Symbols)
   const icons = useMemo(
@@ -70,9 +70,9 @@ export default function ComprasKpis({
       })}
 
       {kpiCard({
-        title: "Sin Vincular a Costeo",
-        value: sinVincularCosteo ?? 0,
-        subtitle: "Pendientes costeo",
+        title: "Sin Vincular a Cotización",
+        value: sinVincularCotizacion ?? 0,
+        subtitle: "Pendientes cotización",
         icon: icons.linkoff,
         iconBg: "bg-purple-50 ",
       })}

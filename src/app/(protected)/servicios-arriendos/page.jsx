@@ -253,9 +253,42 @@ export default function ServiciosArriendosPage() {
   const [fAsunto, setFAsunto] = useState("");
   const [fCliente, setFCliente] = useState("");
   const [fNumero, setFNumero] = useState("");
-  const [filterMonth, setFilterMonth] = useState(dayjs().month() + 1);
-  const [filterYear, setFilterYear] = useState(dayjs().year());
+  const [periodo, setPeriodo] = useState("todo");
+  const [refDate, setRefDate] = useState(new Date());
   const [filterEstado, setFilterEstado] = useState("");
+
+  const availableYears = useMemo(() => {
+    const years = new Set([new Date().getFullYear()]);
+    cotizaciones.forEach(c => {
+      const d = c.creada_en ? new Date(c.creada_en) : null;
+      if (d) years.add(d.getFullYear());
+    });
+    return Array.from(years).sort((a, b) => b - a);
+  }, [cotizaciones]);
+
+  const handleScaleSelect = (scale) => {
+    setPeriodo(scale);
+    setRefDate(new Date());
+  };
+
+  const handleYearSelect = (e) => {
+    const nd = new Date(refDate);
+    nd.setFullYear(Number(e.target.value));
+    setRefDate(nd);
+  };
+
+  const handleMonthSelect = (e) => {
+    const nd = new Date(refDate);
+    nd.setMonth(Number(e.target.value));
+    setRefDate(nd);
+  };
+
+  const handleWeekSelect = (e) => {
+    const offset = Number(e.target.value);
+    const nd = new Date();
+    nd.setDate(nd.getDate() + (offset * 7));
+    setRefDate(nd);
+  };
 
   // Dialogs
   const [openEdit, setOpenEdit] = useState(false);
@@ -399,12 +432,25 @@ export default function ServiciosArriendosPage() {
       // Filtrar SOLO suscripciones/arriendos
       if (!c.es_suscripcion) return false;
 
-      // Filtro mes/año
-      if (filterMonth !== "" || filterYear !== "") {
+      // Filtro fecha
+      if (periodo !== "todo") {
         const d = c.creada_en ? new Date(c.creada_en) : null;
         if (!d) return false;
-        if (filterMonth !== "" && Number(filterMonth) !== d.getMonth() + 1) return false;
-        if (filterYear !== "" && Number(filterYear) !== d.getFullYear()) return false;
+        if (periodo === "semanal") {
+          const refD = new Date(refDate);
+          const day = refD.getDay();
+          const diff = refD.getDate() - day + (day === 0 ? -6 : 1);
+          const start = new Date(refD.setDate(diff));
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(start);
+          end.setDate(start.getDate() + 6);
+          end.setHours(23, 59, 59, 999);
+          if (d < start || d > end) return false;
+        } else if (periodo === "mensual") {
+          if (d.getFullYear() !== refDate.getFullYear() || d.getMonth() !== refDate.getMonth()) return false;
+        } else if (periodo === "anual") {
+          if (d.getFullYear() !== refDate.getFullYear()) return false;
+        }
       }
       // Estado
       if (filterEstado && c?.estado !== filterEstado) return false;
@@ -424,16 +470,16 @@ export default function ServiciosArriendosPage() {
       }
       return true;
     });
-  }, [cotizaciones, filterMonth, filterYear, filterEstado, fNumero, fAsunto, fCliente]);
+  }, [cotizaciones, periodo, refDate, filterEstado, fNumero, fAsunto, fCliente]);
 
-  const hasFilters = filterMonth !== "" || filterYear !== "" || filterEstado || fNumero || fAsunto || fCliente;
+  const hasFilters = periodo !== "todo" || filterEstado || fNumero || fAsunto || fCliente;
   const clearFilters = () => {
     setFAsunto("");
     setFCliente("");
     setFNumero("");
     setFilterEstado("");
-    setFilterMonth(dayjs().month() + 1);
-    setFilterYear(dayjs().year());
+    setPeriodo("todo");
+    setRefDate(new Date());
   };
 
   const stateUI = (
@@ -478,7 +524,7 @@ export default function ServiciosArriendosPage() {
         <ServiciosArriendosSummary cotizaciones={cotizaciones} />
 
         {/* Filtros */}
-        <div className="mb-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+        <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Nº DOC */}
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-bold">#</span>
@@ -525,39 +571,96 @@ export default function ServiciosArriendosPage() {
             </select>
             <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">▾</span>
           </div>
+        </div>
 
-          {/* Mes */}
-          <div className="relative">
-            <select
-              value={filterMonth}
-              onChange={(e) => setFilterMonth(e.target.value)}
-              className="w-full h-[46px] px-3 pr-9 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all appearance-none cursor-pointer"
+        {/* Date Filter Row */}
+        <div className="mb-5 flex flex-col md:flex-row gap-3 items-center">
+          <nav className="flex bg-slate-200/60 p-1 rounded-xl w-full md:w-auto">
+            <button
+              onClick={() => handleScaleSelect("todo")}
+              className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-semibold transition ${
+                periodo === "todo" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
             >
-              <option value="">Todos los meses</option>
-              {MESES.map((m) => (
-                <option key={m.val} value={m.val}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs text-[10px] font-bold uppercase">Mes</span>
-          </div>
+              Todos
+            </button>
+            <button
+              onClick={() => handleScaleSelect("semanal")}
+              className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-semibold transition ${
+                periodo === "semanal" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Semana
+            </button>
+            <button
+              onClick={() => handleScaleSelect("mensual")}
+              className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-semibold transition ${
+                periodo === "mensual" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Mes
+            </button>
+            <button
+              onClick={() => handleScaleSelect("anual")}
+              className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-semibold transition ${
+                periodo === "anual" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Año
+            </button>
+          </nav>
 
-          {/* Año */}
-          <div className="relative">
-            <select
-              value={filterYear}
-              onChange={(e) => setFilterYear(e.target.value)}
-              className="w-full h-[46px] px-3 pr-9 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all appearance-none cursor-pointer"
-            >
-              <option value="">Todos los años</option>
-              {YEARS.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs text-[10px] font-bold uppercase">Año</span>
+          <div className="flex gap-2 w-full md:w-auto">
+            {periodo === "semanal" && (
+              <div className="relative w-full md:w-44">
+                <select
+                  onChange={handleWeekSelect}
+                  defaultValue={0}
+                  className="w-full h-[40px] px-3 pr-9 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all appearance-none cursor-pointer font-medium"
+                >
+                  <option value={0}>Esta semana</option>
+                  <option value={-1}>Semana pasada</option>
+                  <option value={-2}>Hace 2 semanas</option>
+                  <option value={-3}>Hace 3 semanas</option>
+                  <option value={-4}>Hace 4 semanas</option>
+                </select>
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">▾</span>
+              </div>
+            )}
+
+            {periodo === "mensual" && (
+              <div className="relative w-full md:w-40">
+                <select
+                  value={refDate.getMonth()}
+                  onChange={handleMonthSelect}
+                  className="w-full h-[40px] px-3 pr-9 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all appearance-none cursor-pointer font-medium"
+                >
+                  {["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"].map((m, i) => (
+                    <option key={i} value={i}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">▾</span>
+              </div>
+            )}
+
+            {(periodo === "mensual" || periodo === "anual") && (
+              <div className="relative w-full md:w-32">
+                <select
+                  value={refDate.getFullYear()}
+                  onChange={handleYearSelect}
+                  className="w-full h-[40px] px-3 pr-9 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all appearance-none cursor-pointer font-medium"
+                >
+                  {availableYears.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">▾</span>
+              </div>
+            )}
           </div>
         </div>
 

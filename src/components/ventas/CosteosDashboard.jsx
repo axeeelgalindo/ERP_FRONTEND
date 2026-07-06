@@ -67,46 +67,7 @@ export default function CosteosDashboard({ ventas = [], onOpenReport, session })
   const r = 50;
   const C = 2 * Math.PI * r; // ~314.16
 
-  // Filtros locales para el Dashboard
-  const [range, setRange] = useState("mes"); // todo | mes | porMes | dia
-  const [q, setQ] = useState("");
-  const [exportingPdf, setExportingPdf] = useState(false);
-
-  const filteredVentas = useMemo(() => {
-    let out = [...ventas];
-
-    // Rango de fecha
-    if (range === "mes") {
-      const now = new Date();
-      out = out.filter((v) =>
-        inMonth(v?.fecha, now.getFullYear(), now.getMonth())
-      );
-    } else if (range === "dia") {
-      const now = new Date();
-      out = out.filter((v) => {
-        const d = v?.fecha ? new Date(v.fecha) : null;
-        if (!d) return false;
-        return (
-          d.getFullYear() === now.getFullYear() &&
-          d.getMonth() === now.getMonth() &&
-          d.getDate() === now.getDate()
-        );
-      });
-    }
-
-    // Búsqueda
-    const qq = q.trim().toLowerCase();
-    if (qq) {
-      out = out.filter((v) => {
-        const desc = String(v?.descripcion || "").toLowerCase();
-        const num = String(v?.numero ?? "").toLowerCase();
-        const id = String(v?.id || "").toLowerCase();
-        return desc.includes(qq) || num.includes(qq) || id.includes(qq);
-      });
-    }
-
-    return out;
-  }, [ventas, range, q]);
+  const filteredVentas = ventas;
 
   // Cálculos principales
   const stats = useMemo(() => {
@@ -241,113 +202,8 @@ export default function CosteosDashboard({ ventas = [], onOpenReport, session })
 
   return (
     <div className="space-y-6">
-      {/* Barra de Filtros del Dashboard */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col lg:flex-row gap-6 lg:items-center">
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setRange("todo")}
-            className={`px-4 py-2 text-sm rounded-lg border transition ${
-              range === "todo"
-                ? "font-semibold text-blue-600 bg-blue-600/10 border-blue-600/20"
-                : "font-medium text-slate-600 bg-slate-50 border-slate-200 hover:border-blue-600/50"
-            }`}
-          >
-            Todo
-          </button>
-
-          <button
-            onClick={() => setRange("mes")}
-            className={`px-4 py-2 text-sm rounded-lg border transition ${
-              range === "mes"
-                ? "font-semibold text-blue-600 bg-blue-600/10 border-blue-600/20"
-                : "font-medium text-slate-600 bg-slate-50 border-slate-200 hover:border-blue-600/50"
-            }`}
-          >
-            Mes actual
-          </button>
-
-          <button
-            onClick={() => setRange("porMes")}
-            className={`px-4 py-2 text-sm rounded-lg border transition ${
-              range === "porMes"
-                ? "font-semibold text-blue-600 bg-blue-600/10 border-blue-600/20"
-                : "font-medium text-slate-600 bg-slate-50 border-slate-200 hover:border-blue-600/50"
-            }`}
-            title="UI lista"
-          >
-            Por Mes
-          </button>
-
-          <button
-            onClick={() => setRange("dia")}
-            className={`px-4 py-2 text-sm rounded-lg border transition ${
-              range === "dia"
-                ? "font-semibold text-blue-600 bg-blue-600/10 border-blue-600/20"
-                : "font-medium text-slate-600 bg-slate-50 border-slate-200 hover:border-blue-600/50"
-            }`}
-            title="Día"
-          >
-            Día
-          </button>
-        </div>
-
-        <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
-            🔎
-          </span>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-transparent rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600/20"
-            placeholder="Filtrar dashboard por descripción, ID o proyecto..."
-            type="text"
-          />
-        </div>
-
-        <button
-          onClick={() => exportGeneralPDF(filteredVentas, range, q, session, setExportingPdf)}
-          disabled={exportingPdf || filteredVentas.length === 0}
-          className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/20 hover:scale-[1.02] active:scale-95 transition disabled:scale-100 disabled:opacity-60 whitespace-nowrap hover:cursor-pointer"
-          title="Descargar Reporte General de Costeos (PDF)"
-        >
-          {exportingPdf ? (
-            <>
-              <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-              <span>Generando...</span>
-            </>
-          ) : (
-            <>
-              <span>📊</span>
-              <span>Reporte General</span>
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* Banner de Filtros Activos estilo Power BI */}
-      <div className="bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200 flex items-center justify-between text-xs text-slate-500 font-medium">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center justify-center bg-blue-100 text-blue-700 w-5 h-5 rounded-md text-[10px]">📌</span>
-          <span>
-            Filtros Activos:{" "}
-            <strong className="text-slate-800">
-              {range === "mes" ? `Mes Actual (${currentMonthLabel})` : range === "dia" ? "Día de Hoy" : "Todo el histórico"}
-            </strong>
-            {q.trim() && (
-              <>
-                {" "}| Búsqueda: <strong className="text-slate-800">"{q}"</strong>
-              </>
-            )}
-          </span>
-        </div>
-        <div className="text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
-          Moneda: CLP
-        </div>
-      </div>
-
-      {/* 1. KPIs Principales (Tarjetas Resumen) */}
+      {/* 1. KPIs Principales (Tarjetas Resumen) - COMENTADO PARA NO DUPLICAR
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Card 1: Costeos Totales */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Costeos Totales</span>
@@ -359,7 +215,6 @@ export default function CosteosDashboard({ ventas = [], onOpenReport, session })
           </div>
         </div>
 
-        {/* Card 2: Costo Total */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Costo Total</span>
@@ -371,7 +226,6 @@ export default function CosteosDashboard({ ventas = [], onOpenReport, session })
           </div>
         </div>
 
-        {/* Card 3: Venta Total */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Venta Total</span>
@@ -383,7 +237,6 @@ export default function CosteosDashboard({ ventas = [], onOpenReport, session })
           </div>
         </div>
 
-        {/* Card 4: Utilidad Proyectada */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Utilidad Proy.</span>
@@ -395,7 +248,6 @@ export default function CosteosDashboard({ ventas = [], onOpenReport, session })
           </div>
         </div>
 
-        {/* Card 5: Margen Promedio */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition">
           <div className="flex items-center justify-between mb-2">
             <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Margen Prom.</span>
@@ -407,6 +259,7 @@ export default function CosteosDashboard({ ventas = [], onOpenReport, session })
           </div>
         </div>
       </div>
+      */}
 
       {/* 2. Gráficos de Análisis Operativo */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

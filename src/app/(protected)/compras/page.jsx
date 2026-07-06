@@ -12,7 +12,7 @@ import ComprasPagination from "@/components/compras/ComprasPagination";
 import CompraManualModal from "@/components/compras/CompraManualModal";
 import CompraProvOllamaModal from "@/components/compras/CompraProvOllamaModal";
 import QuickProveedorModal from "@/components/compras/QuickProveedorModal";
-import VincularCosteoModal from "@/components/compras/VincularCosteoModal";
+import VincularCotizacionModal from "@/components/compras/VincularCotizacionModal";
 import AsignarImputacionModal from "@/components/compras/AsignarImputacionModal";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -148,15 +148,50 @@ export default function ComprasPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
-  // filtros UI
-  const [estadoFilter, setEstadoFilter] = useState("ALL");
+  // filtros UI (igual que costeos)
   const [q, setQ] = useState("");
+  const [filterEstado, setFilterEstado] = useState("ALL");
+  const [periodoScale, setPeriodoScale] = useState("todo"); // "todo" | "semanal" | "mensual" | "anual"
+  const [refDate, setRefDate] = useState(new Date());
 
-  // periodo YYYY-MM
-  const now = new Date();
-  const pad2 = (n) => String(n).padStart(2, "0");
-  const defaultPeriodo = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
-  const [periodo, setPeriodo] = useState(defaultPeriodo);
+  const availableYears = useMemo(() => {
+    const years = new Set([new Date().getFullYear()]);
+    const curYear = new Date().getFullYear();
+    for (let y = curYear - 5; y <= curYear + 1; y++) {
+      years.add(y);
+    }
+    return Array.from(years).sort((a, b) => b - a);
+  }, []);
+
+  const handleScaleSelect = (scale) => {
+    setPeriodoScale(scale);
+    setRefDate(new Date());
+    setPage(1);
+  };
+
+  const handleYearSelect = (e) => {
+    const nd = new Date(refDate);
+    nd.setFullYear(Number(e.target.value));
+    setRefDate(nd);
+    setPage(1);
+  };
+
+  const handleMonthSelect = (e) => {
+    const nd = new Date(refDate);
+    nd.setMonth(Number(e.target.value));
+    setRefDate(nd);
+    setPage(1);
+  };
+
+  const handleWeekSelect = (e) => {
+    const offset = Number(e.target.value);
+    const nd = new Date();
+    nd.setDate(nd.getDate() + (offset * 7));
+    setRefDate(nd);
+    setPage(1);
+  };
+
+  const hasFilters = periodoScale !== "todo" || filterEstado !== "ALL" || q !== "";
 
   // ===== Import CSV =====
   const [importing, setImporting] = useState(false);
@@ -196,15 +231,15 @@ export default function ComprasPage() {
   const [quickProvLoading, setQuickProvLoading] = useState(false);
   const [quickProvErr, setQuickProvErr] = useState("");
 
-  // ===== Vincular costeos =====
+  // ===== Vincular cotizaciones =====
   const [openVincular, setOpenVincular] = useState(false);
   const [compraSel, setCompraSel] = useState(null);
 
-  const [costeosDisponibles, setCosteosDisponibles] = useState([]);
-  const [costeosLoading, setCosteosLoading] = useState(false);
-  const [costeosErr, setCosteosErr] = useState("");
+  const [cotizacionesDisponibles, setCotizacionesDisponibles] = useState([]);
+  const [cotizacionesLoading, setCotizacionesLoading] = useState(false);
+  const [cotizacionesErr, setCotizacionesErr] = useState("");
 
-  const [asignaciones, setAsignaciones] = useState([]);
+  const [selectedCotizacionId, setSelectedCotizacionId] = useState("");
   const [savingVinc, setSavingVinc] = useState(false);
   const [savingErr, setSavingErr] = useState("");
 
@@ -250,8 +285,9 @@ export default function ComprasPage() {
 
       // ✅ Usar filtros del estado si no se pasan en opts
       const queryQ = opts.q !== undefined ? opts.q : q;
-      const queryEstado = opts.estado !== undefined ? opts.estado : estadoFilter;
-      const queryPeriodo = opts.periodo !== undefined ? opts.periodo : periodo;
+      const queryEstado = opts.estado !== undefined ? opts.estado : filterEstado;
+      const scale = opts.periodoScale !== undefined ? opts.periodoScale : periodoScale;
+      const rDate = opts.refDate !== undefined ? opts.refDate : refDate;
 
       const params = new URLSearchParams({
         page: String(p),
@@ -260,7 +296,33 @@ export default function ComprasPage() {
 
       if (queryQ) params.append("q", queryQ);
       if (queryEstado && queryEstado !== "ALL") params.append("estado", queryEstado);
-      if (queryPeriodo) params.append("periodo", queryPeriodo);
+
+      // Calculamos las fechas de inicio y fin según la escala y la fecha de referencia
+      if (scale !== "todo") {
+        let start, end;
+        if (scale === "semanal") {
+          const day = rDate.getDay();
+          const diff = rDate.getDate() - day + (day === 0 ? -6 : 1);
+          start = new Date(rDate);
+          start.setDate(diff);
+          start.setHours(0, 0, 0, 0);
+
+          end = new Date(start);
+          end.setDate(start.getDate() + 6);
+          end.setHours(23, 59, 59, 999);
+        } else if (scale === "mensual") {
+          start = new Date(rDate.getFullYear(), rDate.getMonth(), 1, 0, 0, 0, 0);
+          end = new Date(rDate.getFullYear(), rDate.getMonth() + 1, 0, 23, 59, 59, 999);
+        } else if (scale === "anual") {
+          start = new Date(rDate.getFullYear(), 0, 1, 0, 0, 0, 0);
+          end = new Date(rDate.getFullYear(), 11, 31, 23, 59, 59, 999);
+        }
+
+        if (start && end) {
+          params.append("startDate", start.toISOString());
+          params.append("endDate", end.toISOString());
+        }
+      }
 
       const res = await fetch(`${API}/compras?${params.toString()}`, {
         headers: makeHeadersJson(session)
@@ -337,7 +399,7 @@ export default function ComprasPage() {
       if (cancelled) return;
       // ✅ Cargar datos cuando cambian los filtros principales
       await Promise.all([
-        loadCompras({ page: 1, pageSize, q, estado: estadoFilter, periodo }),
+        loadCompras({ page: 1, pageSize, q, estado: filterEstado, periodoScale, refDate }),
         loadLookups(),
       ]);
     })();
@@ -345,7 +407,7 @@ export default function ComprasPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, status, q, estadoFilter, periodo]);
+  }, [session, status, q, filterEstado, periodoScale, refDate]);
 
   /* =========================
      Filters client-side
@@ -368,9 +430,9 @@ export default function ComprasPage() {
 
     const sinPdf = pageRows.filter((c) => !c?.factura_url).length;
 
-    const sinVincularCosteo = pageRows.filter((c) => getVincPct(c) < 100).length;
+    const sinVincularCotizacion = pageRows.filter((c) => !c?.cotizacionId && !c?.cotizacion?.id).length;
 
-    return { totalMes, pendientesRendicion, sinPdf, sinVincularCosteo };
+    return { totalMes, pendientesRendicion, sinPdf, sinVincularCotizacion };
   }, [bundle, rows]);
 
   /* =========================
@@ -565,167 +627,42 @@ export default function ComprasPage() {
   }
 
   /* =========================
-     Vinculación costeos (ventas)
+     Vinculación Cotizaciones
   ========================= */
-  async function loadCosteosDisponibles() {
+  async function loadCotizacionesDisponibles() {
     if (!session) return;
-    setCosteosLoading(true);
-    setCosteosErr("");
+    setCotizacionesLoading(true);
+    setCotizacionesErr("");
 
     try {
-      const res = await fetch(`${API}/ventas?page=1&pageSize=100`, {
+      const res = await fetch(`${API}/cotizaciones`, {
         headers: makeHeadersJson(session),
       });
       const payload = await jsonOrNull(res);
 
       if (!res.ok) {
         throw new Error(
-          payload?.message || payload?.msg || payload?.error || "Error cargando ventas",
+          payload?.error || "Error al cargar cotizaciones"
         );
       }
 
-      const arr = Array.isArray(payload) ? payload : payload?.data || [];
-      setCosteosDisponibles(arr);
+      setCotizacionesDisponibles(payload || []);
     } catch (e) {
-      setCosteosErr(e?.message || "Error cargando ventas");
+      setCotizacionesErr(e?.message || "Error al cargar cotizaciones");
     } finally {
-      setCosteosLoading(false);
-    }
-  }
-
-  async function loadCosteosCompra(compraId) {
-    if (!session) return [];
-    try {
-      const res = await fetch(`${API}/compras/${compraId}/costeos`, {
-        headers: makeHeadersJson(session),
-      });
-      const payload = await jsonOrNull(res);
-      if (!res.ok) return [];
-
-      const rows = payload?.data || [];
-
-      return rows
-        .map((r) => ({
-          ventaId: String(r?.venta_id ?? r?.ventaId ?? r?.venta?.id ?? ""),
-          monto: Number(r?.monto || 0),
-          locked: true,
-          meta: r?.venta || null,
-        }))
-        .filter((x) => x.ventaId);
-    } catch {
-      return [];
+      setCotizacionesLoading(false);
     }
   }
 
   async function openVincularModal(compra) {
     setSavingErr("");
-    setCosteosErr("");
+    setCotizacionesErr("");
     setCompraSel(compra);
+    setSelectedCotizacionId(compra.cotizacionId ?? compra.cotizacion?.id ?? "");
     setOpenVincular(true);
 
-    await loadCosteosDisponibles();
-
-    const current = await loadCosteosCompra(compra.id);
-    setAsignaciones(current.length ? current : []);
+    await loadCotizacionesDisponibles();
   }
-
-  function totalCompraSel() {
-    return Number(compraSel?.total || 0);
-  }
-
-  function sumAsignado(list = asignaciones) {
-    return list.reduce((acc, a) => acc + Number(a.monto || 0), 0);
-  }
-
-  function isSelected(ventaId) {
-    return asignaciones.some((a) => a.ventaId === ventaId);
-  }
-
-  function toggleCosteo(venta) {
-    const ventaId = String(venta.id);
-    const total = totalCompraSel();
-
-    setAsignaciones((prev) => {
-      const exists = prev.find((x) => x.ventaId === ventaId);
-
-      if (exists) {
-        const next = prev.filter((x) => x.ventaId !== ventaId);
-        if (next.length === 1) {
-          return [{ ...next[0], monto: total, locked: false }];
-        }
-        return next;
-      }
-
-      const next = [...prev, { ventaId, monto: 0, locked: false, meta: venta }];
-
-      if (next.length === 1) {
-        return [{ ...next[0], monto: total, locked: false }];
-      }
-
-      const base = Math.floor(total / next.length);
-      const copy = next.map((a, idx) => ({
-        ...a,
-        monto: idx === next.length - 1 ? total - base * (next.length - 1) : base,
-        locked: false,
-      }));
-      return copy;
-    });
-  }
-
-  function updateMonto(ventaId, montoRaw) {
-    const monto = Math.max(0, Number(montoRaw || 0));
-    const total = totalCompraSel();
-
-    setAsignaciones((prev) => {
-      const next = prev.map((a) =>
-        a.ventaId === ventaId ? { ...a, monto, locked: true } : a,
-      );
-
-      const unlocked = next.filter((a) => !a.locked);
-      if (unlocked.length === 0) return next;
-
-      const sumLocked = next
-        .filter((a) => a.locked)
-        .reduce((acc, a) => acc + Number(a.monto || 0), 0);
-
-      const restante = Math.max(0, total - sumLocked);
-
-      const unlockedIds = unlocked.map((u) => u.ventaId);
-      const lastUnlockedId = unlockedIds[unlockedIds.length - 1];
-
-      return next.map((a) => {
-        if (!a.locked && a.ventaId === lastUnlockedId) {
-          return { ...a, monto: restante };
-        }
-        if (!a.locked && a.ventaId !== lastUnlockedId) {
-          return { ...a, monto: 0 };
-        }
-        return a;
-      });
-    });
-  }
-
-  function resetLocks() {
-    setAsignaciones((prev) => {
-      if (prev.length <= 1) return prev.map((a) => ({ ...a, locked: false }));
-      const lastId = prev[prev.length - 1].ventaId;
-      return prev.map((a) => ({ ...a, locked: a.ventaId !== lastId }));
-    });
-  }
-
-  const diffAsignacion = useMemo(() => {
-    const total = totalCompraSel();
-    const sum = sumAsignado();
-    return Math.round((sum - total) * 100) / 100;
-  }, [asignaciones, compraSel]);
-
-  const canSaveVinc = useMemo(() => {
-    const total = totalCompraSel();
-    const sum = sumAsignado();
-    if (!compraSel) return false;
-    if (asignaciones.length === 0) return false;
-    return Math.abs(sum - total) <= 0.01;
-  }, [asignaciones, compraSel]);
 
   async function saveVinculacion() {
     if (!session || !compraSel) return;
@@ -734,33 +671,31 @@ export default function ComprasPage() {
     setSavingVinc(true);
 
     try {
-      const body = {
-        items: asignaciones.map((a) => ({
-          venta_id: a.ventaId,
-          monto: Number(a.monto || 0),
-        })),
-      };
-
-      const res = await fetch(`${API}/compras/${compraSel.id}/costeos`, {
+      // Vincular compra a la cotización (PUT /compras/:id).
+      // El backend alinea automáticamente el destino, proyecto y centros de costo si la cotización tiene un proyecto.
+      const res = await fetch(`${API}/compras/${compraSel.id}`, {
         method: "PUT",
         headers: makeHeadersJson(session),
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          cotizacionId: selectedCotizacionId || null,
+        }),
       });
 
       const payload = await jsonOrNull(res);
       if (!res.ok) {
         throw new Error(
-          payload?.message || payload?.msg || payload?.error || "Error guardando vinculación",
+          payload?.error || payload?.message || "Error al vincular cotización"
         );
       }
 
+      triggerToast("Vínculo de cotización guardado exitosamente.", "success");
       setOpenVincular(false);
       setCompraSel(null);
-      setAsignaciones([]);
+      setSelectedCotizacionId("");
 
       await loadCompras({ page, pageSize });
     } catch (e) {
-      setSavingErr(e?.message || "Error guardando vinculación");
+      setSavingErr(e?.message || "Error al vincular cotización");
     } finally {
       setSavingVinc(false);
     }
@@ -845,8 +780,9 @@ export default function ComprasPage() {
 
   function handleClearFilters() {
     setQ("");
-    setEstadoFilter("ALL");
-    setPeriodo(defaultPeriodo);
+    setFilterEstado("ALL");
+    setPeriodoScale("todo");
+    setRefDate(new Date());
     setPage(1);
   }
 
@@ -927,7 +863,7 @@ export default function ComprasPage() {
           totalMes={kpis.totalMes}
           pendientesRendicion={kpis.pendientesRendicion}
           sinPdf={kpis.sinPdf}
-          sinVincularCosteo={kpis.sinVincularCosteo}
+          sinVincularCosteo={kpis.sinVincularCotizacion}
         />
 
         {/* Import */}
@@ -943,7 +879,154 @@ export default function ComprasPage() {
           }}
         />
 
-        {/* Tabla + filtros */}
+        {/* Unified Filters for Compras */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-6 mt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+            {/* Search Input */}
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔎</span>
+              <input
+                value={q}
+                onChange={(e) => {
+                  setQ(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full pl-9 pr-4 h-[46px] border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all"
+                placeholder="Proveedor, RUT, folio, proyecto..."
+                type="text"
+              />
+            </div>
+
+            {/* Status Select */}
+            <div className="relative">
+              <select
+                value={filterEstado}
+                onChange={(e) => {
+                  setFilterEstado(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full h-[46px] px-3 pr-9 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all appearance-none cursor-pointer"
+              >
+                <option value="ALL">Todos los estados</option>
+                <option value="ORDEN_COMPRA">ORDEN_COMPRA</option>
+                <option value="FACTURADA">FACTURADA</option>
+                <option value="PAGADA">PAGADA</option>
+                <option value="PENDIENTE">PENDIENTE</option>
+                <option value="VINCULADO">VINCULADO</option>
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">▾</span>
+            </div>
+
+            {/* Date Filters Trigger scale */}
+            <nav className="flex bg-slate-100 p-1 rounded-xl w-full h-[46px] items-center">
+              <button
+                onClick={() => handleScaleSelect("todo")}
+                className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition hover:cursor-pointer ${
+                  periodoScale === "todo" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Todos
+              </button>
+              <button
+                onClick={() => handleScaleSelect("semanal")}
+                className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition hover:cursor-pointer ${
+                  periodoScale === "semanal" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Semana
+              </button>
+              <button
+                onClick={() => handleScaleSelect("mensual")}
+                className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition hover:cursor-pointer ${
+                  periodoScale === "mensual" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Mes
+              </button>
+              <button
+                onClick={() => handleScaleSelect("anual")}
+                className={`flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition hover:cursor-pointer ${
+                  periodoScale === "anual" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Año
+              </button>
+            </nav>
+          </div>
+
+          {/* Conditional Dropdowns Row */}
+          {periodoScale !== "todo" && (
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+              {periodoScale === "semanal" && (
+                <div className="relative w-full sm:w-44">
+                  <select
+                    onChange={handleWeekSelect}
+                    defaultValue={0}
+                    className="w-full h-[40px] px-3 pr-9 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all appearance-none cursor-pointer font-medium"
+                  >
+                    <option value={0}>Esta semana</option>
+                    <option value={-1}>Semana pasada</option>
+                    <option value={-2}>Hace 2 semanas</option>
+                    <option value={-3}>Hace 3 semanas</option>
+                    <option value={-4}>Hace 4 semanas</option>
+                  </select>
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">▾</span>
+                </div>
+              )}
+
+              {periodoScale === "mensual" && (
+                <div className="relative w-full sm:w-40">
+                  <select
+                    value={refDate.getMonth()}
+                    onChange={handleMonthSelect}
+                    className="w-full h-[40px] px-3 pr-9 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all appearance-none cursor-pointer font-medium"
+                  >
+                    {["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"].map((m, i) => (
+                      <option key={i} value={i}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">▾</span>
+                </div>
+              )}
+
+              {(periodoScale === "mensual" || periodoScale === "anual") && (
+                <div className="relative w-full sm:w-32">
+                  <select
+                    value={refDate.getFullYear()}
+                    onChange={handleYearSelect}
+                    className="w-full h-[40px] px-3 pr-9 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all appearance-none cursor-pointer font-medium"
+                  >
+                    {availableYears.map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">▾</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Clean filters link */}
+          {hasFilters && (
+            <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100">
+              <span className="text-xs text-slate-400">
+                {bundle?.total ?? 0} compra{bundle?.total !== 1 ? "s" : ""} encontrada{bundle?.total !== 1 ? "s" : ""}
+              </span>
+              <button
+                onClick={handleClearFilters}
+                className="text-xs font-semibold text-slate-500 hover:text-rose-600 transition-colors flex items-center gap-1 hover:cursor-pointer"
+              >
+                <span>✕</span> Limpiar filtros
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Tabla */}
         <div className="rounded-xl overflow-hidden">
           {/* inputs hidden para PDF por fila */}
           {rows.map((c) => (
@@ -967,22 +1050,6 @@ export default function ComprasPage() {
             API={API}
             loading={loading}
             rows={rows}
-            q={q}
-            onChangeQ={(v) => {
-              setQ(v);
-              setPage(1);
-            }}
-            estadoFilter={estadoFilter}
-            onChangeEstado={(v) => {
-              setEstadoFilter(v);
-              setPage(1);
-            }}
-            periodo={periodo}
-            onChangePeriodo={(v) => {
-              setPeriodo(v);
-              setPage(1);
-            }}
-            onClear={handleClearFilters}
             pageSize={pageSize}
             onChangePageSize={(v) => {
               const s = clampPageSize(v);
@@ -1090,35 +1157,28 @@ export default function ComprasPage() {
         error={quickProvErr}
       />
 
-      {/* MODAL VINCULAR COSTEO */}
-      <VincularCosteoModal
+      {/* MODAL VINCULAR COTIZACIÓN */}
+      <VincularCotizacionModal
         open={openVincular}
         onClose={() => {
           if (savingVinc) return;
           setOpenVincular(false);
           setCompraSel(null);
-          setAsignaciones([]);
+          setSelectedCotizacionId("");
           setSavingErr("");
-          setCosteosErr("");
+          setCotizacionesErr("");
         }}
         compraSel={compraSel}
-        costeosDisponibles={costeosDisponibles}
-        costeosLoading={costeosLoading}
-        costeosErr={costeosErr}
-        asignaciones={asignaciones}
+        cotizacionesDisponibles={cotizacionesDisponibles}
+        cotizacionesLoading={cotizacionesLoading}
+        cotizacionesErr={cotizacionesErr}
+        selectedCotizacionId={selectedCotizacionId}
+        setSelectedCotizacionId={setSelectedCotizacionId}
         savingVinc={savingVinc}
         savingErr={savingErr}
-        canSaveVinc={canSaveVinc}
-        diffAsignacion={diffAsignacion}
-        onReloadCosteos={loadCosteosDisponibles}
-        onToggleCosteo={toggleCosteo}
-        isSelected={isSelected}
-        onUpdateMonto={updateMonto}
-        onResetLocks={resetLocks}
         onSave={saveVinculacion}
-        fmtDateDMY={fmtDateDMY}
         toCLP={toCLP}
-        sumAsignado={sumAsignado}
+        fmtDateDMY={fmtDateDMY}
       />
 
       {/* MODAL ASIGNAR IMPUTACIÓN / CENTRO DE COSTO */}
