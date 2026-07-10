@@ -444,7 +444,7 @@ export default function CotizacionFromVentasDialog({
       try {
         setErr("");
         const urlCli = new URL(`${API_URL}/clientes`);
-        urlCli.searchParams.set("pageSize", "100");
+        urlCli.searchParams.set("pageSize", "10000");
 
         const resCli = await fetch(urlCli, { headers, cache: "no-store" });
         const jsonCli = await safeJson(resCli);

@@ -85,7 +85,7 @@ export default function ProyectoFormModal({
       setLoadingClientes(true);
       const headers = makeHeaders(session);
       const url = new URL(`${API}/clientes`);
-      url.searchParams.set("pageSize", "100");
+      url.searchParams.set("pageSize", "10000");
 
       const res = await fetch(url, { headers, cache: "no-store" });
       const json = await res.json().catch(() => null);

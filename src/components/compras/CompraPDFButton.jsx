@@ -324,7 +324,7 @@ export default function CompraPDFButton({ compra }) {
         doc.setFontSize(8.5);
         doc.setTextColor(38, 56, 69); // #263845
         doc.text("Punta Arenas", W - mx, 14, { align: "right" });
-        doc.text("Capitán Juan Guillermo 02233", W - mx, 18, { align: "right" });
+        doc.text("Capitán Juan Guillermos 02233", W - mx, 18, { align: "right" });
         doc.text("Puerto Montt", W - mx, 22, { align: "right" });
         doc.text("Av. San Agustín S/N, La Paloma PC #38", W - mx, 26, { align: "right" });
         doc.text(empRut, W - mx, 30, { align: "right" });
@@ -392,7 +392,7 @@ export default function CompraPDFButton({ compra }) {
       doc.text("Blue ingeniería", mx, yLeft);
       yLeft += 4;
       if (branch === "punta_arenas") {
-        doc.text("Capitán Juan Guillermo 02233", mx, yLeft);
+        doc.text("Capitán Juan Guillermos 02233", mx, yLeft);
         yLeft += 4;
         doc.text("Punta Arenas", mx, yLeft);
       } else {
@@ -779,7 +779,7 @@ export default function CompraPDFButton({ compra }) {
                 />
                 <div>
                   <span className="font-bold text-sm text-slate-800">Punta Arenas</span>
-                  <p className="text-xs text-slate-500 mt-0.5">Capitán Juan Guillermo 02233</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Capitán Juan Guillermos 02233</p>
                 </div>
               </label>
             </div>

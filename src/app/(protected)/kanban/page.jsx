@@ -29,6 +29,7 @@ export default function KanbanPage() {
   });
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [evidenceFile, setEvidenceFile] = useState(null);
   const [addingItem, setAddingItem] = useState(false);
   const [formType, setFormType] = useState("TAREA"); // EPICA, TAREA, SUBTAREA
   const [formData, setFormData] = useState({
@@ -1357,14 +1358,14 @@ export default function KanbanPage() {
       {/* Modal Agregar Item */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsAddModalOpen(false)}></div>
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => { setIsAddModalOpen(false); setEvidenceFile(null); }}></div>
           <div className="bg-white rounded-3xl w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col relative shadow-2xl animate-in zoom-in-95 duration-200">
             <header className="px-8 py-6 border-b border-gray-100 flex justify-between items-center">
               <div>
                 <h2 className="text-xl font-black text-gray-900">Nuevo Item</h2>
                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Añadir al flujo de trabajo</p>
               </div>
-              <button onClick={() => setIsAddModalOpen(false)} className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400"><span className="material-symbols-outlined">close</span></button>
+              <button onClick={() => { setIsAddModalOpen(false); setEvidenceFile(null); }} className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400"><span className="material-symbols-outlined">close</span></button>
             </header>
 
             <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
@@ -1686,12 +1687,37 @@ export default function KanbanPage() {
                     onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
                   ></textarea>
                 </div>
+
+                {formType !== "EPICA" && (
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Foto Evidencia (Antes de comenzar)</label>
+                    <div className="relative group">
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={(e) => setEvidenceFile(e.target.files[0] || null)}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      />
+                      <div className={`w-full border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center transition-all ${evidenceFile ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-gray-50 group-hover:border-blue-300 group-hover:bg-blue-50/30'}`}>
+                        <span className={`material-symbols-outlined text-3xl mb-2 ${evidenceFile ? 'text-green-500' : 'text-gray-400'}`}>
+                          {evidenceFile ? 'check_circle' : 'add_a_photo'}
+                        </span>
+                        <p className={`text-[10px] font-bold uppercase tracking-wider ${evidenceFile ? 'text-green-600' : 'text-gray-400'}`}>
+                          {evidenceFile ? `Foto seleccionada: ${evidenceFile.name}` : "Subir Foto de Evidencia Antes"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             <footer className="px-8 py-6 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
               <button
-                onClick={() => setIsAddModalOpen(false)}
+                onClick={() => {
+                  setIsAddModalOpen(false);
+                  setEvidenceFile(null);
+                }}
                 className="px-6 py-2.5 bg-white border border-gray-200 text-gray-500 rounded-xl text-xs font-bold hover:bg-gray-50 transition-all"
               >
                 Cancelar
@@ -1701,6 +1727,23 @@ export default function KanbanPage() {
                 onClick={async () => {
                   setAddingItem(true);
                   try {
+                    let evidenciaAntesUrl = null;
+                    if (evidenceFile) {
+                      const uploadHeaders = makeHeaders(session);
+                      delete uploadHeaders["Content-Type"];
+                      const uploadData = new FormData();
+                      uploadData.append("archivo", evidenceFile);
+
+                      const uploadRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tareas/upload-evidencia`, {
+                        method: "POST",
+                        headers: uploadHeaders,
+                        body: uploadData,
+                      });
+                      const uploadJson = await uploadRes.json();
+                      if (!uploadJson.ok) throw new Error(uploadJson.message || "Error al subir la foto de evidencia");
+                      evidenciaAntesUrl = uploadJson.url;
+                    }
+
                     const headers = makeHeaders(session);
                     let url = "";
                     let body = {};
@@ -1712,13 +1755,15 @@ export default function KanbanPage() {
                       url = `${process.env.NEXT_PUBLIC_API_URL}/tareas/add`;
                       body = { 
                         ...formData,
-                        requisitos: formData.requisitos || []
+                        requisitos: formData.requisitos || [],
+                        evidencia_antes_url: evidenciaAntesUrl
                       };
                     } else if (formType === "SUBTAREA") {
                       url = `${process.env.NEXT_PUBLIC_API_URL}/tareas-detalle/add`;
                       body = { 
                         ...formData, 
-                        titulo: formData.nombre // Subtareas usan titulo
+                        titulo: formData.nombre, // Subtareas usan titulo
+                        evidencia_antes_url: evidenciaAntesUrl
                       };
                     }
 
@@ -1731,6 +1776,7 @@ export default function KanbanPage() {
                     if (!json.ok) throw new Error(json.message || "Error al crear");
                     
                     setIsAddModalOpen(false);
+                    setEvidenceFile(null);
                     // Reset formData
                     setFormData({
                       nombre: "",
