@@ -54,9 +54,9 @@ export default function EpicaFormModal({
     try {
       const dt = new Date(d);
       if (Number.isNaN(dt.getTime())) return "";
-      const yyyy = dt.getFullYear();
-      const mm = String(dt.getMonth() + 1).padStart(2, "0");
-      const dd = String(dt.getDate()).padStart(2, "0");
+      const yyyy = dt.getUTCFullYear();
+      const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+      const dd = String(dt.getUTCDate()).padStart(2, "0");
       return `${yyyy}-${mm}-${dd}`;
     } catch {
       return "";

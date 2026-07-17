@@ -902,6 +902,7 @@ export default function CotizacionDrawerLight({
               <DocButton docType="fac" label="Facturas (FAC)" multiple adjuntos={c?.adjuntos} />
               <DocButton docType="comprobante" label="Comprobantes Pago" multiple adjuntos={c?.adjuntos} />
               <DocButton docType="gd" label="Guías de Despacho" multiple adjuntos={c?.adjuntos} />
+              <DocButton docType="ae" label="Acta de Entrega" multiple adjuntos={c?.adjuntos} />
             </div>
           </div>
         </div>

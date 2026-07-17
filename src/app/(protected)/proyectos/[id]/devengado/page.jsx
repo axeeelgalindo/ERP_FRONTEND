@@ -25,7 +25,7 @@ const pct1 = (n) => `${Number(n || 0).toFixed(1)}%`;
 
 const fmtDate = (d) => {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return new Date(d).toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" });
 };
 
 const fmtRange = (s, e) => {

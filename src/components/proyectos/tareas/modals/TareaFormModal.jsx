@@ -62,9 +62,9 @@ function toISODateInput(d) {
   try {
     const dt = new Date(d);
     if (Number.isNaN(dt.getTime())) return "";
-    const yyyy = dt.getFullYear();
-    const mm = String(dt.getMonth() + 1).padStart(2, "0");
-    const dd = String(dt.getDate()).padStart(2, "0");
+    const yyyy = dt.getUTCFullYear();
+    const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(dt.getUTCDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   } catch {
     return "";
@@ -80,8 +80,8 @@ function daysBetweenInclusive(startISO, endISO) {
   const b = new Date(endISO);
   if (Number.isNaN(b.getTime())) return null;
 
-  const a0 = new Date(a.getFullYear(), a.getMonth(), a.getDate());
-  const b0 = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+  const a0 = new Date(Date.UTC(a.getUTCFullYear(), a.getUTCMonth(), a.getUTCDate()));
+  const b0 = new Date(Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate()));
 
   const MS_PER_DAY = 24 * 60 * 60 * 1000;
   const diff = Math.round((b0.getTime() - a0.getTime()) / MS_PER_DAY);

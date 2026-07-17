@@ -171,15 +171,20 @@ export default function ServicioArriendoDrawer({
         terminos_condiciones: c.terminos_condiciones || null,
         acuerdo_pago: c.acuerdo_pago || null,
         ventaIds: [], // Standard quote with direct glosas!
-        glosas: (c.glosas || []).map((g, i) => ({
-          descripcion: g.descripcion,
-          monto: g.monto,
-          monto_uf: g.monto_uf,
-          cantidad: g.cantidad,
-          precio_unitario: g.precio_unitario,
-          manual: true,
-          orden: i,
-        })),
+        glosas: (c.glosas || []).map((g, i) => {
+          const isUF = c.moneda === "UF";
+          const precio = isUF ? Number(g.monto_uf || 0) : Number(g.precio_unitario || g.monto || 0);
+          const totalGlosa = precio * Number(g.cantidad || 1);
+          return {
+            descripcion: g.descripcion,
+            monto: totalGlosa,
+            monto_uf: isUF ? Number(g.monto_uf || 0) : null,
+            cantidad: g.cantidad,
+            precio_unitario: precio,
+            manual: true,
+            orden: i,
+          };
+        }),
         es_suscripcion: false, // Force standard sales quote
         moneda: c.moneda || "CLP",
         ciclos_mensuales: 1, // Billed for 1 month

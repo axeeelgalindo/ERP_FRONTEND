@@ -4,6 +4,9 @@ import {
   Pencil,
   Trash,
   Users,
+  Play,
+  CheckCircle2,
+  FileText,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -89,11 +92,9 @@ function fmtCL(value) {
   return d.toLocaleDateString("es-CL", { timeZone: "UTC" });
 }
 
-function EstadoPill({ estado }) {
+function EstadoPill({ estado, fecha_inicio_real }) {
   const s = String(estado || "activo").toLowerCase();
 
-  const isActivo = ["activo", "en_curso", "en_progreso"].includes(s);
-  const isPausado = ["pausado", "pause", "detenido"].includes(s);
   const isCompletado = [
     "completado",
     "completa",
@@ -101,13 +102,23 @@ function EstadoPill({ estado }) {
     "cerrado",
   ].includes(s);
 
-  const label = isCompletado ? "Completado" : isPausado ? "Pausado" : "Activo";
+  const isPausado = ["pausado", "pause", "detenido"].includes(s);
 
-  const cls = isCompletado
-    ? "bg-indigo-50 text-indigo-700 border-indigo-200 "
-    : isPausado
-      ? "bg-gray-100 text-gray-600 border-gray-200 "
-      : "bg-green-100 text-green-700 border-green-200  ";
+  const hasStarted = !!fecha_inicio_real;
+
+  let label = "En espera";
+  let cls = "bg-slate-100 text-slate-700 border-slate-200 ";
+
+  if (isCompletado) {
+    label = "Finalizado";
+    cls = "bg-green-100 text-green-700 border-green-200 ";
+  } else if (isPausado) {
+    label = "Pausado";
+    cls = "bg-amber-100 text-amber-700 border-amber-200 ";
+  } else if (s === "en_progreso" || s === "en_curso" || (s === "activo" && hasStarted)) {
+    label = "En progreso";
+    cls = "bg-blue-100 text-blue-700 border-blue-200 ";
+  }
 
   return (
     <span
@@ -192,6 +203,7 @@ export default function ProjectsTable({
   onDelete,
   onStart,
   onFinish,
+  onActaEntrega,
   page = 1,
   pageSize = 10,
   total = 0,
@@ -277,7 +289,7 @@ export default function ProjectsTable({
                   </td>
 
                   <td className="p-5">
-                    <EstadoPill estado={row.estado || "activo"} />
+                    <EstadoPill estado={row.estado} fecha_inicio_real={row.fecha_inicio_real} />
                   </td>
 
                   <td className="p-5">
@@ -290,6 +302,45 @@ export default function ProjectsTable({
 
                   <td className="p-5 text-right">
                     <div className="flex items-center justify-end gap-1">
+                      {onStart && !row.fecha_inicio_real && (row.estado || "activo") !== "finalizado" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onStart(row);
+                          }}
+                          className="text-gray-400 hover:text-green-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors hover:cursor-pointer"
+                          title="Iniciar Proyecto"
+                          type="button"
+                        >
+                          <Play size={18} />
+                        </button>
+                      )}
+                      {onFinish && row.fecha_inicio_real && !row.fecha_fin_real && (row.estado || "activo") !== "finalizado" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onFinish(row);
+                          }}
+                          className="text-gray-400 hover:text-indigo-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors hover:cursor-pointer"
+                          title="Finalizar Proyecto"
+                          type="button"
+                        >
+                          <CheckCircle2 size={18} />
+                        </button>
+                      )}
+                      {onActaEntrega && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onActaEntrega(row);
+                          }}
+                          className="text-gray-400 hover:text-sky-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors hover:cursor-pointer"
+                          title="Acta de Entrega"
+                          type="button"
+                        >
+                          <FileText size={18} />
+                        </button>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

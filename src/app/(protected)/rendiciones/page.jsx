@@ -39,6 +39,18 @@ function toCLP(v) {
   });
 }
 
+function formatCurrency(val) {
+  if (!val) return "";
+  const digits = String(val).replace(/\D/g, "");
+  if (!digits) return "";
+  return "$" + Number(digits).toLocaleString("es-CL");
+}
+
+function parseCurrency(val) {
+  if (!val) return "";
+  return String(val).replace(/\D/g, "");
+}
+
 export default function RendicionesPage() {
   const { data: session, status } = useSession();
 
@@ -55,6 +67,8 @@ export default function RendicionesPage() {
   const [fProyecto, setFProyecto] = useState("");
   const [fEstado, setFEstado] = useState("ALL");
   const [fFecha, setFFecha] = useState(null);
+  const [filterMontoMin, setFilterMontoMin] = useState("");
+  const [filterMontoMax, setFilterMontoMax] = useState("");
 
   const [selectedRendicion, setSelectedRendicion] = useState(null);
   const [openDrawer, setOpenDrawer] = useState(false);
@@ -134,12 +148,22 @@ export default function RendicionesPage() {
         const proy = String(r.proyecto?.nombre || r.centro_costo || "").toLowerCase();
         if (!proy.includes(fProyecto.trim().toLowerCase())) return false;
       }
+      // Monto
+      if (filterMontoMin.trim()) {
+        const val = Number(filterMontoMin);
+        if ((r.monto_total || 0) < val) return false;
+      }
+      if (filterMontoMax.trim()) {
+        const val = Number(filterMontoMax);
+        if ((r.monto_total || 0) > val) return false;
+      }
+
       return true;
     });
-  }, [data, fEstado, fFecha, fEmpleado, fProyecto]);
+  }, [data, fEstado, fFecha, fEmpleado, fProyecto, filterMontoMin, filterMontoMax]);
 
-  const hasFilters = fEstado !== "ALL" || fFecha || fEmpleado || fProyecto;
-  const clearFilters = () => { setFEstado("ALL"); setFFecha(null); setFEmpleado(""); setFProyecto(""); };
+  const hasFilters = fEstado !== "ALL" || fFecha || fEmpleado || fProyecto || filterMontoMin || filterMontoMax;
+  const clearFilters = () => { setFEstado("ALL"); setFFecha(null); setFEmpleado(""); setFProyecto(""); setFilterMontoMin(""); setFilterMontoMax(""); };
 
   const kpis = useMemo(() => {
     const list = filtered;
@@ -327,6 +351,30 @@ export default function RendicionesPage() {
                 }}
               />
             </LocalizationProvider>
+          </div>
+
+          {/* Monto Min/Max row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3 pt-3 border-t border-slate-100">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+              <input
+                value={formatCurrency(filterMontoMin)}
+                onChange={(e) => setFilterMontoMin(parseCurrency(e.target.value))}
+                className="w-full pl-7 pr-4 h-[42px] border border-slate-200 bg-slate-50 rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all font-medium"
+                placeholder="Monto mínimo..."
+                type="text"
+              />
+            </div>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+              <input
+                value={formatCurrency(filterMontoMax)}
+                onChange={(e) => setFilterMontoMax(parseCurrency(e.target.value))}
+                className="w-full pl-7 pr-4 h-[42px] border border-slate-200 bg-slate-50 rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all font-medium"
+                placeholder="Monto máximo..."
+                type="text"
+              />
+            </div>
           </div>
 
           {/* Resultado + limpiar */}

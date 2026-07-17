@@ -16,7 +16,7 @@ const DEFAULT_HEIGHT_PX = 720;
  */
 function startOfLocalDay(date) {
   const d = new Date(date);
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
 
 function parseDateSafe(d) {

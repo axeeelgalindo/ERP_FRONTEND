@@ -57,11 +57,11 @@ export function estadoColor(estado) {
 export function nextEstados(estadoActual) {
   if (estadoActual === "COTIZACION") return ["ACEPTADA"];
   if (estadoActual === "ACEPTADA") return ["ORDEN_VENTA"];
-  if (estadoActual === "ORDEN_VENTA") return ["ENTREGADO"];
-  if (estadoActual === "ENTREGADO") return ["POR_FACTURAR"];
+  if (estadoActual === "ORDEN_VENTA") return ["POR_FACTURAR"];
   if (estadoActual === "POR_FACTURAR") return ["FACTURADA"];
   if (estadoActual === "FACTURADA") return ["PAGADA"];
-  // ✅ finales: PAGADA, RECHAZADA, etc.
+  if (estadoActual === "PAGADA") return ["ENTREGADO"];
+  // ✅ finales: ENTREGADO, RECHAZADA, etc.
   return [];
 }
 
@@ -70,5 +70,5 @@ export function estadoLabel(estado) {
 }
 
 export function fechaCL(value) {
-  return value ? new Date(value).toLocaleDateString("es-CL") : "-";
+  return value ? new Date(value).toLocaleDateString("es-CL", { timeZone: "UTC" }) : "-";
 }

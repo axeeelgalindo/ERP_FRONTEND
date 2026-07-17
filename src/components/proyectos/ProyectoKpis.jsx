@@ -254,8 +254,8 @@ export default function ProyectoKpis({ proyecto = {}, items = [] }) {
     }
   }
 
-  const fInicioReal = proyecto?.fecha_inicio_real ? new Date(proyecto.fecha_inicio_real).toLocaleDateString() : (clampPct(tareasFinal.avancePromedio) > 0 ? "En curso" : "No iniciada");
-  const fFinReal = proyecto?.fecha_fin_real ? new Date(proyecto.fecha_fin_real).toLocaleDateString() : (clampPct(tareasFinal.porcentajeCompletado) >= 100 ? "Completada sin fecha" : "Pendiente");
+  const fInicioReal = proyecto?.fecha_inicio_real ? new Date(proyecto.fecha_inicio_real).toLocaleDateString("es-CL", { timeZone: "UTC" }) : (clampPct(tareasFinal.avancePromedio) > 0 ? "En curso" : "No iniciada");
+  const fFinReal = proyecto?.fecha_fin_real ? new Date(proyecto.fecha_fin_real).toLocaleDateString("es-CL", { timeZone: "UTC" }) : (clampPct(tareasFinal.porcentajeCompletado) >= 100 ? "Completada sin fecha" : "Pendiente");
 
   // Validate if we should ask for a delay comment
   // "Solo aparece cuando no hay epicas, tareas, subtareas planificadas y/o fuera de planificacion"

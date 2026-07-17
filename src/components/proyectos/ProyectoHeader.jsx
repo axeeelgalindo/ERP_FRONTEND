@@ -40,14 +40,30 @@ export default function ProyectoHeader({ proyecto, metrics, tareas = [] }) {
     }
   }
 
-  const formatD = (d, isPlan = false) => {
+  const formatD = (d) => {
     if (!d) return "No defin.";
     return d.toLocaleDateString("es-CL", {
       day: "2-digit",
       month: "short",
       year: "numeric",
-      ...(isPlan ? { timeZone: "UTC" } : {}),
+      timeZone: "UTC",
     });
+  };
+
+  const getEstadoLabel = (estado, hasStarted) => {
+    const s = String(estado || "activo").toLowerCase();
+    if (s === "finalizado" || s === "completado" || s === "cerrado") return "Finalizado";
+    if (s === "pausado" || s === "detenido") return "Pausado";
+    if (s === "en_progreso" || s === "en_curso" || (s === "activo" && hasStarted)) return "En progreso";
+    return "En espera";
+  };
+
+  const getEstadoCls = (estado, hasStarted) => {
+    const s = String(estado || "activo").toLowerCase();
+    if (s === "finalizado" || s === "completado" || s === "cerrado") return "bg-green-50 text-green-700 border border-green-200";
+    if (s === "pausado" || s === "detenido") return "bg-amber-50 text-amber-700 border border-amber-200";
+    if (s === "en_progreso" || s === "en_curso" || (s === "activo" && hasStarted)) return "bg-blue-50 text-blue-700 border border-blue-200";
+    return "bg-slate-50 text-slate-700 border border-slate-200";
   };
 
   const today = new Date();
@@ -66,8 +82,8 @@ export default function ProyectoHeader({ proyecto, metrics, tareas = [] }) {
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary-container/5 rounded-full -mr-20 -mt-20"></div>
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-4">
-            <span className="px-3 py-1 bg-secondary-container text-on-secondary-container text-[11px] font-bold rounded-full uppercase tracking-wider">
-              {proyecto.estado || "En Ejecución"}
+            <span className={`px-3 py-1 text-[11px] font-bold rounded-full uppercase tracking-wider ${getEstadoCls(proyecto.estado, !!proyecto.fecha_inicio_real)}`}>
+              {getEstadoLabel(proyecto.estado, !!proyecto.fecha_inicio_real)}
             </span>
             <h1 className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center gap-1">
               <Presentation size={14} /> Proyecto de Ingeniería

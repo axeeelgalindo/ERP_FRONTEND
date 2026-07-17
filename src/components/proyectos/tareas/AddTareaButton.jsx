@@ -67,7 +67,7 @@ export default function AddTareaModal({
     const base = new Date(fechaInicioStr);
     if (Number.isNaN(base.getTime())) return null;
     const d = new Date(base.getTime());
-    d.setDate(d.getDate() + (diasInt - 1));
+    d.setUTCDate(d.getUTCDate() + (diasInt - 1));
     return d.toISOString();
   }
 

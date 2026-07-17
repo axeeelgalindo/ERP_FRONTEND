@@ -236,6 +236,18 @@ async function safeJson(res) {
   }
 }
 
+function formatCurrency(val) {
+  if (!val) return "";
+  const digits = String(val).replace(/\D/g, "");
+  if (!digits) return "";
+  return "$" + Number(digits).toLocaleString("es-CL");
+}
+
+function parseCurrency(val) {
+  if (!val) return "";
+  return String(val).replace(/\D/g, "");
+}
+
 export default function ServiciosArriendosPage() {
   const { data: session, status } = useSession();
 
@@ -256,6 +268,8 @@ export default function ServiciosArriendosPage() {
   const [periodo, setPeriodo] = useState("todo");
   const [refDate, setRefDate] = useState(new Date());
   const [filterEstado, setFilterEstado] = useState("");
+  const [filterMontoMin, setFilterMontoMin] = useState("");
+  const [filterMontoMax, setFilterMontoMax] = useState("");
 
   const availableYears = useMemo(() => {
     const years = new Set([new Date().getFullYear()]);
@@ -468,11 +482,25 @@ export default function ServiciosArriendosPage() {
         const t = fCliente.trim().toLowerCase();
         if (!nombre.includes(t) && !rut.includes(t)) return false;
       }
+      // Monto
+      if (filterMontoMin.trim()) {
+        const val = Number(filterMontoMin);
+        const sub = c.subtotal || 0;
+        const tot = c.total || 0;
+        if (sub < val && tot < val) return false;
+      }
+      if (filterMontoMax.trim()) {
+        const val = Number(filterMontoMax);
+        const sub = c.subtotal || 0;
+        const tot = c.total || 0;
+        if (sub > val && tot > val) return false;
+      }
+
       return true;
     });
-  }, [cotizaciones, periodo, refDate, filterEstado, fNumero, fAsunto, fCliente]);
+  }, [cotizaciones, periodo, refDate, filterEstado, fNumero, fAsunto, fCliente, filterMontoMin, filterMontoMax]);
 
-  const hasFilters = periodo !== "todo" || filterEstado || fNumero || fAsunto || fCliente;
+  const hasFilters = periodo !== "todo" || filterEstado || fNumero || fAsunto || fCliente || filterMontoMin || filterMontoMax;
   const clearFilters = () => {
     setFAsunto("");
     setFCliente("");
@@ -480,6 +508,8 @@ export default function ServiciosArriendosPage() {
     setFilterEstado("");
     setPeriodo("todo");
     setRefDate(new Date());
+    setFilterMontoMin("");
+    setFilterMontoMax("");
   };
 
   const stateUI = (
@@ -570,6 +600,30 @@ export default function ServiciosArriendosPage() {
               <option value="PAGADA">Pagada</option>
             </select>
             <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">▾</span>
+          </div>
+        </div>
+
+        {/* Monto Min/Max row */}
+        <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+            <input
+              value={formatCurrency(filterMontoMin)}
+              onChange={(e) => setFilterMontoMin(parseCurrency(e.target.value))}
+              className="w-full pl-7 pr-4 h-[46px] border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all font-medium"
+              placeholder="Monto mínimo..."
+              type="text"
+            />
+          </div>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+            <input
+              value={formatCurrency(filterMontoMax)}
+              onChange={(e) => setFilterMontoMax(parseCurrency(e.target.value))}
+              className="w-full pl-7 pr-4 h-[46px] border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all font-medium"
+              placeholder="Monto máximo..."
+              type="text"
+            />
           </div>
         </div>
 

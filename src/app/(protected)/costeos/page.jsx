@@ -21,6 +21,18 @@ import { VentaDeleteDialog } from "@/components/ventas/modalForm";
 import { useVentas } from "@/components/ventas/hooks/useVentas";
 import { exportGeneralPDF } from "@/components/ventas/utils/exportGeneralPDF";
 
+function formatCurrency(val) {
+  if (!val) return "";
+  const digits = String(val).replace(/\D/g, "");
+  if (!digits) return "";
+  return "$" + Number(digits).toLocaleString("es-CL");
+}
+
+function parseCurrency(val) {
+  if (!val) return "";
+  return String(val).replace(/\D/g, "");
+}
+
 export default function VentasPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -53,6 +65,9 @@ export default function VentasPage() {
   const [filterEstado, setFilterEstado] = useState("");
   const [periodo, setPeriodo] = useState("todo");
   const [refDate, setRefDate] = useState(new Date());
+  const [filterMontoMin, setFilterMontoMin] = useState("");
+  const [filterMontoMax, setFilterMontoMax] = useState("");
+
   const [exportingPdf, setExportingPdf] = useState(false);
 
   const availableYears = useMemo(() => {
@@ -132,16 +147,37 @@ export default function VentasPage() {
         if (!desc.includes(qq) && !num.includes(qq) && !id.includes(qq) && !client.includes(qq)) return false;
       }
 
+      // 4. Filtro montos (subtotal o total)
+      const totalVenta = v.totalFinal != null ? Number(v.totalFinal) : (v.detalles || []).reduce((s, d) => s + (Number(d.total ?? d.ventaTotal) || 0), 0);
+      const totalCosto = v.costoFinal != null ? Number(v.costoFinal) : (v.detalles || []).reduce((s, d) => s + (Number(d.costoTotal) || 0), 0);
+
+      if (filterMontoMin.trim()) {
+        const val = Number(filterMontoMin);
+        if (totalVenta < val && totalCosto < val) return false;
+      }
+      if (filterMontoMax.trim()) {
+        const val = Number(filterMontoMax);
+        if (totalVenta > val && totalCosto > val) return false;
+      }
+
       return true;
     });
-  }, [ventas, periodo, refDate, filterEstado, q]);
+  }, [ventas, periodo, refDate, filterEstado, q, filterMontoMin, filterMontoMax]);
 
-  const hasFilters = periodo !== "todo" || filterEstado !== "" || q !== "";
+  const hasFilters =
+    periodo !== "todo" ||
+    filterEstado !== "" ||
+    q !== "" ||
+    filterMontoMin !== "" ||
+    filterMontoMax !== "";
+
   const clearFilters = () => {
     setQ("");
     setFilterEstado("");
     setPeriodo("todo");
     setRefDate(new Date());
+    setFilterMontoMin("");
+    setFilterMontoMax("");
   };
 
   const handleExportPdf = () => {
@@ -395,6 +431,30 @@ export default function VentasPage() {
               )}
             </div>
           )}
+
+          {/* Amount range filters */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3 pt-3 border-t border-slate-100">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+              <input
+                value={formatCurrency(filterMontoMin)}
+                onChange={(e) => setFilterMontoMin(parseCurrency(e.target.value))}
+                className="w-full pl-7 pr-4 h-[46px] border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all font-medium"
+                placeholder="Monto mínimo..."
+                type="text"
+              />
+            </div>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+              <input
+                value={formatCurrency(filterMontoMax)}
+                onChange={(e) => setFilterMontoMax(parseCurrency(e.target.value))}
+                className="w-full pl-7 pr-4 h-[46px] border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all font-medium"
+                placeholder="Monto máximo..."
+                type="text"
+              />
+            </div>
+          </div>
 
           {/* Clean filters link */}
           {hasFilters && (

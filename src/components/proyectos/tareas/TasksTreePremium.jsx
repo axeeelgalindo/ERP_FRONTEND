@@ -30,7 +30,7 @@ function formatDate(d) {
   try {
     const dt = typeof d === "string" ? new Date(d) : new Date(d);
     if (Number.isNaN(dt.getTime())) return "—";
-    return dt.toLocaleDateString("es-CL", { day: "2-digit", month: "short" });
+    return dt.toLocaleDateString("es-CL", { day: "2-digit", month: "short", timeZone: "UTC" });
   } catch {
     return "—";
   }

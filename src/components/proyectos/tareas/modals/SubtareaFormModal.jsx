@@ -62,9 +62,9 @@ function toISODateInput(d) {
   try {
     const dt = new Date(d);
     if (Number.isNaN(dt.getTime())) return "";
-    const yyyy = dt.getFullYear();
-    const mm = String(dt.getMonth() + 1).padStart(2, "0");
-    const dd = String(dt.getDate()).padStart(2, "0");
+    const yyyy = dt.getUTCFullYear();
+    const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(dt.getUTCDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   } catch {
     return "";
@@ -72,17 +72,20 @@ function toISODateInput(d) {
 }
 
 function daysBetweenInclusive(dateStartStr, dateEndStr) {
-  if (!dateStartStr || !dateEndStr) return null;
+  if (!dateStartStr) return null;
   const a = new Date(dateStartStr);
+  if (Number.isNaN(a.getTime())) return null;
+  if (!dateEndStr) return 1;
+
   const b = new Date(dateEndStr);
-  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return null;
+  if (Number.isNaN(b.getTime())) return null;
 
-  a.setHours(0, 0, 0, 0);
-  b.setHours(0, 0, 0, 0);
+  const a0 = new Date(Date.UTC(a.getUTCFullYear(), a.getUTCMonth(), a.getUTCDate()));
+  const b0 = new Date(Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate()));
 
-  const MS = 24 * 60 * 60 * 1000;
-  const diff = Math.round((b.getTime() - a.getTime()) / MS);
-  return diff >= 0 ? diff + 1 : null;
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  const diff = Math.round((b0.getTime() - a0.getTime()) / MS_PER_DAY);
+  return Math.max(1, diff + 1);
 }
 
 export default function SubtareaFormModal({

@@ -435,6 +435,8 @@ export default function CotizacionPDFButton({ cotizacion }) {
 
       // Col 1: Asunto
       const referenciaDoc = safe(cot?.referencia || cot?.asunto || "—");
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
       const refLines = doc.splitTextToSize(referenciaDoc, colW - 4);
       let colX = mx + 2;
       doc.setFont("helvetica", "bold");

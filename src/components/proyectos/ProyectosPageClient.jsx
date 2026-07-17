@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import ProyectoFormModal from "@/components/proyectos/ProyectoFormModal";
 import ProjectsTable from "@/components/proyectos/ProjectsTable";
+import ActaEntregaModal from "@/components/proyectos/ActaEntregaModal";
 
-import { Filter, Plus, Folder, TrendingUp, AlertTriangle, CheckCircle2, X, Trash2 } from "lucide-react";
+import { Filter, Plus, Folder, TrendingUp, AlertTriangle, CheckCircle2, X, Trash2, Play } from "lucide-react";
 
 import {
   calcProgresoProyecto,
@@ -61,6 +62,9 @@ export default function ProyectosPageClient({
   const [openModal, setOpenModal] = useState(false);
   const [editingProyecto, setEditingProyecto] = useState(null);
   const [proyectoToDelete, setProyectoToDelete] = useState(null);
+  const [proyectoToStart, setProyectoToStart] = useState(null);
+  const [proyectoToFinish, setProyectoToFinish] = useState(null);
+  const [proyectoForActa, setProyectoForActa] = useState(null);
   const [toast, setToast] = useState({ open: false, msg: "", type: "success" });
 
   const triggerToast = (msg, type = "success") => {
@@ -111,8 +115,12 @@ export default function ProyectosPageClient({
     }
   };
 
-  const handleStartProyecto = async (proyecto) => {
+  const handleStartProyecto = (proyecto) => {
     if (!proyecto?.id) return;
+    setProyectoToStart(proyecto);
+  };
+
+  const executeStartProyecto = async (proyecto) => {
     try {
       const token = session?.user?.accessToken || session?.accessToken || "";
       const empresaId = session?.user?.empresaId ?? session?.user?.empresa_id ?? session?.user?.empresa?.id ?? null;
@@ -142,8 +150,12 @@ export default function ProyectosPageClient({
     }
   };
 
-  const handleFinishProyecto = async (proyecto) => {
+  const handleFinishProyecto = (proyecto) => {
     if (!proyecto?.id) return;
+    setProyectoToFinish(proyecto);
+  };
+
+  const executeFinishProyecto = async (proyecto) => {
     try {
       const token = session?.user?.accessToken || session?.accessToken || "";
       const empresaId = session?.user?.empresaId ?? session?.user?.empresa_id ?? session?.user?.empresa?.id ?? null;
@@ -325,6 +337,7 @@ export default function ProyectosPageClient({
           onDelete={handleDeleteProyecto}
           onStart={handleStartProyecto}
           onFinish={handleFinishProyecto}
+          onActaEntrega={(row) => setProyectoForActa(row)}
         />
       </div>
 
@@ -348,6 +361,13 @@ export default function ProyectosPageClient({
           );
           router.refresh();
         }}
+      />
+
+      {/* MODAL ACTA DE ENTREGA */}
+      <ActaEntregaModal
+        open={!!proyectoForActa}
+        onClose={() => setProyectoForActa(null)}
+        proyecto={proyectoForActa}
       />
 
       {/* CONFIRM DELETE MODAL */}
@@ -383,6 +403,84 @@ export default function ProyectosPageClient({
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium shadow-md shadow-red-600/10 hover:cursor-pointer"
               >
                 Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM START MODAL */}
+      {proyectoToStart && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-md bg-white rounded-2xl border border-gray-100 shadow-2xl p-6 transition-all transform scale-100">
+            <div className="flex items-center gap-3 text-green-600 mb-4">
+              <div className="p-2 bg-green-50 rounded-full">
+                <Play className="w-6 h-6 fill-current" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Iniciar Proyecto</h3>
+            </div>
+            
+            <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+              ¿Estás seguro de que deseas iniciar el proyecto <span className="font-semibold text-gray-800">"{proyectoToStart.nombre}"</span>? Esto registrará la fecha de inicio real de hoy.
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setProyectoToStart(null)}
+                className="px-4 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium hover:cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const p = proyectoToStart;
+                  setProyectoToStart(null);
+                  executeStartProyecto(p);
+                }}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium shadow-md shadow-green-600/10 hover:cursor-pointer"
+              >
+                Iniciar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM FINISH MODAL */}
+      {proyectoToFinish && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-md bg-white rounded-2xl border border-gray-100 shadow-2xl p-6 transition-all transform scale-100">
+            <div className="flex items-center gap-3 text-indigo-600 mb-4">
+              <div className="p-2 bg-indigo-50 rounded-full">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Finalizar Proyecto</h3>
+            </div>
+            
+            <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+              ¿Estás seguro de que deseas finalizar el proyecto <span className="font-semibold text-gray-800">"{proyectoToFinish.nombre}"</span>? Esto registrará la fecha de término real de hoy y cambiará su estado a Finalizado.
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setProyectoToFinish(null)}
+                className="px-4 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium hover:cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const p = proyectoToFinish;
+                  setProyectoToFinish(null);
+                  executeFinishProyecto(p);
+                }}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors text-sm font-medium shadow-md shadow-indigo-600/10 hover:cursor-pointer"
+              >
+                Finalizar
               </button>
             </div>
           </div>

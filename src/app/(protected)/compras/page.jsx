@@ -136,6 +136,18 @@ function clampPageSize(n) {
 /* =========================
    Page
 ========================= */
+function formatCurrency(val) {
+  if (!val) return "";
+  const digits = String(val).replace(/\D/g, "");
+  if (!digits) return "";
+  return "$" + Number(digits).toLocaleString("es-CL");
+}
+
+function parseCurrency(val) {
+  if (!val) return "";
+  return String(val).replace(/\D/g, "");
+}
+
 export default function ComprasPage() {
   const { data: session, status } = useSession();
 
@@ -153,6 +165,9 @@ export default function ComprasPage() {
   const [filterEstado, setFilterEstado] = useState("ALL");
   const [periodoScale, setPeriodoScale] = useState("todo"); // "todo" | "semanal" | "mensual" | "anual"
   const [refDate, setRefDate] = useState(new Date());
+
+  const [filterMontoMin, setFilterMontoMin] = useState("");
+  const [filterMontoMax, setFilterMontoMax] = useState("");
 
   const availableYears = useMemo(() => {
     const years = new Set([new Date().getFullYear()]);
@@ -191,7 +206,7 @@ export default function ComprasPage() {
     setPage(1);
   };
 
-  const hasFilters = periodoScale !== "todo" || filterEstado !== "ALL" || q !== "";
+  const hasFilters = periodoScale !== "todo" || filterEstado !== "ALL" || q !== "" || filterMontoMin !== "" || filterMontoMax !== "";
 
   // ===== Import CSV =====
   const [importing, setImporting] = useState(false);
@@ -413,8 +428,17 @@ export default function ComprasPage() {
      Filters client-side
   ========================= */
   const rows = useMemo(() => {
-    return bundle?.data || [];
-  }, [bundle]);
+    let list = bundle?.data || [];
+    if (filterMontoMin.trim()) {
+      const min = Number(filterMontoMin);
+      list = list.filter((c) => (c.total || 0) >= min);
+    }
+    if (filterMontoMax.trim()) {
+      const max = Number(filterMontoMax);
+      list = list.filter((c) => (c.total || 0) <= max);
+    }
+    return list;
+  }, [bundle, filterMontoMin, filterMontoMax]);
 
   /* =========================
      KPIs (en base a lo que tienes disponible)
@@ -784,6 +808,8 @@ export default function ComprasPage() {
     setPeriodoScale("todo");
     setRefDate(new Date());
     setPage(1);
+    setFilterMontoMin("");
+    setFilterMontoMax("");
   }
 
   /* =========================
@@ -1010,11 +1036,41 @@ export default function ComprasPage() {
             </div>
           )}
 
+          {/* Amount range filters */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-3 pt-3 border-t border-slate-100">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+              <input
+                value={formatCurrency(filterMontoMin)}
+                onChange={(e) => {
+                  setFilterMontoMin(parseCurrency(e.target.value));
+                  setPage(1);
+                }}
+                className="w-full pl-7 pr-4 h-[46px] border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all font-medium"
+                placeholder="Monto mínimo..."
+                type="text"
+              />
+            </div>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+              <input
+                value={formatCurrency(filterMontoMax)}
+                onChange={(e) => {
+                  setFilterMontoMax(parseCurrency(e.target.value));
+                  setPage(1);
+                }}
+                className="w-full pl-7 pr-4 h-[46px] border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all font-medium"
+                placeholder="Monto máximo..."
+                type="text"
+              />
+            </div>
+          </div>
+
           {/* Clean filters link */}
           {hasFilters && (
             <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100">
               <span className="text-xs text-slate-400">
-                {bundle?.total ?? 0} compra{bundle?.total !== 1 ? "s" : ""} encontrada{bundle?.total !== 1 ? "s" : ""}
+                {rows.length} compra{rows.length !== 1 ? "s" : ""} encontrada{rows.length !== 1 ? "s" : ""}
               </span>
               <button
                 onClick={handleClearFilters}
