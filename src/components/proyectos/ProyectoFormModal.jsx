@@ -289,7 +289,7 @@ export default function ProyectoFormModal({
             value={estado}
             onChange={(e) => setEstado(e.target.value)}
           >
-            <option value="activo">Activo</option>
+            <option value="activo">En espera</option>
             <option value="en_progreso">En Progreso</option>
             <option value="finalizado">Finalizado</option>
           </select>
@@ -344,12 +344,6 @@ export default function ProyectoFormModal({
               ))
             )}
           </select>
-
-          <p className="text-[11px] text-gray-400">
-            * Ojo: tu modelo <b>Proyecto</b> no tiene <code>cliente_id</code>{" "}
-            aún. Este select no guardará nada hasta que lo agregues en
-            DB/backend.
-          </p>
         </div>
 
         {/* Miembros */}

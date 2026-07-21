@@ -248,9 +248,6 @@ export default function ProjectsTable({
               <th className="p-5 text-sm font-semibold text-gray-500  w-[360px]">
                 Progreso / Fechas
               </th>
-              <th className="p-5 text-sm font-semibold text-gray-500 ">
-                Descripción
-              </th>
               <th className="p-5 text-sm font-semibold text-gray-500  text-right">
                 Acciones
               </th>
@@ -276,12 +273,6 @@ export default function ProjectsTable({
                     >
                       {nombre}
                     </Link>
-                    <div className="text-xs text-gray-400 mt-1">
-                      ID:{" "}
-                      {codigo
-                        ? `#${String(codigo)}`
-                        : `#${String(id).slice(-6)}`}
-                    </div>
                   </td>
 
                   <td className="p-5">
@@ -294,10 +285,6 @@ export default function ProjectsTable({
 
                   <td className="p-5">
                     <ProgressDatesCell row={row} />
-                  </td>
-
-                  <td className="p-5 text-sm text-gray-500 ">
-                    {row.descripcion || "—"}
                   </td>
 
                   <td className="p-5 text-right">

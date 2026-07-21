@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Pagination from "@/components/ui/Pagination";
 import CotizacionPDFButtonLight from "@/components/cotizaciones/CotizacionPDFButtonLight";
 import CotizacionPDFButton from "./CotizacionPDFButton";
 import { fechaCL, formatCLP, formatMoney } from "@/components/cotizaciones/utils/utils";
@@ -54,8 +55,13 @@ export default function CotizacionesTableLight({
 
   onUpdateEstado,
   onEditCotizacion, // ✅ NUEVO
+  page = 1,
+  pageSize = 10,
+  total = 0,
+  onPageChange,
 }) {
   const rows = useMemo(() => cotizaciones ?? [], [cotizaciones]);
+  const totalPages = Math.ceil(total / pageSize) || 1;
   const [menuId, setMenuId] = useState(null);
 
   const [anchorEl, setAnchorEl] = useState(null);
@@ -168,32 +174,18 @@ export default function CotizacionesTableLight({
         </table>
       </div>
 
-      {/* Footer (mismo look ejemplo) - por ahora solo informativo */}
+      {/* Footer con Paginación Interactiva Estándar */}
       <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
-        <span className="text-xs text-slate-500">
-          Mostrando 1-{rows.length} de {rows.length} resultados
+        <span className="text-xs text-slate-500 font-medium">
+          Mostrando {total > 0 ? (page - 1) * pageSize + 1 : 0}-
+          {Math.min(page * pageSize, total)} de {total} resultados
         </span>
 
-        <div className="flex gap-2">
-          <button
-            className="p-2 border border-slate-200 rounded-lg disabled:opacity-50"
-            disabled
-            title="Anterior"
-          >
-            ‹
-          </button>
-
-          <button className="px-3 py-1 bg-blue-600 text-white text-xs font-bold rounded-lg">
-            1
-          </button>
-
-          <button
-            className="p-2 border border-slate-200 rounded-lg"
-            title="Siguiente"
-          >
-            ›
-          </button>
-        </div>
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          onPageChange={onPageChange}
+        />
       </div>
       <CotizacionActionsMenu
         open={openMenu}

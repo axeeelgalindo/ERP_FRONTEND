@@ -7,15 +7,23 @@ export default async function ProyectosPage({ searchParams }) {
 
   const page = sp?.page ? Number(sp.page) : 1;
   const pageSize = sp?.pageSize ? Number(sp.pageSize) : 10;
+  const q = sp?.q || "";
+  const estado = sp?.estado || "";
+  const clienteId = sp?.clienteId || "";
 
   let items = [];
   let total = 0;
 
   try {
-    const qs = new URLSearchParams({
+    const params = {
       page: String(page),
       pageSize: String(pageSize),
-    }).toString();
+    };
+    if (q) params.q = q;
+    if (estado) params.estado = estado;
+    if (clienteId) params.clienteId = clienteId;
+
+    const qs = new URLSearchParams(params).toString();
 
     const data = await serverApi(`/proyectos?${qs}`);
 
@@ -34,6 +42,9 @@ export default async function ProyectosPage({ searchParams }) {
       total={total}
       page={page}
       pageSize={pageSize}
+      initialQ={q}
+      initialEstado={estado}
+      initialClienteId={clienteId}
     />
   );
 }

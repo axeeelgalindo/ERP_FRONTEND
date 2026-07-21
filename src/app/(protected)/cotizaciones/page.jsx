@@ -23,6 +23,7 @@ import CotizacionDrawerLight from "@/components/cotizaciones/CotizacionDrawerLig
 import ImportRcvPanel from "@/components/compras/ImportRcvPanel";
 import ReporteCotizacionesModal from "@/components/cotizaciones/ReporteCotizacionesModal";
 import * as XLSX from "xlsx";
+import { ChevronDown, ChevronUp, Layers, DollarSign, CheckCircle2, FileText, ShoppingCart, Percent } from "lucide-react";
 
 const MESES = [
   { val: 1, label: "Enero" },
@@ -83,6 +84,18 @@ function parseCurrency(val) {
   return String(val).replace(/\D/g, "");
 }
 
+function fmtMoney(val, moneda = "CLP") {
+  if (val === undefined || val === null) return "—";
+  const m = String(moneda).toUpperCase();
+  if (m === "UF") {
+    return `${Number(val).toLocaleString("es-CL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} UF`;
+  }
+  if (m === "USD") {
+    return `US$ ${Number(val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  return `$${Number(val).toLocaleString("es-CL", { maximumFractionDigits: 0 })}`;
+}
+
 export default function CotizacionesPage() {
   const { data: session, status } = useSession();
 
@@ -105,6 +118,72 @@ export default function CotizacionesPage() {
   const [filterEstado, setFilterEstado] = useState("");
   const [filterMontoMin, setFilterMontoMin] = useState("");
   const [filterMontoMax, setFilterMontoMax] = useState("");
+
+  // UI: pagination
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // UI: Collapsible summary cards (6x2 grid)
+  const [summaryGridOpen, setSummaryGridOpen] = useState(true);
+
+  // Categorize master list (unfiltered) of cotizaciones
+  const categorized = useMemo(() => {
+    const pagadoParcial = [];
+    const facturada100 = [];
+    const facturadaParcial = [];
+    const hes = [];
+    const oc = [];
+    const aceptada = [];
+
+    for (const c of cotizaciones) {
+      if (c.eliminado) continue;
+
+      // Calcular total de ventas (facturado)
+      const totalVentas = (c.ventas || []).reduce((sum, v) => {
+        const detallesTotal = (v.detalles || []).reduce((acc, d) => acc + (Number(d.costoTotal) || 0), 0);
+        return sum + (v.total || detallesTotal || 0);
+      }, 0);
+
+      // 1) Pagado parcial: avance_pago_pct > 0 y < 99.9
+      const pctPago = c.avance_pago_pct || 0;
+      if (pctPago > 0 && pctPago < 99.9) {
+        pagadoParcial.push(c);
+      }
+
+      // 2) Facturada 100%: totalVentas >= c.total y total > 0
+      if (c.total > 0 && totalVentas >= c.total * 0.99) {
+        facturada100.push(c);
+      }
+
+      // 3) Facturada parcial: totalVentas > 0 y totalVentas < c.total
+      if (c.total > 0 && totalVentas > 0 && totalVentas < c.total * 0.99) {
+        facturadaParcial.push(c);
+      }
+
+      // 4) HES: tiene doc_hes_url o adjunto tipo hes
+      if (c.doc_hes_url || c.adjuntos?.some((a) => a.tipo === "hes")) {
+        hes.push(c);
+      }
+
+      // 5) OC: tiene doc_oc_url o adjunto tipo oc
+      if (c.doc_oc_url || c.adjuntos?.some((a) => a.tipo === "oc")) {
+        oc.push(c);
+      }
+
+      // 6) Aceptada: estado === ACEPTADA
+      if (c.estado === "ACEPTADA") {
+        aceptada.push(c);
+      }
+    }
+
+    return [
+      { key: "pagadoParcial", label: "Pagado Parcial", items: pagadoParcial.slice(0, 2), icon: Percent, iconColor: "text-blue-500", iconBg: "bg-blue-50" },
+      { key: "facturada100", label: "Facturada 100%", items: facturada100.slice(0, 2), icon: CheckCircle2, iconColor: "text-emerald-500", iconBg: "bg-emerald-50" },
+      { key: "facturadaParcial", label: "Facturada Parcial", items: facturadaParcial.slice(0, 2), icon: Layers, iconColor: "text-indigo-500", iconBg: "bg-indigo-50" },
+      { key: "hes", label: "HES", items: hes.slice(0, 2), icon: FileText, iconColor: "text-amber-500", iconBg: "bg-amber-50" },
+      { key: "oc", label: "OC", items: oc.slice(0, 2), icon: ShoppingCart, iconColor: "text-sky-500", iconBg: "bg-sky-50" },
+      { key: "aceptada", label: "Aceptada", items: aceptada.slice(0, 2), icon: DollarSign, iconColor: "text-purple-500", iconBg: "bg-purple-50" }
+    ];
+  }, [cotizaciones]);
 
   const availableYears = useMemo(() => {
     const years = new Set([new Date().getFullYear()]);
@@ -710,6 +789,16 @@ export default function CotizacionesPage() {
     });
   }, [cotizaciones, periodo, refDate, filterEstado, fNumero, fAsunto, fCliente, filterMontoMin, filterMontoMax]);
 
+  const paginatedRows = useMemo(() => {
+    const startIndex = (currentPage - 1) * 10;
+    return filtered.slice(startIndex, startIndex + 10);
+  }, [filtered, currentPage]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [fAsunto, fCliente, fNumero, periodo, refDate, filterEstado, filterMontoMin, filterMontoMax]);
+
   const hasFilters = periodo !== "todo" || filterEstado || fNumero || fAsunto || fCliente || filterMontoMin || filterMontoMax;
   const clearFilters = () => {
     setFAsunto("");
@@ -775,6 +864,105 @@ export default function CotizacionesPage() {
         </p>
 
         <CotizacionesSummary cotizaciones={filtered} filterEstado={filterEstado} />
+
+        {/* Grilla Collapsible 6x2 de Cotizaciones Críticas */}
+        <div className="bg-white border border-slate-200 rounded-2xl mb-8 shadow-sm overflow-hidden transition-all duration-300">
+          {/* Header */}
+          <div 
+            onClick={() => setSummaryGridOpen(!summaryGridOpen)}
+            className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between cursor-pointer select-none hover:bg-slate-100/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Layers className="text-slate-500 w-5 h-5" />
+              <h3 className="font-bold text-slate-800 text-sm">Control Rápido de Cotizaciones Críticas</h3>
+              <span className="text-xs text-slate-400 font-medium bg-slate-200/50 px-2 py-0.5 rounded-full">
+                12 registros (2 por estado clave)
+              </span>
+            </div>
+            <button className="text-slate-500 hover:text-slate-800 transition-colors">
+              {summaryGridOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            </button>
+          </div>
+
+          {/* Grid Content */}
+          {summaryGridOpen && (
+            <div className="p-6 bg-white">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+                {categorized.map((cat) => (
+                  <div key={cat.key} className="flex flex-col gap-3">
+                    {/* Header de columna */}
+                    <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                      <div className={`w-7 h-7 rounded-lg ${cat.iconBg} flex items-center justify-center ${cat.iconColor}`}>
+                        <cat.icon size={15} />
+                      </div>
+                      <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        {cat.label}
+                      </span>
+                    </div>
+
+                    {/* Fila de Tarjetas */}
+                    <div className="flex flex-col gap-3">
+                      {cat.items.length === 0 ? (
+                        <div className="p-4 border border-dashed border-slate-200 rounded-xl flex items-center justify-center min-h-[96px]">
+                          <span className="text-[11px] text-slate-400 font-medium">Sin cotizaciones</span>
+                        </div>
+                      ) : (
+                        cat.items.map((cot) => (
+                          <div
+                            key={cot.id}
+                            onClick={() => {
+                              setSelectedId(cot.id);
+                              setOpenDrawer(true);
+                            }}
+                            className="p-3 border border-slate-100 hover:border-blue-200 hover:shadow-md rounded-xl bg-white cursor-pointer transition-all duration-300 transform hover:-translate-y-0.5 group flex flex-col justify-between min-h-[96px]"
+                          >
+                            <div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold text-slate-400 group-hover:text-blue-500 transition-colors">
+                                  Nº {cot.numero}
+                                </span>
+                                {cot.es_suscripcion && (
+                                  <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-black uppercase">
+                                    Servicio
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs font-bold text-slate-800 line-clamp-1 mt-1">
+                                {cot.cliente?.nombre || "Sin cliente"}
+                              </p>
+                              {cot.asunto && (
+                                <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                                  {cot.asunto}
+                                </p>
+                              )}
+                            </div>
+                            <div className="text-xs font-black text-right text-slate-700 mt-2 border-t border-slate-50 pt-1.5">
+                              {fmtMoney(cot.total, cot.moneda)}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Import RCV Section */}
+        <div className="mb-8">
+          <ImportRcvPanel
+            importing={importing}
+            importErr={importErr}
+            importResult={importResult}
+            onImportFile={handleImportRCV}
+            onClear={() => {
+              setImportErr("");
+              setImportResult(null);
+            }}
+          />
+        </div>
 
         {/* Filtros */}
         <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -960,20 +1148,6 @@ export default function CotizacionesPage() {
           )}
         </div>
 
-        {/* Import RCV Section */}
-        <div className="mb-8">
-          <ImportRcvPanel
-            importing={importing}
-            importErr={importErr}
-            importResult={importResult}
-            onImportFile={handleImportRCV}
-            onClear={() => {
-              setImportErr("");
-              setImportResult(null);
-            }}
-          />
-        </div>
-
         {/* Estado general (loading/error/empty) */}
         <CotizacionesState
           status={status}
@@ -985,12 +1159,16 @@ export default function CotizacionesPage() {
         {/* Tabla */}
         {!loading && filtered.length > 0 && (
           <CotizacionesTableLight
-            cotizaciones={filtered}
+            cotizaciones={paginatedRows}
             onRowClick={(cot) => {
               setSelectedId(cot.id);
               setOpenDrawer(true);
             }}
             onEdit={(id) => openEditCot(id)}
+            page={currentPage}
+            pageSize={10}
+            total={filtered.length}
+            onPageChange={setCurrentPage}
           />
         )}
       </div>

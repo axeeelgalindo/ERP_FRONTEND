@@ -6,8 +6,9 @@ import { useSession } from "next-auth/react";
 import ProyectoFormModal from "@/components/proyectos/ProyectoFormModal";
 import ProjectsTable from "@/components/proyectos/ProjectsTable";
 import ActaEntregaModal from "@/components/proyectos/ActaEntregaModal";
+import ProjectsFilters from "@/components/proyectos/ProjectsFilters";
 
-import { Filter, Plus, Folder, TrendingUp, AlertTriangle, CheckCircle2, X, Trash2, Play } from "lucide-react";
+import { Filter, Plus, Folder, TrendingUp, AlertTriangle, CheckCircle2, Clock, X, Trash2, Play } from "lucide-react";
 
 import {
   calcProgresoProyecto,
@@ -35,11 +36,29 @@ function StatCard({ icon: Icon, iconBg, iconColor, tag, title, value }) {
 
 // flatten ventas desde cotizaciones para que ClientsCell(ventas) funcione
 function extractVentasFromProyecto(p) {
-  const cotis = Array.isArray(p?.cotizaciones) ? p.cotizaciones : [];
   const out = [];
+
+  // 1. Cliente directo del proyecto
+  if (p?.cliente) {
+    out.push({ cliente: p.cliente });
+  }
+
+  // 2. Clientes desde cotizaciones y sus ventas
+  const cotis = Array.isArray(p?.cotizaciones) ? p.cotizaciones : [];
   for (const c of cotis) {
     const ventas = Array.isArray(c?.ventas) ? c.ventas : [];
-    for (const v of ventas) out.push(v);
+    if (ventas.length === 0) {
+      if (c?.cliente) {
+        out.push({ cliente: c.cliente });
+      }
+    } else {
+      for (const v of ventas) {
+        out.push({
+          ...v,
+          cliente: v?.cliente || v?.Cliente || c?.cliente,
+        });
+      }
+    }
   }
   return out;
 }
@@ -51,6 +70,9 @@ export default function ProyectosPageClient({
   pageSize = 10,
   loading = false,
   error = "",
+  initialQ = "",
+  initialEstado = "",
+  initialClienteId = "",
   // handlers (puedes conectarlos a tu modal/API)
   onEditProyecto,
   onDeleteProyecto,
@@ -66,6 +88,98 @@ export default function ProyectosPageClient({
   const [proyectoToFinish, setProyectoToFinish] = useState(null);
   const [proyectoForActa, setProyectoForActa] = useState(null);
   const [toast, setToast] = useState({ open: false, msg: "", type: "success" });
+
+  // --- FILTROS ---
+  const [filterQ, setFilterQ] = useState(initialQ || "");
+  const [filterEstado, setFilterEstado] = useState(initialEstado || "");
+  const [filterClienteId, setFilterClienteId] = useState(initialClienteId || "");
+
+  const [clientes, setClientes] = useState([]);
+  const [loadingClientes, setLoadingClientes] = useState(false);
+
+  // Cargar clientes para los filtros
+  useEffect(() => {
+    async function loadClientes() {
+      try {
+        setLoadingClientes(true);
+        const token = session?.user?.accessToken || session?.accessToken || "";
+        const empresaId = session?.user?.empresaId ?? session?.user?.empresa_id ?? session?.user?.empresa?.id ?? null;
+        
+        const headers = {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(empresaId ? { "x-empresa-id": String(empresaId) } : {}),
+        };
+
+        const API = process.env.NEXT_PUBLIC_API_URL;
+        const url = new URL(`${API}/clientes`);
+        url.searchParams.set("pageSize", "10000");
+
+        const res = await fetch(url, { headers, cache: "no-store" });
+        const json = await res.json().catch(() => null);
+
+        const list = Array.isArray(json?.data)
+          ? json.data
+          : Array.isArray(json?.items)
+            ? json.items
+            : Array.isArray(json)
+              ? json
+              : [];
+
+        setClientes(list);
+      } catch (e) {
+        console.error("Error cargando clientes en ProyectosPageClient", e);
+      } finally {
+        setLoadingClientes(false);
+      }
+    }
+
+    if (session?.user) {
+      loadClientes();
+    }
+  }, [session]);
+
+  // Sincronizar props con estado local cuando cambian en el server component
+  useEffect(() => {
+    setFilterQ(initialQ || "");
+    setFilterEstado(initialEstado || "");
+    setFilterClienteId(initialClienteId || "");
+  }, [initialQ, initialEstado, initialClienteId]);
+
+  // Aplicar filtros en la URL
+  const applyFilters = (newQ, newEstado, newClienteId) => {
+    const params = {
+      page: "1", // reset a página 1 al filtrar
+      pageSize: String(pageSize),
+    };
+    if (newQ) params.q = newQ;
+    if (newEstado) params.estado = newEstado;
+    if (newClienteId) params.clienteId = newClienteId;
+
+    const qs = new URLSearchParams(params).toString();
+    router.push(`/proyectos?${qs}`);
+  };
+
+  // Cambios inmediatos
+  const handleEstadoChange = (newEst) => {
+    setFilterEstado(newEst);
+    applyFilters(filterQ, newEst, filterClienteId);
+  };
+
+  const handleClienteIdChange = (newCliId) => {
+    setFilterClienteId(newCliId);
+    applyFilters(filterQ, filterEstado, newCliId);
+  };
+
+  // Debounce búsqueda de texto
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (filterQ !== initialQ) {
+        applyFilters(filterQ, filterEstado, filterClienteId);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [filterQ]);
 
   const triggerToast = (msg, type = "success") => {
     setToast({ open: true, msg, type });
@@ -217,6 +331,7 @@ export default function ProyectosPageClient({
 
     let enCurso = 0;
     let completados = 0;
+    let enEspera = 0;
     let proximosVenc = 0;
 
     const now = new Date();
@@ -226,9 +341,17 @@ export default function ProyectosPageClient({
       const estado = String(p?.estado || "activo").toLowerCase();
       const isCompletado = ["completado", "completa", "finalizado", "cerrado"].includes(estado);
       const isPausado = ["pausado", "pause", "detenido"].includes(estado);
+      const hasStarted = !!p?.fecha_inicio_real;
 
-      if (isCompletado) completados += 1;
-      else if (!isPausado) enCurso += 1;
+      if (isCompletado) {
+        completados += 1;
+      } else if (isPausado) {
+        // Pausado
+      } else if (estado === "en_progreso" || estado === "en_curso" || (estado === "activo" && hasStarted)) {
+        enCurso += 1;
+      } else {
+        enEspera += 1;
+      }
 
       if (p?.fecha_fin_plan) {
         const end = new Date(p.fecha_fin_plan);
@@ -239,15 +362,20 @@ export default function ProyectosPageClient({
       }
     }
 
-    return { totalProyectos, enCurso, completados, proximosVenc };
+    return { totalProyectos, enCurso, completados, enEspera, proximosVenc };
   }, [rows, total]);
 
   const goTo = (newPage) => {
     const p = Math.max(1, Math.min(totalPages, newPage));
-    const qs = new URLSearchParams({
+    const params = {
       page: String(p),
       pageSize: String(pageSize),
-    }).toString();
+    };
+    if (filterQ) params.q = filterQ;
+    if (filterEstado) params.estado = filterEstado;
+    if (filterClienteId) params.clienteId = filterClienteId;
+
+    const qs = new URLSearchParams(params).toString();
     router.push(`/proyectos?${qs}`);
   };
 
@@ -265,15 +393,6 @@ export default function ProyectosPageClient({
         <div className="flex items-center gap-3">
           <button
             type="button"
-            className="flex items-center gap-2 bg-white  border border-gray-200  text-gray-600  px-4 py-2 rounded-lg hover:bg-gray-50  transition-colors shadow-sm"
-            onClick={() => alert("Filtros: pendiente")}
-          >
-            <Filter className="w-5 h-5" />
-            <span>Filtros</span>
-          </button>
-
-          <button
-            type="button"
             className="bg-sky-600 hover:bg-sky-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-md shadow-sky-600/20 flex items-center gap-2 transition-all transform hover:-translate-y-0.5"
             onClick={() => {
               setEditingProyecto(null);
@@ -286,8 +405,7 @@ export default function ProyectosPageClient({
         </div>
       </div>
 
-      {/* KPI CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
         <StatCard
           icon={Folder}
           iconBg="bg-blue-50 "
@@ -295,6 +413,13 @@ export default function ProyectosPageClient({
           tag="+12%"
           title="Total Proyectos"
           value={stats.totalProyectos}
+        />
+        <StatCard
+          icon={Clock}
+          iconBg="bg-slate-100 "
+          iconColor="text-slate-600 "
+          title="En Espera"
+          value={stats.enEspera}
         />
         <StatCard
           icon={TrendingUp}
@@ -309,16 +434,28 @@ export default function ProyectosPageClient({
           iconColor="text-amber-600 "
           tag="Atención"
           title="Próximo Vencimiento"
-          value={0}
+          value={stats.proximosVenc}
         />
         <StatCard
           icon={CheckCircle2}
           iconBg="bg-indigo-50 "
           iconColor="text-indigo-600 "
           title="Completados"
-          value={0}
+          value={stats.completados}
         />
       </div>
+
+      <ProjectsFilters
+        q={filterQ}
+        onQ={setFilterQ}
+        estado={filterEstado}
+        onEstado={handleEstadoChange}
+        clienteId={filterClienteId}
+        onClienteId={handleClienteIdChange}
+        clientes={clientes}
+        loadingClientes={loadingClientes}
+        loading={loading}
+      />
 
       {/* TABLE CARD */}
       <div className="bg-white  rounded-xl border border-gray-200  shadow-sm overflow-hidden">

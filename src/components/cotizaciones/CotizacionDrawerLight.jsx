@@ -408,12 +408,14 @@ export default function CotizacionDrawerLight({
   const [openAceptada, setOpenAceptada] = useState(false);
   const [inicioPlan, setInicioPlan] = useState(todayStr);
   const [finPlan, setFinPlan] = useState(todayStr);
+  const [crearProyecto, setCrearProyecto] = useState(true);
   const [errAceptada, setErrAceptada] = useState("");
 
   const openAceptarModal = () => {
     if (!c?.id) return;
     setCotizacionIdLocked(c.id);
     setErrAceptada("");
+    setCrearProyecto(true); // reset a true al abrir
     closeEstadoMenu();
     setTimeout(() => setOpenAceptada(true), 0);
   };
@@ -437,6 +439,7 @@ export default function CotizacionDrawerLight({
     onUpdateEstado?.(id, "ACEPTADA", {
       fecha_inicio_plan: inicioPlan,
       fecha_fin_plan: finPlan,
+      crear_proyecto: crearProyecto,
     });
 
     setCotizacionIdLocked(null);
@@ -1139,6 +1142,20 @@ export default function CotizacionDrawerLight({
               </div>
             </div>
 
+            {/* Checkbox Crear Proyecto */}
+            <div className="flex items-center gap-3 p-3 bg-blue-50/50 border border-blue-100 rounded-xl">
+              <input
+                type="checkbox"
+                id="crearProyectoCheckbox"
+                checked={crearProyecto}
+                onChange={(e) => setCrearProyecto(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+              />
+              <label htmlFor="crearProyectoCheckbox" className="text-sm font-semibold text-slate-700 cursor-pointer select-none">
+                Crear un proyecto asociado para esta cotización
+              </label>
+            </div>
+
             {/* Alerta de error */}
             {errAceptada && (
               <Alert severity="error" className="rounded-xl border border-red-100">
@@ -1163,7 +1180,7 @@ export default function CotizacionDrawerLight({
             className="px-6 py-2.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-all font-bold text-sm shadow-md hover:shadow-lg flex items-center gap-2 hover:scale-[1.02] active:scale-95 hover:cursor-pointer"
           >
             <ThumbUpAltOutlinedIcon sx={{ fontSize: 16 }} />
-            Aceptar y Crear Proyecto
+            {crearProyecto ? "Aceptar y Crear Proyecto" : "Aceptar Cotización"}
           </button>
         </DialogActions>
       </Dialog>

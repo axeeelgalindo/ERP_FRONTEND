@@ -33,158 +33,112 @@ function shortCLP(v) {
 export default function CotizacionesSummary({ cotizaciones, filterEstado }) {
   const totals = useMemo(() => {
     const list = cotizaciones || [];
-    let count = list.length || 0;
     
-    let ventaCotizadaOnly = 0;
-    let utilidadRealFiltered = 0;
-    let pagadoRealOnly = 0;
-    
-    let totalVentaRealAll = 0;
-    let totalCostoRealAll = 0;
-    let totalPagadoAll = 0;
-    let totalCotizadoAll = 0;
-
-    const UTIL_STATES = ["ACEPTADA", "ORDEN_VENTA", "POR_FACTURAR", "FACTURADA"];
+    let countCotizaciones = 0;
+    let countConOC = 0;
+    let sumTotalConOC = 0;
+    let sumFacturado = 0;
+    let sumPagado = 0;
 
     for (const c of list) {
+      if (c.eliminado) continue;
+      if (c.es_suscripcion) continue; // standard quotes only
+
+      countCotizaciones++;
+
       const cTotal = Number(c.total || 0);
-      totalCotizadoAll += cTotal;
+      // COT con OC: cualquier estado diferente de COTIZACION y RECHAZADA (aceptadas/orden de venta/etc.)
+      const hasOC = c.estado !== "COTIZACION" && c.estado !== "RECHAZADA";
 
-      // 1. Venta Cotizada: Solo las en estado COTIZACION
-      if (c.estado === "COTIZACION") {
-        ventaCotizadaOnly += cTotal;
-      }
+      if (hasOC) {
+        countConOC++;
+        sumTotalConOC += cTotal;
 
-      // 3. Pagado Real: Solo las en estado PAGADA
-      if (c.estado === "PAGADA") {
-        pagadoRealOnly += cTotal;
-      }
+        const totalVentas = (c.ventas || []).reduce((sum, v) => {
+          const detallesTotal = (v.detalles || []).reduce((acc, d) => acc + (Number(d.ventaTotal ?? d.total) || 0), 0);
+          return sum + (v.total || detallesTotal || 0);
+        }, 0);
+        sumFacturado += totalVentas;
 
-      // Cálculo de pagos (Total Pagado KPI)
-      const pagado = c.total_pagado ?? (c.pagos?.reduce((a,p) => a + Number(p.monto||0), 0) || 0);
-      totalPagadoAll += pagado;
-
-      // Cálculo de Ventas/Costos Reales (para Utilidad Real y otros cards)
-      const ventas = c.ventas || [];
-      let cVentaReal = 0;
-      let cCostoReal = 0;
-
-      if (c.estado !== "COTIZACION" && c.estado !== "RECHAZADA") {
-        for (const v of ventas) {
-          const vVenta = (v.detalles || []).reduce(
-            (acc, d) => acc + (Number(d.ventaTotal ?? d.total) || 0),
-            0
-          );
-          const vCosto = (v.detalles || []).reduce(
-            (acc, d) => acc + (Number(d.costoTotal) || 0),
-            0
-          );
-          cVentaReal += vVenta;
-          cCostoReal += vCosto;
-        }
-      }
-
-      totalVentaRealAll += cVentaReal;
-      totalCostoRealAll += cCostoReal;
-
-      // 2. Utilidad Real (según usuario): Suma de totales en estados "reales"
-      if (UTIL_STATES.includes(c.estado)) {
-        utilidadRealFiltered += cTotal;
+        const totalPagado = c.total_pagado ?? (c.pagos?.reduce((a, p) => a + Number(p.monto || 0), 0) || 0);
+        sumPagado += totalPagado;
       }
     }
 
-    const pctPagado = totalCotizadoAll > 0 ? (totalPagadoAll / totalCotizadoAll) * 100 : 0;
+    const conversionRate = countCotizaciones > 0 ? (countConOC / countCotizaciones) * 100 : 0;
+    const facturadasRate = sumTotalConOC > 0 ? (sumFacturado / sumTotalConOC) * 100 : 0;
+    const pagadasRate = sumFacturado > 0 ? (sumPagado / sumFacturado) * 100 : 0;
 
     return {
-      count,
-      ventaCotizadaOnly,
-      utilidadRealFiltered,
-      pagadoRealOnly,
-      totalVentaRealAll,
-      totalCostoRealAll,
-      totalPagadoAll,
-      pctPagado,
+      conversionRate,
+      ventaTotalOC: sumTotalConOC,
+      facturadasRate,
+      facturadoTotal: sumFacturado,
+      pagadasRate,
+      pagadoTotal: sumPagado,
     };
   }, [cotizaciones]);
 
   const cards = [
     {
-      title: "Venta Cotizada",
-      subtitle: "Solo est. COTIZACION",
-      value: shortCLP(totals.ventaCotizadaOnly),
-      iconBg: "bg-slate-50",
-      iconText: "text-slate-600",
-      icon: "💵",
-    },
-    {
-      title: "Utilidad Real",
-      subtitle: "Suma Totales Acep./Fact.",
-      value: shortCLP(totals.utilidadRealFiltered),
-      valueClass: "text-purple-600",
-      iconBg: "bg-purple-50",
-      iconText: "text-purple-600",
+      title: "CONVERSIÓN",
+      subtitle: "% de COT a venta",
+      value: `${totals.conversionRate.toFixed(1).replace(".", ",")}%`,
+      valueClass: "text-blue-600",
+      iconBg: "bg-blue-50",
+      iconText: "text-blue-600",
       icon: "📈",
     },
     {
-      title: "PAGADO REAL",
-      subtitle: "Total en est. PAGADA",
-      value: shortCLP(totals.pagadoRealOnly),
-      valueClass: "text-emerald-600",
-      iconBg: "bg-emerald-50",
-      iconText: "text-emerald-600",
-      icon: "✅",
-    },
-    {
-      title: "Total Pagado",
-      subtitle: `${totals.pctPagado.toFixed(1)}% de abonos`,
-      value: shortCLP(totals.totalPagadoAll),
-      valueClass: "text-indigo-600",
-      iconBg: "bg-indigo-50",
-      iconText: "text-indigo-600",
-      icon: "💰",
-    },
-    {
-      title: "Venta Real",
-      subtitle: "De ventas vinculadas",
-      value: shortCLP(totals.totalVentaRealAll),
+      title: "VENTA",
+      subtitle: "COT con OC",
+      value: shortCLP(totals.ventaTotalOC),
       valueClass: "text-green-600",
       iconBg: "bg-green-50",
       iconText: "text-green-600",
+      icon: "🛒",
+    },
+    {
+      title: "FACTURADAS",
+      subtitle: "% de OC facturadas",
+      value: `${totals.facturadasRate.toFixed(1).replace(".", ",")}%`,
+      valueClass: "text-purple-600",
+      iconBg: "bg-purple-50",
+      iconText: "text-purple-600",
+      icon: "📋",
+    },
+    {
+      title: "FACTURADO",
+      subtitle: "OC facturadas",
+      value: shortCLP(totals.facturadoTotal),
+      valueClass: "text-purple-600",
+      iconBg: "bg-purple-50",
+      iconText: "text-purple-600",
       icon: "💵",
     },
     {
-      title: "Costo Real",
-      subtitle: "De ventas vinculadas",
-      value: shortCLP(totals.totalCostoRealAll),
+      title: "PAGADAS",
+      subtitle: "% de facturas pagadas",
+      value: `${totals.pagadasRate.toFixed(1).replace(".", ",")}%`,
+      valueClass: "text-amber-600",
       iconBg: "bg-amber-50",
       iconText: "text-amber-600",
-      icon: "💼",
+      icon: "💳",
     },
     {
-      title: "Cotizaciones totales",
-      subtitle: "(mostradas)",
-      value: totals.count,
-      iconBg: "bg-blue-50",
-      iconText: "text-blue-600",
-      icon: "📋",
+      title: "PAGADO",
+      subtitle: "Facturas pagadas",
+      value: shortCLP(totals.pagadoTotal),
+      valueClass: "text-green-600",
+      iconBg: "bg-green-50",
+      iconText: "text-green-600",
+      icon: "✅",
     },
   ];
 
-  // Logic: prioritize "Utilidad Real" if filtered by something else than COTIZACION
-  const sortedCards = useMemo(() => {
-    if (filterEstado && filterEstado !== "COTIZACION") {
-      const utilIndex = cards.findIndex(c => c.title === "Utilidad Real");
-      if (utilIndex > -1) {
-        const [utilCard] = cards.splice(utilIndex, 1);
-        return [utilCard, ...cards];
-      }
-    }
-    return cards;
-  }, [cards, filterEstado]);
-
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4 mb-8">
-      {sortedCards.map((c) => (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+      {cards.map((c) => (
         <div
           key={c.title}
           className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow"
