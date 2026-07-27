@@ -10,8 +10,21 @@ import BorderColorRoundedIcon from "@mui/icons-material/BorderColorRounded";
 import DeleteForeverRoundedIcon from "@mui/icons-material/DeleteForeverRounded";
 import { exportGeneralPDF } from "./utils/exportGeneralPDF";
 
-function clp(v) {
+function clp(v, moneda = "CLP") {
   const n = Number(v || 0);
+  const m = String(moneda || "CLP").toUpperCase();
+  if (m === "USD") {
+    return "US$ " + n.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+  if (m === "UF") {
+    return "UF " + n.toLocaleString("es-CL", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 4,
+    });
+  }
   return n.toLocaleString("es-CL", {
     style: "currency",
     currency: "CLP",
@@ -217,7 +230,7 @@ export default function VentasTable({
                         )}
                       </h4>
 
-                      <p className="text-sm text-slate-500  flex items-center gap-2">
+                      <p className="text-sm text-slate-500  flex items-center gap-2 flex-wrap">
                         <span className="text-base">📅</span>{" "}
                         {getFechaLabel(venta)}
                         <span className="mx-1 text-slate-300">•</span>
@@ -230,6 +243,10 @@ export default function VentasTable({
                             {cotLabel}
                           </span>
                         )}
+                        <span className="mx-1 text-slate-300">•</span>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase tracking-wider">
+                          Moneda: {venta.moneda || "CLP"}
+                        </span>
                       </p>
                     </div>
                   </div>
@@ -248,7 +265,7 @@ export default function VentasTable({
                       <p className="text-xs uppercase font-semibold text-slate-400 tracking-wider mb-1">
                         Total
                       </p>
-                      <p className="font-bold text-lg">{clp(totalVenta)}</p>
+                      <p className="font-bold text-lg">{clp(totalVenta, venta.moneda)}</p>
                     </div>
 
                     <div className="flex flex-col items-center lg:items-start min-w-[140px]">
@@ -350,7 +367,7 @@ export default function VentasTable({
                 <div className="px-5 pb-5 -mt-2 text-xs text-slate-400">
                   Costo:{" "}
                   <span className="font-semibold text-slate-600 ">
-                    {clp(totalCosto)}
+                    {clp(totalCosto, venta.moneda)}
                   </span>
                 </div>
               </div>

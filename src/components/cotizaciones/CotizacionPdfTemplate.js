@@ -4,6 +4,28 @@ import autoTable from "jspdf-autotable";
 
 export function generarCotizacionPDF(cotizacion) {
   const doc = new jsPDF();
+  const moneda = String(cotizacion?.moneda || "CLP").toUpperCase();
+
+  const fmt = (v) => {
+    if (v == null || Number.isNaN(Number(v))) return "-";
+    if (moneda === "USD") {
+      return "US$ " + Number(v).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+    if (moneda === "UF") {
+      return "UF " + Number(v).toLocaleString("es-CL", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 4,
+      });
+    }
+    return Number(v).toLocaleString("es-CL", {
+      style: "currency",
+      currency: "CLP",
+      maximumFractionDigits: 0,
+    });
+  };
 
   // ===== Header =====
   doc.setFontSize(16);
@@ -29,8 +51,8 @@ export function generarCotizacionPDF(cotizacion) {
       ? it.producto?.nombre || "Producto"
       : it.Item || "Servicio",
     it.cantidad,
-    formatoCLP(it.precioUnitario),
-    formatoCLP(it.total),
+    fmt(it.precioUnitario),
+    fmt(it.total),
   ]);
 
   autoTable(doc, {
@@ -44,10 +66,10 @@ export function generarCotizacionPDF(cotizacion) {
   // ===== Totales =====
   const finalY = doc.lastAutoTable.finalY + 10;
 
-  doc.text(`Subtotal: ${formatoCLP(cotizacion.subtotal)}`, 140, finalY);
-  doc.text(`IVA: ${formatoCLP(cotizacion.iva)}`, 140, finalY + 6);
+  doc.text(`Subtotal: ${fmt(cotizacion.subtotal)}`, 140, finalY);
+  doc.text(`IVA: ${fmt(cotizacion.iva)}`, 140, finalY + 6);
   doc.setFontSize(11);
-  doc.text(`TOTAL: ${formatoCLP(cotizacion.total)}`, 140, finalY + 14);
+  doc.text(`TOTAL: ${fmt(cotizacion.total)}`, 140, finalY + 14);
 
   // ===== Términos =====
   doc.setFontSize(9);
@@ -63,12 +85,4 @@ export function generarCotizacionPDF(cotizacion) {
 
   // Descargar
   doc.save(`Cotizacion-${cotizacion.numero}.pdf`);
-}
-
-function formatoCLP(valor) {
-  return Number(valor || 0).toLocaleString("es-CL", {
-    style: "currency",
-    currency: "CLP",
-    maximumFractionDigits: 0,
-  });
 }

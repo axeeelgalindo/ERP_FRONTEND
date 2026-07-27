@@ -903,7 +903,7 @@ export default function CotizacionesPage() {
                     {/* Fila de Tarjetas */}
                     <div className="flex flex-col gap-3">
                       {cat.items.length === 0 ? (
-                        <div className="p-4 border border-dashed border-slate-200 rounded-xl flex items-center justify-center min-h-[96px]">
+                        <div className="p-4 border border-dashed border-slate-200 rounded-xl flex items-center justify-center min-h-[110px]">
                           <span className="text-[11px] text-slate-400 font-medium">Sin cotizaciones</span>
                         </div>
                       ) : (
@@ -914,7 +914,7 @@ export default function CotizacionesPage() {
                               setSelectedId(cot.id);
                               setOpenDrawer(true);
                             }}
-                            className="p-3 border border-slate-100 hover:border-blue-200 hover:shadow-md rounded-xl bg-white cursor-pointer transition-all duration-300 transform hover:-translate-y-0.5 group flex flex-col justify-between min-h-[96px]"
+                            className="p-3 border border-slate-100 hover:border-blue-200 hover:shadow-md rounded-xl bg-white cursor-pointer transition-all duration-300 transform hover:-translate-y-0.5 group flex flex-col justify-between min-h-[110px]"
                           >
                             <div>
                               <div className="flex items-center justify-between">
@@ -936,8 +936,23 @@ export default function CotizacionesPage() {
                                 </p>
                               )}
                             </div>
-                            <div className="text-xs font-black text-right text-slate-700 mt-2 border-t border-slate-50 pt-1.5">
-                              {fmtMoney(cot.total, cot.moneda)}
+                            <div className="flex justify-between items-center text-[11px] mt-2 border-t border-slate-100 pt-1.5">
+                              <div className="text-left">
+                                <span className="block text-[9px] uppercase tracking-wider text-slate-400 font-semibold">
+                                  Parcial
+                                </span>
+                                <span className="text-xs font-black text-slate-700">
+                                  {fmtMoney(cot.total_pagado ?? 0, cot.moneda)}
+                                </span>
+                              </div>
+                              <div className="text-right">
+                                <span className="block text-[9px] uppercase tracking-wider text-slate-400 font-semibold">
+                                  Total
+                                </span>
+                                <span className="text-xs font-black text-slate-700">
+                                  {fmtMoney(cot.total, cot.moneda)}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         ))
@@ -965,7 +980,7 @@ export default function CotizacionesPage() {
         </div>
 
         {/* Filtros */}
-        <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 
           {/* Nº COT */}
           <div className="relative">
@@ -1016,10 +1031,8 @@ export default function CotizacionesPage() {
             </select>
             <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">▾</span>
           </div>
-        </div>
 
-        {/* Monto Min/Max row */}
-        <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Monto Min */}
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
             <input
@@ -1030,6 +1043,8 @@ export default function CotizacionesPage() {
               type="text"
             />
           </div>
+
+          {/* Monto Max */}
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
             <input
@@ -1040,6 +1055,7 @@ export default function CotizacionesPage() {
               type="text"
             />
           </div>
+
         </div>
 
         {/* Date Filter Row */}

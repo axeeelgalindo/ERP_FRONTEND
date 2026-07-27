@@ -816,8 +816,8 @@ export default function ComprasPage() {
      Render
   ========================= */
   return (
-    <div className="bg-background-light  text-slate-900  min-h-screen transition-colors duration-200">
-      <header className=" mx-auto px-6 py-8">
+    <div className="bg-background-light  text-slate-900  min-h-screen transition-colors duration-200 w-full max-w-full overflow-hidden">
+      <header className="w-full max-w-full px-6 py-8 overflow-hidden">
         {/* header top */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
@@ -1083,7 +1083,7 @@ export default function ComprasPage() {
         </div>
 
         {/* Tabla */}
-        <div className="rounded-xl overflow-hidden">
+        <div className="w-full max-w-full overflow-hidden rounded-xl">
           {/* inputs hidden para PDF por fila */}
           {rows.map((c) => (
             <input

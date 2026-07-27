@@ -5,12 +5,27 @@ import jsPDF from "jspdf";
 export default function CotizacionPDFButtonLight({ cotizacion, iconOnly = false }) {
   if (!cotizacion) return null;
 
-  const clp = (v) =>
-    Number(v || 0).toLocaleString("es-CL", {
+  const clp = (v) => {
+    if (v == null || Number.isNaN(Number(v))) return "-";
+    const moneda = String(cotizacion?.moneda || "CLP").toUpperCase();
+    if (moneda === "USD") {
+      return "US$ " + Number(v).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+    if (moneda === "UF") {
+      return "UF " + Number(v).toLocaleString("es-CL", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 4,
+      });
+    }
+    return Number(v).toLocaleString("es-CL", {
       style: "currency",
       currency: "CLP",
       maximumFractionDigits: 0,
     });
+  };
 
   const generarPDF = () => {
     const doc = new jsPDF("p", "mm", "a4");

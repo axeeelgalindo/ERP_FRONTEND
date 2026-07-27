@@ -497,9 +497,25 @@ export default function KanbanPage() {
       >
         <div className="p-3">
           <div className="flex justify-between items-start mb-2">
-            <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${bgType}`}>
-              <span className="material-symbols-outlined text-[10px] font-bold">{icon}</span>
-              {item.tipo}
+            <div className="flex gap-1.5 items-center">
+              <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${bgType}`}>
+                <span className="material-symbols-outlined text-[10px] font-bold">{icon}</span>
+                {item.tipo}
+              </div>
+              {item.tipo === "TAREA" && (
+                <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${
+                  (item.prioridad ?? 2) === 1 ? "bg-green-50 text-green-700 border border-green-200" :
+                  (item.prioridad ?? 2) === 3 ? "bg-red-50 text-red-700 border border-red-200 animate-pulse" :
+                  "bg-amber-50 text-amber-700 border border-amber-200"
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    (item.prioridad ?? 2) === 1 ? "bg-green-500" :
+                    (item.prioridad ?? 2) === 3 ? "bg-red-500" :
+                    "bg-amber-500"
+                  }`}></span>
+                  {(item.prioridad ?? 2) === 1 ? "Baja" : (item.prioridad ?? 2) === 3 ? "Alta" : "Media"}
+                </div>
+              )}
             </div>
             <div className="flex gap-1 items-center">
               {item.evidencias?.length > 0 && (
@@ -756,6 +772,7 @@ export default function KanbanPage() {
     const item = selectedItem;
     const { bgType, icon } = getTaskStyles(item);
     const isCompletada = ["completada", "finalizado"].includes(item.estado);
+    const canEditPriority = item.tipo === "TAREA" && (!item.creador_id || item.creador_id === session?.user?.id);
 
     return (
       <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -857,6 +874,57 @@ export default function KanbanPage() {
                   </select>
                 </div>
               </div>
+
+              {item.tipo === "TAREA" && (
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Prioridad (Urgencia)</span>
+                  <div className="flex items-center gap-2">
+                    {canEditPriority ? (
+                      <select
+                        value={item.prioridad ?? 2}
+                        onChange={(e) => {
+                          const newPrioridad = parseInt(e.target.value) || 2;
+                          setSelectedItem(prev => ({
+                            ...prev,
+                            prioridad: newPrioridad
+                          }));
+
+                          (async () => {
+                            setIsUpdating(true);
+                            try {
+                              const headers = makeHeaders(session);
+                              const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tareas/update/${item.id}`, {
+                                method: "PATCH",
+                                headers,
+                                body: JSON.stringify({ prioridad: newPrioridad }),
+                              });
+                              if (!res.ok) throw new Error("Error al actualizar la prioridad");
+                              fetchData(searchTerm);
+                            } catch (err) {
+                              console.error(err);
+                              alert("Error actualizando prioridad");
+                            } finally {
+                              setIsUpdating(false);
+                            }
+                          })();
+                        }}
+                        className="bg-transparent text-xs font-bold text-gray-700 border-b border-dashed border-gray-300 focus:border-blue-500 outline-none cursor-pointer py-0.5"
+                      >
+                        <option value={1}>🟢 Baja</option>
+                        <option value={2}>🟡 Media</option>
+                        <option value={3}>🔴 Alta</option>
+                      </select>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700 py-0.5">
+                        <span>
+                          {(item.prioridad ?? 2) === 1 ? "🟢 Baja" : (item.prioridad ?? 2) === 3 ? "🔴 Alta" : "🟡 Media"}
+                        </span>
+                        <span className="material-symbols-outlined text-[12px] text-gray-400 cursor-help" title="Solo el creador de la tarea puede editar la prioridad">lock</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {item.tipo === "TAREA" && (
                 <div className="space-y-3 md:col-span-2 pt-3 border-t border-gray-100">
@@ -1676,6 +1744,33 @@ export default function KanbanPage() {
                     onChange={(e) => setFormData({ ...formData, dias_plan: parseInt(e.target.value) || 1 })}
                   />
                 </div>
+
+                {formType === "TAREA" && (
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Prioridad (Urgencia)</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { val: 1, lab: "Baja", color: "bg-green-500", text: "text-green-700", border: "border-green-200", bg: "bg-green-50/50" },
+                        { val: 2, lab: "Media", color: "bg-amber-500", text: "text-amber-700", border: "border-amber-200", bg: "bg-amber-50/50" },
+                        { val: 3, lab: "Alta", color: "bg-red-500", text: "text-red-700", border: "border-red-200", bg: "bg-red-50/50" }
+                      ].map(p => (
+                        <button
+                          type="button"
+                          key={p.val}
+                          onClick={() => setFormData({ ...formData, prioridad: p.val })}
+                          className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border transition-all cursor-pointer ${
+                            formData.prioridad === p.val
+                              ? `${p.bg} ${p.text} ${p.border} font-black ring-2 ring-offset-1 ring-blue-500`
+                              : "bg-gray-50 text-gray-400 border-transparent hover:border-gray-200"
+                          }`}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${p.color}`}></span>
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider">{p.lab}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Descripción</label>

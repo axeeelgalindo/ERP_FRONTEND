@@ -12,6 +12,7 @@ import RendicionKpis from "@/components/rendiciones/RendicionKpis";
 import RendicionTable from "@/components/rendiciones/RendicionTable";
 import RendicionDetailDrawer from "@/components/rendiciones/RendicionDetailDrawer";
 import IndependentRendicionModal from "@/components/rendiciones/IndependentRendicionModal";
+import Pagination from "@/components/ui/Pagination";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -60,7 +61,7 @@ export default function RendicionesPage() {
   const [err, setErr] = useState("");
 
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(20);
 
   // Filters – individual fields
   const [fEmpleado, setFEmpleado] = useState("");
@@ -91,8 +92,8 @@ export default function RendicionesPage() {
 
     try {
       const params = new URLSearchParams({
-        page: String(page),
-        pageSize: String(pageSize),
+        page: "1",
+        pageSize: "1000",
       });
 
       const res = await fetch(`${API}/rendiciones?${params.toString()}`, {
@@ -119,7 +120,12 @@ export default function RendicionesPage() {
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, status, page]);
+  }, [session, status]);
+
+  // Reset page when filters or pageSize change
+  useEffect(() => {
+    setPage(1);
+  }, [fEmpleado, fProyecto, fEstado, fFecha, filterMontoMin, filterMontoMax, pageSize]);
 
   useEffect(() => {
     if (toast.open) {
@@ -264,7 +270,12 @@ export default function RendicionesPage() {
     }
   }
 
-  const totalPages = Math.ceil(total / pageSize);
+  const displayRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
+
+  const totalPages = Math.ceil(filtered.length / pageSize);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -400,61 +411,54 @@ export default function RendicionesPage() {
             </div>
           )}
 
+          {/* Selector de cantidad de registros */}
+          <div className="flex justify-between items-center bg-white px-5 py-3 rounded-xl border border-slate-200 shadow-sm text-sm">
+            <span className="font-semibold text-slate-700">Listado de Rendiciones</span>
+            <div className="flex items-center gap-2 text-slate-500">
+              <span>Mostrar</span>
+              <select
+                className="bg-white border border-slate-200 rounded-lg text-xs py-1 px-2 cursor-pointer focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+              >
+                {[10, 20, 50, 100].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+              <span>registros por página</span>
+            </div>
+          </div>
+
           <RendicionTable
-            rows={filtered}
+            rows={displayRows}
             loading={loading}
             onVerRendicion={handleVerRendicion}
             onPagar={handlePagar}
           />
 
           {/* Paginación */}
-          {totalPages > 1 && (
-            <div className="mt-8 flex justify-center gap-2 items-center">
-              <button
-                disabled={page === 1}
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                className="p-2 rounded-lg bg-white border border-slate-200 text-slate-600 disabled:opacity-30 hover:bg-slate-50 transition-colors"
-              >
-                <span className="material-symbols-outlined">chevron_left</span>
-              </button>
-              <div className="flex items-center gap-1">
-                {[...Array(totalPages)].map((_, i) => {
-                  const p = i + 1;
-                  if (totalPages > 7) {
-                    if (p > 1 && p < totalPages && (p < page - 1 || p > page + 1)) {
-                      if (p === page - 2 || p === page + 2) return <span key={p} className="px-1 text-slate-300">...</span>;
-                      return null;
-                    }
-                  }
-                  return (
-                    <button
-                      key={p}
-                      onClick={() => setPage(p)}
-                      className={`min-w-[36px] h-9 px-2 rounded-lg text-xs font-bold transition-all ${page === p
-                        ? "bg-slate-900 text-white shadow-lg"
-                        : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
-                        }`}
-                    >
-                      {p}
-                    </button>
-                  );
-                })}
-              </div>
-              <button
-                disabled={page === totalPages}
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                className="p-2 rounded-lg bg-white border border-slate-200 text-slate-600 disabled:opacity-30 hover:bg-slate-50 transition-colors"
-              >
-                <span className="material-symbols-outlined">chevron_right</span>
-              </button>
-            </div>
-          )}
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={(p) => setPage(p)}
+            className="mt-8"
+          />
 
-          {total > 0 && (
-            <div className="mt-3 text-center">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                Mostrando {filtered.length} de {total} rendiciones
-              </p>
+          {filtered.length > 0 && (
+            <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-3 text-slate-500 text-xs px-2">
+              <span>
+                Mostrando {filtered.length ? (page - 1) * pageSize + 1 : 0} a {filtered.length ? Math.min(filtered.length, page * pageSize) : 0} de {filtered.length} registros
+              </span>
+              {total > filtered.length && (
+                <span className="text-slate-400 font-medium">
+                  (de {total} totales en el sistema)
+                </span>
+              )}
             </div>
           )}
         </div>

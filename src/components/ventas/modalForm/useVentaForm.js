@@ -610,7 +610,7 @@ export default function useVentaForm({
       // =========================================================
       // 🚀 LÓGICA DE CAPPING (Límite por Cotización)
       // =========================================================
-      if (selectedOrdenVenta && (patch.cantidad !== undefined || patch.costoUnitarioManual !== undefined)) {
+      if (selectedOrdenVenta && selectedOrdenVenta.estado !== "COTIZACION" && (patch.cantidad !== undefined || patch.costoUnitarioManual !== undefined)) {
         // 1. Calculamos cuánto presupuesto hay para ESTA línea.
         // El presupuesto total es selectedOrdenVenta.total.
         // El gasto de las OTRAS líneas es: totalVenta - currentLineVenta.
@@ -829,6 +829,7 @@ export default function useVentaForm({
 
   const isOverQuoteLimit = useMemo(() => {
     if (!selectedOrdenVenta || !preview.total) return false;
+    if (selectedOrdenVenta.estado === "COTIZACION") return false;
     return preview.total > (selectedOrdenVenta.total || 0) + 1;
   }, [selectedOrdenVenta, preview.total]);
 

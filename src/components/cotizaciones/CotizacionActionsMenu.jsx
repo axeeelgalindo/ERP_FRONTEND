@@ -14,6 +14,7 @@ import {
   Button,
   TextField,
   Stack,
+  Tooltip,
 } from "@mui/material";
 
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
@@ -204,15 +205,31 @@ export default function CotizacionActionsMenu({
         </MenuItem>
 
         {/* ✅ EDITAR */}
-        <MenuItem onClick={handleEdit} disabled={!cotizacion?.id}>
-          <ListItemIcon>
-            <EditIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText
-            primary="Editar cotización"
-            secondary="Editar datos de la cotización"
-          />
-        </MenuItem>
+        {cotizacion?.estado === "COTIZACION" ? (
+          <MenuItem onClick={handleEdit} disabled={!cotizacion?.id}>
+            <ListItemIcon>
+              <EditIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText
+              primary="Editar cotización"
+              secondary="Editar datos de la cotización"
+            />
+          </MenuItem>
+        ) : (
+          <Tooltip title="No se puede editar porque ya avanzó de estado" arrow placement="left">
+            <span>
+              <MenuItem disabled>
+                <ListItemIcon>
+                  <EditIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText
+                  primary="Editar cotización 🔒"
+                  secondary={`Bloqueado por estado: ${cotizacion?.estado}`}
+                />
+              </MenuItem>
+            </span>
+          </Tooltip>
+        )}
       </Menu>
 
       {/* ===== Modal Aceptada ===== */}

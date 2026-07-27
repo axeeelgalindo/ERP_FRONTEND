@@ -29,12 +29,27 @@ export default function CotizacionPDFButton({ cotizacion }) {
   const [busy, setBusy] = useState(false);
   if (!cotizacion) return null;
 
-  const clp = (v) =>
-    Number(v || 0).toLocaleString("es-CL", {
+  const clp = (v) => {
+    if (v == null || Number.isNaN(Number(v))) return "-";
+    const moneda = String(cotizacion?.moneda || "CLP").toUpperCase();
+    if (moneda === "USD") {
+      return "US$ " + Number(v).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+    if (moneda === "UF") {
+      return "UF " + Number(v).toLocaleString("es-CL", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 4,
+      });
+    }
+    return Number(v).toLocaleString("es-CL", {
       style: "currency",
       currency: "CLP",
       maximumFractionDigits: 0,
     });
+  };
 
   const fmtDate = (d) => {
     if (!d) return "-";
@@ -468,7 +483,7 @@ export default function CotizacionPDFButton({ cotizacion }) {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8.5);
       doc.setTextColor(11, 111, 164);
-      doc.text("Fecha de la orden:", colX, yContent + 4.5);
+      doc.text("Fecha emisión:", colX, yContent + 4.5);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9.5);
       doc.setTextColor(...C.text);

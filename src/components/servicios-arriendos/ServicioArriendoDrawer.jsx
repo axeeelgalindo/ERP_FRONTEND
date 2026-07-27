@@ -1369,13 +1369,24 @@ export default function ServicioArriendoDrawer({
 
         {/* Footer botones */}
         <div className="p-6 border-t border-slate-100 bg-slate-50 grid grid-cols-2 gap-3">
-          <button
-            className="p-2 rounded-lg border border-slate-300 bg-slate-200 hover:bg-slate-300 hover:cursor-pointer font-semibold flex items-center justify-center gap-2 text-slate-700"
-            onClick={handleEdit}
-          >
-            <EditIcon fontSize="small" />
-            Editar Contrato
-          </button>
+          {estado === "COTIZACION" ? (
+            <button
+              className="p-2 rounded-lg border border-slate-300 bg-slate-200 hover:bg-slate-300 hover:cursor-pointer font-semibold flex items-center justify-center gap-2 text-slate-700"
+              onClick={handleEdit}
+            >
+              <EditIcon fontSize="small" />
+              Editar Contrato
+            </button>
+          ) : (
+            <button
+              className="p-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 font-semibold flex items-center justify-center gap-2 cursor-not-allowed"
+              title="No se puede editar porque ya avanzó de estado"
+              disabled
+            >
+              <EditIcon fontSize="small" />
+              Editar Contrato 🔒
+            </button>
+          )}
 
           {estado === "COTIZACION" ? (
             <button

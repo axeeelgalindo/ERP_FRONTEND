@@ -538,6 +538,11 @@ export default function CotizacionDrawerLight({
                   Cotización #{c?.numero ?? "—"}
                 </h3>
                 <Badge>{estado}</Badge>
+                {c?.moneda && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase tracking-wider">
+                    {c.moneda}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
                 Creada: {c?.creada_en ? fechaCL(c.creada_en) : "—"}
@@ -912,13 +917,23 @@ export default function CotizacionDrawerLight({
 
         {/* Footer botones */}
         <div className="p-6 border-t border-slate-100 bg-slate-50 grid grid-cols-2 gap-3">
-          <button
-            className="p-2 rounded-lg border border-slate-300 bg-slate-200 hover:bg-slate-300 hover:cursor-pointer font-semibold"
-            title="Editar"
-            onClick={() => c?.id && onEdit?.(c.id)}
-          >
-            Editar ✎
-          </button>
+          {c?.estado === "COTIZACION" ? (
+            <button
+              className="p-2 rounded-lg border border-slate-300 bg-slate-200 hover:bg-slate-300 hover:cursor-pointer font-semibold"
+              title="Editar"
+              onClick={() => c?.id && onEdit?.(c.id)}
+            >
+              Editar ✎
+            </button>
+          ) : (
+            <button
+              className="p-2 rounded-lg border border-slate-200 bg-slate-100 text-slate-400 font-semibold cursor-not-allowed"
+              title="No se puede editar porque ya avanzó de estado"
+              disabled
+            >
+              Editar 🔒
+            </button>
+          )}
 
           <button
             className="px-4 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-colors"
@@ -1039,26 +1054,46 @@ export default function CotizacionDrawerLight({
             )}
 
             {/* 3. Editar Cotización */}
-            <button
-              onClick={() => {
-                closeEstadoMenu();
-                handleEdit();
-              }}
-              className="w-full text-left p-4 rounded-2xl border border-slate-200 hover:border-slate-300 bg-gradient-to-r from-slate-50/50 to-white hover:from-slate-50/80 transition-all duration-200 group flex items-start gap-4 hover:shadow-md hover:scale-[1.01] hover:cursor-pointer"
-            >
-              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 group-hover:scale-110 transition-transform">
-                <EditIcon />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-bold text-slate-800">Editar cotización</h4>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                  Modifica los datos principales, montos, clientes y glosas de esta cotización.
-                </p>
-              </div>
-              <div className="text-slate-300 group-hover:text-slate-600 font-bold self-center text-lg">
-                →
-              </div>
-            </button>
+            {c?.estado === "COTIZACION" ? (
+              <button
+                onClick={() => {
+                  closeEstadoMenu();
+                  handleEdit();
+                }}
+                className="w-full text-left p-4 rounded-2xl border border-slate-200 hover:border-slate-300 bg-gradient-to-r from-slate-50/50 to-white hover:from-slate-50/80 transition-all duration-200 group flex items-start gap-4 hover:shadow-md hover:scale-[1.01] hover:cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 group-hover:scale-110 transition-transform">
+                  <EditIcon />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-bold text-slate-800">Editar cotización</h4>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Modifica los datos principales, montos, clientes y glosas de esta cotización.
+                  </p>
+                </div>
+                <div className="text-slate-300 group-hover:text-slate-600 font-bold self-center text-lg">
+                  →
+                </div>
+              </button>
+            ) : (
+              <button
+                className="w-full text-left p-4 rounded-2xl border border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed group flex items-start gap-4"
+                title="No se puede editar porque ya avanzó de estado"
+                disabled
+              >
+                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
+                  <EditIcon />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-bold text-slate-400 flex items-center gap-1.5">
+                    Editar cotización 🔒
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    Bloqueado por estado: {c?.estado}
+                  </p>
+                </div>
+              </button>
+            )}
           </div>
         </DialogContent>
       </Dialog>

@@ -159,6 +159,9 @@ export default function CotizacionesDesktopTable({
                             <strong>{siguiente.replaceAll("_", " ")}</strong>
                           </Typography>
                         ) : null}
+                        <Typography variant="caption" sx={{ mt: 0.5, fontWeight: 700, color: "primary.main" }}>
+                          Moneda: {c.moneda || "CLP"}
+                        </Typography>
                       </Box>
                     </TableCell>
 

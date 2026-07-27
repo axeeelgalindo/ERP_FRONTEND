@@ -83,57 +83,57 @@ export default function ComprasTable({
 
       {/* tabla */}
       <div className="overflow-x-auto custom-scrollbar">
-        <table className="w-full text-left text-sm border-collapse min-w-[1200px]">
+        <table className="w-full text-left text-xs lg:text-sm border-collapse min-w-[1000px] xl:min-w-full">
           <thead>
-            <tr className="bg-slate-50/50    text-slate-500  font-semibold border-b border-slate-100 ">
-              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">
+            <tr className="bg-slate-50/50 text-slate-500 font-semibold border-b border-slate-100">
+              <th className="px-3 lg:px-4 py-3 lg:py-3.5 font-medium uppercase tracking-wider text-[10px] lg:text-[11px]">
                 N°
               </th>
-              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">
+              <th className="px-3 lg:px-4 py-3 lg:py-3.5 font-medium uppercase tracking-wider text-[10px] lg:text-[11px]">
                 Estado
               </th>
-              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">
+              <th className="px-3 lg:px-4 py-3 lg:py-3.5 font-medium uppercase tracking-wider text-[10px] lg:text-[11px]">
                 Proveedor / RUT
               </th>
-              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">
+              <th className="px-3 lg:px-4 py-3 lg:py-3.5 font-medium uppercase tracking-wider text-[10px] lg:text-[11px]">
                 Doc / Folio
               </th>
-              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">
+              <th className="px-3 lg:px-4 py-3 lg:py-3.5 font-medium uppercase tracking-wider text-[10px] lg:text-[11px]">
                 Fecha
               </th>
-              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">
+              <th className="px-3 lg:px-4 py-3 lg:py-3.5 font-medium uppercase tracking-wider text-[10px] lg:text-[11px]">
                 Destino
               </th>
-              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px] text-center">
+              <th className="px-3 lg:px-4 py-3 lg:py-3.5 font-medium uppercase tracking-wider text-[10px] lg:text-[11px] text-center">
                 PDF
               </th>
-              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px] text-center">
+              <th className="px-3 lg:px-4 py-3 lg:py-3.5 font-medium uppercase tracking-wider text-[10px] lg:text-[11px] text-center">
                 Rendición
               </th>
-              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px] text-center">
+              <th className="px-3 lg:px-4 py-3 lg:py-3.5 font-medium uppercase tracking-wider text-[10px] lg:text-[11px] text-center">
                 Vínculo Cotización
               </th>
-              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px] text-right">
+              <th className="px-3 lg:px-4 py-3 lg:py-3.5 font-medium uppercase tracking-wider text-[10px] lg:text-[11px] text-right">
                 Monto Total
               </th>
-              <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px] text-center">
+              <th className="px-3 lg:px-4 py-3 lg:py-3.5 font-medium uppercase tracking-wider text-[10px] lg:text-[11px] text-center">
                 Acciones
               </th>
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-slate-100 ">
+          <tbody className="divide-y divide-slate-100">
             {loading ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <tr key={i}>
-                  <td className="px-6 py-4 text-slate-400" colSpan={11}>
+                  <td className="px-3 lg:px-4 py-3 lg:py-3.5 text-slate-400" colSpan={11}>
                     Cargando…
                   </td>
                 </tr>
               ))
             ) : rows.length === 0 ? (
               <tr>
-                <td className="px-6 py-4 text-slate-500" colSpan={11}>
+                <td className="px-3 lg:px-4 py-3 lg:py-3.5 text-slate-500" colSpan={11}>
                   No hay compras para mostrar.
                 </td>
               </tr>
@@ -157,15 +157,15 @@ export default function ComprasTable({
                 return (
                   <tr
                     key={c.id}
-                    className={`hover:bg-slate-50/80  transition-colors ${
-                      idx % 2 ? "bg-slate-50/30 " : ""
+                    className={`hover:bg-slate-50/80 transition-colors ${
+                      idx % 2 ? "bg-slate-50/30" : ""
                     }`}
                   >
-                    <td className="px-6 py-4 font-medium text-slate-400">
+                    <td className="px-3 lg:px-4 py-3 lg:py-3.5 font-medium text-slate-400">
                       {numero}
                     </td>
 
-                    <td className="px-6 py-4">
+                    <td className="px-3 lg:px-4 py-3 lg:py-3.5">
                       <span
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${estadoBadge(
                           c?.estado,
@@ -175,30 +175,30 @@ export default function ComprasTable({
                       </span>
                     </td>
 
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-slate-900  ">
+                    <td className="px-3 lg:px-4 py-3 lg:py-3.5">
+                      <div className="flex flex-col max-w-[140px] xl:max-w-[200px] whitespace-normal break-words">
+                        <span className="font-semibold text-slate-900 leading-tight">
                           {proveedor}
                         </span>
-                        <span className="text-xs text-slate-400">{rut}</span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">{rut}</span>
                       </div>
                     </td>
 
-                    <td className="px-6 py-4">
+                    <td className="px-3 lg:px-4 py-3 lg:py-3.5">
                       <div className="flex items-center gap-2">
-                        <span className="bg-slate-100  px-1.5 py-0.5 rounded text-[10px] font-bold">
+                        <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] font-bold">
                           {tipoDoc}
                         </span>
                         <span className="font-medium">{folio}</span>
                       </div>
                     </td>
 
-                    <td className="px-6 py-4 text-slate-600  whitespace-nowrap">
+                    <td className="px-3 lg:px-4 py-3 lg:py-3.5 text-slate-600 whitespace-nowrap">
                       {fmtDateDMY(c?.fecha_docto)}
                     </td>
 
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5">
+                    <td className="px-3 lg:px-4 py-3 lg:py-3.5">
+                      <div className="flex items-center">
                         <button
                           type="button"
                           onClick={() => onOpenImputacion?.(c)}
@@ -211,15 +211,25 @@ export default function ComprasTable({
                                   ? "bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-300"
                                   : "bg-slate-50 text-slate-400 border-dashed border-slate-300 hover:border-slate-400"
                           }`}
-                          title="Asignar / Cambiar Imputación"
+                          title={
+                            c?.destino === "PROYECTO"
+                              ? `Proyecto: ${proyecto}`
+                              : c?.destino === "TALLER"
+                                ? `Taller (${c.centro_costo || "S/CC"})`
+                                : c?.destino === "ADMINISTRACION"
+                                  ? `Admin (${c.centro_costo || "S/CC"})`
+                                  : "No imputado"
+                          }
                         >
-                          {c?.destino === "PROYECTO"
-                            ? `Proyecto: ${proyecto}`
-                            : c?.destino === "TALLER"
-                              ? `Taller (${c.centro_costo || "S/CC"})`
-                              : c?.destino === "ADMINISTRACION"
-                                ? `Admin (${c.centro_costo || "S/CC"})`
-                                : "No imputado"}
+                          <span className="max-w-[120px] xl:max-w-[185px] truncate">
+                            {c?.destino === "PROYECTO"
+                              ? `Proyecto: ${proyecto}`
+                              : c?.destino === "TALLER"
+                                ? `Taller (${c.centro_costo || "S/CC"})`
+                                : c?.destino === "ADMINISTRACION"
+                                  ? `Admin (${c.centro_costo || "S/CC"})`
+                                  : "No imputado"}
+                          </span>
                           <span className="material-symbols-outlined text-[10px] ml-1.5 opacity-60">
                             edit
                           </span>
@@ -227,32 +237,32 @@ export default function ComprasTable({
                       </div>
                     </td>
 
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-3 lg:px-4 py-3 lg:py-3.5 text-center">
                       {hasPdf ? (
                         <a
                           href={`${API.replace(/\/$/, "")}${c.factura_url}`}
                           target="_blank"
                           rel="noreferrer"
                           title="Ver factura PDF"
-                          className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-slate-200  hover:bg-slate-50 "
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-slate-200 hover:bg-slate-50"
                         >
                           ✓
                         </a>
                       ) : (
                         <span
                           title="Sin factura"
-                          className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-slate-200   bg-white  text-slate-300 "
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-300"
                         >
                           ✕
                         </span>
                       )}
                     </td>
 
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-3 lg:px-4 py-3 lg:py-3.5 text-center">
                       <RendicionCell compra={c} />
                     </td>
 
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-3 lg:px-4 py-3 lg:py-3.5 text-center">
                       {c?.cotizacion ? (
                         <span className="inline-flex flex-col items-center gap-0.5">
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -271,11 +281,11 @@ export default function ComprasTable({
                       )}
                     </td>
 
-                    <td className="px-6 py-4 text-right font-bold text-slate-900 ">
+                    <td className="px-3 lg:px-4 py-3 lg:py-3.5 text-right font-bold text-slate-900">
                       {toCLP(c?.total)}
                     </td>
 
-                    <td className="px-6 py-4">
+                    <td className="px-3 lg:px-4 py-3 lg:py-3.5">
                       <div className="flex items-center justify-center gap-2">
                         <button
                           className={`p-1.5 rounded-lg transition-all ${
@@ -291,7 +301,7 @@ export default function ComprasTable({
                         </button>
 
                         <button
-                          className="p-1.5 text-slate-400 hover:text-primary hover:bg-blue-50  rounded-lg transition-all"
+                          className="p-1.5 text-slate-400 hover:text-primary hover:bg-blue-50 rounded-lg transition-all"
                           title="Vincular a Cotización"
                           type="button"
                           onClick={() => onOpenVincular?.(c)}
@@ -302,7 +312,7 @@ export default function ComprasTable({
                         <CompraPDFButton compra={c} />
 
                         <button
-                          className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50  rounded-lg transition-all disabled:opacity-60"
+                          className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all disabled:opacity-60"
                           title="Subir PDF"
                           type="button"
                           onClick={() => onUploadPdfClick?.(c)}

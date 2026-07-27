@@ -12,9 +12,7 @@ export function formatMoney(value, moneda = "CLP") {
   
   const m = String(moneda || "CLP").toUpperCase();
   if (m === "USD") {
-    return Number(value).toLocaleString("en-US", {
-      style: "currency",
-      currency: "USD",
+    return "US$ " + Number(value).toLocaleString("en-US", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
