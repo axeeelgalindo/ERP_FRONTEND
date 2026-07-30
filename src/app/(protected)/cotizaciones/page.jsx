@@ -137,41 +137,66 @@ export default function CotizacionesPage() {
     for (const c of cotizaciones) {
       if (c.eliminado) continue;
 
-      // Calcular total de ventas (facturado)
-      const totalVentas = (c.ventas || []).reduce((sum, v) => {
-        const detallesTotal = (v.detalles || []).reduce((acc, d) => acc + (Number(d.costoTotal) || 0), 0);
-        return sum + (v.total || detallesTotal || 0);
-      }, 0);
+      // Calcular avance de facturación real de los adjuntos FAC
+      const pctFacturado = (c.adjuntos || [])
+        .filter(a => a.tipo === "fac")
+        .reduce((acc, a) => acc + (Number(a.porcentaje) || 0), 0);
 
-      // 1) Pagado parcial: avance_pago_pct > 0 y < 99.9
+      const isActiva = c.estado !== "COTIZACION" && c.estado !== "RECHAZADA";
+
+      // Guardamos el porcentaje facturado calculado en el objeto de la cotización
+      const cotConPct = {
+        ...c,
+        pct_facturado_calculado: pctFacturado,
+      };
+
+      // 1) Pagado parcial: avance_pago_pct > 0 y < 99.9 (solo para cotizaciones activas/aceptadas)
       const pctPago = c.avance_pago_pct || 0;
-      if (pctPago > 0 && pctPago < 99.9) {
-        pagadoParcial.push(c);
+      if (isActiva && pctPago > 0 && pctPago < 99.9 && c.estado !== "PAGADA") {
+        pagadoParcial.push(cotConPct);
       }
 
-      // 2) Facturada 100%: totalVentas >= c.total y total > 0
-      if (c.total > 0 && totalVentas >= c.total * 0.99) {
-        facturada100.push(c);
+      // Determinar si es facturada total o parcial basada en pctFacturado
+      let esFacturadaTotal = false;
+      let esFacturadaParcial = false;
+
+      if (isActiva) {
+        if (pctFacturado >= 99.9) {
+          esFacturadaTotal = true;
+        } else if (pctFacturado > 0) {
+          esFacturadaParcial = true;
+        } else {
+          // Fallback al estado de la base de datos si no hay facturas subidas en el sistema (0%)
+          const estadoFacturado = c.estado === "FACTURADA" || c.estado === "PAGADA" || c.estado === "ENTREGADO";
+          if (estadoFacturado) {
+            esFacturadaTotal = true;
+          }
+        }
       }
 
-      // 3) Facturada parcial: totalVentas > 0 y totalVentas < c.total
-      if (c.total > 0 && totalVentas > 0 && totalVentas < c.total * 0.99) {
-        facturadaParcial.push(c);
+      // 2) Facturada 100%
+      if (isActiva && esFacturadaTotal) {
+        facturada100.push(cotConPct);
+      }
+
+      // 3) Facturada parcial
+      if (isActiva && esFacturadaParcial) {
+        facturadaParcial.push(cotConPct);
       }
 
       // 4) HES: tiene doc_hes_url o adjunto tipo hes
       if (c.doc_hes_url || c.adjuntos?.some((a) => a.tipo === "hes")) {
-        hes.push(c);
+        hes.push(cotConPct);
       }
 
       // 5) OC: tiene doc_oc_url o adjunto tipo oc
       if (c.doc_oc_url || c.adjuntos?.some((a) => a.tipo === "oc")) {
-        oc.push(c);
+        oc.push(cotConPct);
       }
 
       // 6) Aceptada: estado === ACEPTADA
       if (c.estado === "ACEPTADA") {
-        aceptada.push(c);
+        aceptada.push(cotConPct);
       }
     }
 
@@ -907,55 +932,68 @@ export default function CotizacionesPage() {
                           <span className="text-[11px] text-slate-400 font-medium">Sin cotizaciones</span>
                         </div>
                       ) : (
-                        cat.items.map((cot) => (
-                          <div
-                            key={cot.id}
-                            onClick={() => {
-                              setSelectedId(cot.id);
-                              setOpenDrawer(true);
-                            }}
-                            className="p-3 border border-slate-100 hover:border-blue-200 hover:shadow-md rounded-xl bg-white cursor-pointer transition-all duration-300 transform hover:-translate-y-0.5 group flex flex-col justify-between min-h-[110px]"
-                          >
-                            <div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-bold text-slate-400 group-hover:text-blue-500 transition-colors">
-                                  Nº {cot.numero}
-                                </span>
-                                {cot.es_suscripcion && (
-                                  <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-black uppercase">
-                                    Servicio
+                        cat.items.map((cot) => {
+                          const pctFacturadoAMostrar = (() => {
+                            let pct = cot.pct_facturado_calculado || 0;
+                            if (pct === 0 && (cot.estado === "FACTURADA" || cot.estado === "PAGADA" || cot.estado === "ENTREGADO")) {
+                              return 100;
+                            }
+                            return pct;
+                          })();
+                          const montoParcial = cat.key === "facturadaParcial" || cat.key === "facturada100"
+                            ? cot.total * (pctFacturadoAMostrar / 100)
+                            : (cot.total_pagado ?? 0);
+
+                          return (
+                            <div
+                              key={cot.id}
+                              onClick={() => {
+                                setSelectedId(cot.id);
+                                setOpenDrawer(true);
+                              }}
+                              className="p-3 border border-slate-100 hover:border-blue-200 hover:shadow-md rounded-xl bg-white cursor-pointer transition-all duration-300 transform hover:-translate-y-0.5 group flex flex-col justify-between min-h-[110px]"
+                            >
+                              <div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] font-bold text-slate-400 group-hover:text-blue-500 transition-colors">
+                                    Nº {cot.numero}
                                   </span>
+                                  {cot.es_suscripcion && (
+                                    <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-black uppercase">
+                                      Servicio
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs font-bold text-slate-800 line-clamp-1 mt-1">
+                                  {cot.cliente?.nombre || "Sin cliente"}
+                                </p>
+                                {cot.asunto && (
+                                  <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                                    {cot.asunto}
+                                  </p>
                                 )}
                               </div>
-                              <p className="text-xs font-bold text-slate-800 line-clamp-1 mt-1">
-                                {cot.cliente?.nombre || "Sin cliente"}
-                              </p>
-                              {cot.asunto && (
-                                <p className="text-[10px] text-slate-400 truncate mt-0.5">
-                                  {cot.asunto}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex justify-between items-center text-[11px] mt-2 border-t border-slate-100 pt-1.5">
-                              <div className="text-left">
-                                <span className="block text-[9px] uppercase tracking-wider text-slate-400 font-semibold">
-                                  Parcial
-                                </span>
-                                <span className="text-xs font-black text-slate-700">
-                                  {fmtMoney(cot.total_pagado ?? 0, cot.moneda)}
-                                </span>
-                              </div>
-                              <div className="text-right">
-                                <span className="block text-[9px] uppercase tracking-wider text-slate-400 font-semibold">
-                                  Total
-                                </span>
-                                <span className="text-xs font-black text-slate-700">
-                                  {fmtMoney(cot.total, cot.moneda)}
-                                </span>
+                              <div className="flex justify-between items-center text-[11px] mt-2 border-t border-slate-100 pt-1.5">
+                                <div className="text-left">
+                                  <span className="block text-[9px] uppercase tracking-wider text-slate-400 font-semibold">
+                                    Parcial
+                                  </span>
+                                  <span className="text-xs font-black text-slate-700">
+                                    {fmtMoney(montoParcial, cot.moneda)}
+                                  </span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="block text-[9px] uppercase tracking-wider text-slate-400 font-semibold">
+                                    Total
+                                  </span>
+                                  <span className="text-xs font-black text-slate-700">
+                                    {fmtMoney(cot.total, cot.moneda)}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </div>

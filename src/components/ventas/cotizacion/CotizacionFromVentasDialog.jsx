@@ -63,7 +63,8 @@ function distributeGlosasBrutas(glosas, subtotalBase, moneda) {
     .filter((i) => i !== -1);
 
   if (autosIdx.length === 0) {
-    if (Math.abs(manualSum - t) > 0.01) {
+    const maxDiff = moneda === "CLP" ? 10 : 0.01;
+    if (Math.abs(manualSum - t) > maxDiff) {
       return {
         glosas,
         error: `Falta cuadrar el subtotal base: manual ${formatMoney(
@@ -263,7 +264,8 @@ export default function CotizacionFromVentasDialog({
     [glosas, moneda]
   );
 
-  const okCuadra = !glosaErr && subtotalBase > 0 && Math.abs(sumGlosasBrutas - subtotalBase) <= 0.01;
+  const maxDiff = moneda === "CLP" ? 10 : 0.01;
+  const okCuadra = !glosaErr && subtotalBase > 0 && Math.abs(sumGlosasBrutas - subtotalBase) <= maxDiff;
 
   // =========================================================
   // ✅ REGLA: NO SE PUEDE DESCUENTO GENERAL + DESCUENTO GLOSA
@@ -564,7 +566,8 @@ export default function CotizacionFromVentasDialog({
         return `Glosa #${i + 1}: Descuento % inválido (<100).`;
     }
     if (glosaErr) return glosaErr;
-    if (Math.abs(sumGlosasBrutas - subtotalBase) > 0.01) {
+    const maxDiffValStep = moneda === "CLP" ? 10 : 0.01;
+    if (Math.abs(sumGlosasBrutas - subtotalBase) > maxDiffValStep) {
       return `Las glosas BRUTAS suman ${formatMoney(
         sumGlosasBrutas,
         moneda

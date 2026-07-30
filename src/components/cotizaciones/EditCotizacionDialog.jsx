@@ -515,7 +515,8 @@ export default function EditCotizacionDialog({
             "El subtotal neto calculado desde ventas es 0. Revisa ventas seleccionadas."
           );
         }
-        if (suma !== subtotalNeto) {
+        const maxDiff = moneda === "CLP" ? 10 : 0.01;
+        if (Math.abs(suma - subtotalNeto) > maxDiff) {
           throw new Error(
             `Las glosas deben sumar el subtotal neto (${formatMoney(
               subtotalNeto,

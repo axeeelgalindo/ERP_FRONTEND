@@ -409,6 +409,8 @@ export default function CotizacionDrawerLight({
   const [inicioPlan, setInicioPlan] = useState(todayStr);
   const [finPlan, setFinPlan] = useState(todayStr);
   const [crearProyecto, setCrearProyecto] = useState(true);
+  const [epicaNombre, setEpicaNombre] = useState("Planificación e Inicio");
+  const [tareaNombre, setTareaNombre] = useState("Reunión de kickoff");
   const [errAceptada, setErrAceptada] = useState("");
 
   const openAceptarModal = () => {
@@ -416,6 +418,8 @@ export default function CotizacionDrawerLight({
     setCotizacionIdLocked(c.id);
     setErrAceptada("");
     setCrearProyecto(true); // reset a true al abrir
+    setEpicaNombre("Planificación e Inicio");
+    setTareaNombre("Reunión de kickoff");
     closeEstadoMenu();
     setTimeout(() => setOpenAceptada(true), 0);
   };
@@ -433,6 +437,17 @@ export default function CotizacionDrawerLight({
       return;
     }
 
+    if (crearProyecto) {
+      if (!epicaNombre.trim()) {
+        setErrAceptada("El nombre de la épica es obligatorio.");
+        return;
+      }
+      if (!tareaNombre.trim()) {
+        setErrAceptada("El nombre de la tarea es obligatorio.");
+        return;
+      }
+    }
+
     setErrAceptada("");
     setOpenAceptada(false);
 
@@ -440,6 +455,8 @@ export default function CotizacionDrawerLight({
       fecha_inicio_plan: inicioPlan,
       fecha_fin_plan: finPlan,
       crear_proyecto: crearProyecto,
+      epica_nombre: crearProyecto ? epicaNombre.trim() : undefined,
+      tarea_nombre: crearProyecto ? tareaNombre.trim() : undefined,
     });
 
     setCotizacionIdLocked(null);
@@ -1190,6 +1207,43 @@ export default function CotizacionDrawerLight({
                 Crear un proyecto asociado para esta cotización
               </label>
             </div>
+
+            {/* Inputs de Épica y Tarea */}
+            {crearProyecto && (
+              <div className="space-y-4 border border-slate-100 rounded-2xl p-4 bg-slate-50/50">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Estructura Inicial del Proyecto
+                </h4>
+                
+                {/* Nombre de la Épica */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    Nombre de la Épica
+                  </label>
+                  <input
+                    type="text"
+                    value={epicaNombre}
+                    onChange={(e) => setEpicaNombre(e.target.value)}
+                    placeholder="Ej. Planificación e Inicio"
+                    className="w-full px-4 py-2.5 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all font-semibold text-slate-700"
+                  />
+                </div>
+
+                {/* Nombre de la Tarea */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    Nombre de la Tarea Inicial
+                  </label>
+                  <input
+                    type="text"
+                    value={tareaNombre}
+                    onChange={(e) => setTareaNombre(e.target.value)}
+                    placeholder="Ej. Reunión de Kickoff"
+                    className="w-full px-4 py-2.5 border border-slate-200 bg-white rounded-xl text-sm focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all font-semibold text-slate-700"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Alerta de error */}
             {errAceptada && (
