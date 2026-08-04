@@ -944,6 +944,27 @@ export default function CotizacionesPage() {
                             ? cot.total * (pctFacturadoAMostrar / 100)
                             : (cot.total_pagado ?? 0);
 
+                          // Conversión a CLP si la moneda es UF para este cuadro de control rápido
+                          const isUF = String(cot.moneda).toUpperCase() === "UF";
+                          const ufRate = Number(cot.valor_uf_documento) || 37700;
+                          
+                          let totalRender = cot.total;
+                          let parcialRender = montoParcial;
+                          let monedaRender = cot.moneda;
+                          
+                          if (isUF) {
+                            monedaRender = "CLP";
+                            // Si cot.total ya está expresado en CLP en la base de datos (mayor que 1000)
+                            if (cot.total > 1000) {
+                              totalRender = cot.total;
+                              parcialRender = montoParcial;
+                            } else {
+                              // Si está expresado directamente en UF (ej: 11.9 UF)
+                              totalRender = cot.total * ufRate;
+                              parcialRender = montoParcial * ufRate;
+                            }
+                          }
+
                           return (
                             <div
                               key={cot.id}
@@ -979,7 +1000,7 @@ export default function CotizacionesPage() {
                                     Parcial
                                   </span>
                                   <span className="text-xs font-black text-slate-700">
-                                    {fmtMoney(montoParcial, cot.moneda)}
+                                    {fmtMoney(parcialRender, monedaRender)}
                                   </span>
                                 </div>
                                 <div className="text-right">
@@ -987,7 +1008,7 @@ export default function CotizacionesPage() {
                                     Total
                                   </span>
                                   <span className="text-xs font-black text-slate-700">
-                                    {fmtMoney(cot.total, cot.moneda)}
+                                    {fmtMoney(totalRender, monedaRender)}
                                   </span>
                                 </div>
                               </div>
