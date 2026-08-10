@@ -575,44 +575,86 @@ export default function CotizacionDrawerLight({
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-8 space-y-8">
           {/* Totales */}
-          <div className="grid grid-cols-4 gap-4">
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-              <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">
-                Subtotal (Bruto)
-              </p>
-              <p className="text-lg font-bold">{formatMoney(totals.subtotalBruto, c?.moneda)}</p>
-            </div>
+          {(() => {
+            const isForeignCurrency = c?.moneda && String(c.moneda).toUpperCase() !== "CLP";
+            const mUpper = String(c?.moneda || "").toUpperCase();
+            const rate = mUpper === "USD" 
+              ? (Number(c?.valor_dolar_documento) || 950)
+              : (Number(c?.valor_uf_documento) || 37700);
 
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-              <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">
-                Descuento
-              </p>
-              <p className="text-lg font-bold">{formatMoney(totals.descuentoTotal, c?.moneda)}</p>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Glosas: {formatMoney(totals.descGlosasMonto, c?.moneda)} · General: {formatMoney(totals.descGeneralMonto, c?.moneda)}
-                {totals.descGeneralPct > 0 ? ` (${totals.descGeneralPct}%)` : ""}
-              </p>
-            </div>
+            const toCLP = (val) => {
+              if (val == null) return 0;
+              const num = Number(val);
+              if (mUpper === "UF" && num > 1000) return Math.round(num);
+              return Math.round(num * rate);
+            };
 
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-              <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">
-                Subtotal (Neto)
-              </p>
-              <p className="text-lg font-bold">{formatMoney(totals.subtotalNeto, c?.moneda)}</p>
-            </div>
+            return (
+              <div className="grid grid-cols-4 gap-4">
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">
+                    Subtotal (Bruto)
+                  </p>
+                  <p className="text-lg font-bold">{formatMoney(totals.subtotalBruto, c?.moneda)}</p>
+                  {isForeignCurrency && (
+                    <p className="text-xs font-semibold text-emerald-700 mt-0.5">
+                      ~{formatCLP(toCLP(totals.subtotalBruto))} CLP
+                    </p>
+                  )}
+                </div>
 
-            <div className="p-4 bg-blue-600/5 rounded-2xl border border-blue-600/10">
-              <p className="text-[10px] uppercase font-bold text-blue-600/70 mb-1">
-                Total
-              </p>
-              <p className="text-lg font-bold text-blue-600">
-                {formatMoney(totals.total, c?.moneda)}
-              </p>
-              <p className="text-[11px] text-blue-600/70 mt-1">
-                IVA: {c?.sin_iva ? "Exento" : formatMoney(totals.iva, c?.moneda)}
-              </p>
-            </div>
-          </div>
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">
+                    Descuento
+                  </p>
+                  <p className="text-lg font-bold">{formatMoney(totals.descuentoTotal, c?.moneda)}</p>
+                  {isForeignCurrency && (
+                    <p className="text-xs font-semibold text-emerald-700 mt-0.5">
+                      ~{formatCLP(toCLP(totals.descuentoTotal))} CLP
+                    </p>
+                  )}
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Glosas: {formatMoney(totals.descGlosasMonto, c?.moneda)} · General: {formatMoney(totals.descGeneralMonto, c?.moneda)}
+                    {totals.descGeneralPct > 0 ? ` (${totals.descGeneralPct}%)` : ""}
+                  </p>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">
+                    Subtotal (Neto)
+                  </p>
+                  <p className="text-lg font-bold">{formatMoney(totals.subtotalNeto, c?.moneda)}</p>
+                  {isForeignCurrency && (
+                    <p className="text-xs font-semibold text-emerald-700 mt-0.5">
+                      ~{formatCLP(toCLP(totals.subtotalNeto))} CLP
+                    </p>
+                  )}
+                </div>
+
+                <div className="p-4 bg-blue-600/5 rounded-2xl border border-blue-600/10">
+                  <p className="text-[10px] uppercase font-bold text-blue-600/70 mb-1">
+                    Total
+                  </p>
+                  <p className="text-lg font-bold text-blue-600">
+                    {formatMoney(totals.total, c?.moneda)}
+                  </p>
+                  {isForeignCurrency && (
+                    <p className="text-xs font-bold text-emerald-700 mt-0.5">
+                      ~{formatCLP(toCLP(totals.total))} CLP
+                    </p>
+                  )}
+                  <p className="text-[11px] text-blue-600/70 mt-1">
+                    IVA: {c?.sin_iva ? "Exento" : formatMoney(totals.iva, c?.moneda)}
+                    {isForeignCurrency && !c?.sin_iva && (
+                      <span className="block text-emerald-700 font-semibold text-[10px]">
+                        (~{formatCLP(toCLP(totals.iva))} CLP)
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Datos */}
           <div className="grid grid-cols-2 gap-x-12 gap-y-6">
@@ -840,7 +882,13 @@ export default function CotizacionDrawerLight({
                     {c.pagos.map((pago) => (
                       <tr key={pago.id}>
                         <td className="px-4 py-3 font-medium text-slate-700">
-                          {fechaCL(pago.fecha)}
+                          <div>{fechaCL(pago.fecha)}</div>
+                          {pago.is_factoring && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200 mt-0.5">
+                              Factoring
+                              {pago.factoring_descuento_pct ? ` (${pago.factoring_descuento_pct}%)` : ''}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           {pago.comprobante_url ? (
@@ -871,11 +919,15 @@ export default function CotizacionDrawerLight({
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="font-bold text-green-600">{formatMoney(pago.monto, c?.moneda)}</div>
-                          {totals.total > 0 && (
+                          {pago.is_factoring && pago.factoring_descuento_monto > 0 ? (
+                            <div className="text-[10px] text-amber-800 font-medium mt-0.5">
+                              Líquido: {formatMoney(pago.monto - pago.factoring_descuento_monto, c?.moneda)}
+                            </div>
+                          ) : totals.total > 0 ? (
                             <div className="text-[10px] text-slate-400 font-bold mt-0.5">
                               {((pago.monto / totals.total) * 100).toFixed(1)}%
                             </div>
-                          )}
+                          ) : null}
                         </td>
                       </tr>
                     ))}

@@ -30,7 +30,7 @@ function Badge({ children }) {
     label = "Borrador de Servicio";
     cls = "bg-amber-100 text-amber-700";
   } else if (e === "ACEPTADA") {
-    label = "Proyecto Andando";
+    label = "Operativo";
     cls = "bg-emerald-100 text-emerald-700 font-extrabold";
   } else if (e === "RECHAZADA") {
     label = "Servicio Cancelado";
@@ -114,7 +114,7 @@ export default function ServicioArriendoDrawer({
             setSelectedPlanYear(yr);
             return;
           }
-        } catch {}
+        } catch { }
       }
       setSelectedPlanYear(new Date().getFullYear());
     }
@@ -485,7 +485,7 @@ export default function ServicioArriendoDrawer({
 
   const combinedPayments = useMemo(() => {
     const list = [];
-    
+
     // Direct contract payments
     if (Array.isArray(c?.pagos)) {
       c.pagos.forEach(p => {
@@ -497,6 +497,9 @@ export default function ServicioArriendoDrawer({
           desc: p.descripcion || "Pago directo contrato",
           monto: p.monto,
           comprobante_url: p.comprobante_url,
+          is_factoring: p.is_factoring,
+          factoring_descuento_pct: p.factoring_descuento_pct,
+          factoring_descuento_monto: p.factoring_descuento_monto,
         });
       });
     }
@@ -541,6 +544,9 @@ export default function ServicioArriendoDrawer({
               monto: p.monto,
               comprobante_url: p.comprobante_url,
               quoteId: q.id,
+              is_factoring: p.is_factoring,
+              factoring_descuento_pct: p.factoring_descuento_pct,
+              factoring_descuento_monto: p.factoring_descuento_monto,
             });
           });
         }
@@ -913,7 +919,7 @@ export default function ServicioArriendoDrawer({
             </div>
           </div>
 
-          
+
         </div>
 
         {/* Body */}
@@ -926,15 +932,20 @@ export default function ServicioArriendoDrawer({
             </div>
             <div>
               <p className="text-[10px] uppercase font-bold text-blue-500 mb-1 tracking-wider">Tarifa Mensual</p>
-              <p className="text-2xl font-black text-blue-800">
+              <p className="text-2xl font-black text-blue-800 flex flex-wrap items-baseline gap-2">
                 {c?.moneda === "UF"
                   ? `${(totals.iva > 0 ? totals.totalUF : totals.subtotalBrutoUF).toFixed(2)} UF`
                   : formatCLP(totals.total)}
-                {totals.iva > 0 && <span className="text-[10px] text-slate-400 font-normal ml-1">incl.</span>}
+                {c?.moneda === "UF" && (
+                  <span className="text-base font-bold text-emerald-700">
+                    (~{formatCLP(totals.total)} CLP)
+                  </span>
+                )}
+                {totals.iva > 0 && <span className="text-[10px] text-slate-400 font-normal">incl.</span>}
               </p>
               {c?.moneda === "UF" && (
                 <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
-                  Equiv: {formatCLP(totals.total)} CLP (UF ref: {formatCLP(c?.valor_uf_documento ?? 37700)})
+                  Valor UF Ref: {formatCLP(c?.valor_uf_documento ?? valorUF ?? 37700)}
                 </p>
               )}
             </div>
@@ -1078,14 +1089,28 @@ export default function ServicioArriendoDrawer({
                           {cant}
                         </td>
                         <td className="px-4 py-4 text-right font-medium">
-                          {c?.moneda === "UF"
-                            ? `${Number(it.monto_uf).toFixed(2)} UF`
-                            : formatCLP(it.precio_unitario || it.monto)}
+                          {c?.moneda === "UF" ? (
+                            <div>
+                              <span>{Number(it.monto_uf || 0).toFixed(2)} UF</span>
+                              <div className="text-[11px] font-semibold text-emerald-700">
+                                ~{formatCLP(it.precio_unitario || Math.round(Number(it.monto_uf || 0) * (c?.valor_uf_documento || valorUF || 37700)))} CLP
+                              </div>
+                            </div>
+                          ) : (
+                            formatCLP(it.precio_unitario || it.monto)
+                          )}
                         </td>
                         <td className="px-4 py-4 text-right font-bold text-slate-900">
-                          {c?.moneda === "UF"
-                            ? `${(Number(it.monto_uf) * cant).toFixed(2)} UF (~${formatCLP(it.monto)} CLP)`
-                            : formatCLP(it.monto)}
+                          {c?.moneda === "UF" ? (
+                            <div>
+                              <span>{(Number(it.monto_uf || 0) * cant).toFixed(2)} UF</span>
+                              <div className="text-[11px] font-semibold text-emerald-700">
+                                ~{formatCLP(it.monto || Math.round(Number(it.monto_uf || 0) * cant * (c?.valor_uf_documento || valorUF || 37700)))} CLP
+                              </div>
+                            </div>
+                          ) : (
+                            formatCLP(it.monto)
+                          )}
                         </td>
                       </tr>
                     );
@@ -1109,7 +1134,7 @@ export default function ServicioArriendoDrawer({
               <h4 className="text-sm font-bold uppercase tracking-wider text-slate-500">
                 Planificación de Facturación Mensual
               </h4>
-              
+
               {/* Selector de Año con flechas modernas */}
               {(c?.fecha_inicio_plan && c?.fecha_fin_plan) || (c?.proyecto?.fecha_inicio_plan && c?.proyecto?.fecha_fin_plan) ? (
                 <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
@@ -1129,7 +1154,7 @@ export default function ServicioArriendoDrawer({
                 </div>
               ) : null}
             </div>
-            
+
             {(c?.fecha_inicio_plan && c?.fecha_fin_plan) || (c?.proyecto?.fecha_inicio_plan && c?.proyecto?.fecha_fin_plan) ? (
               <div className="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50/50 shadow-sm p-4">
                 {/* Leyenda de Estados */}
@@ -1153,7 +1178,7 @@ export default function ServicioArriendoDrawer({
                   {MESES.map((m) => {
                     const monthVal = m.val;
                     const label = m.label;
-                    
+
                     // Comprobar si está en el periodo
                     const isWithin = (() => {
                       const { startStr, endStr } = planDates;
@@ -1293,7 +1318,13 @@ export default function ServicioArriendoDrawer({
                     {combinedPayments.map((pago) => (
                       <tr key={pago.id} className={pago.type === "invoice" ? "bg-slate-50/30" : ""}>
                         <td className="px-4 py-3 font-medium text-slate-700">
-                          {fechaCL(pago.fecha)}
+                          <div>{fechaCL(pago.fecha)}</div>
+                          {pago.is_factoring && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200 mt-0.5">
+                              Factoring
+                              {pago.factoring_descuento_pct ? ` (${pago.factoring_descuento_pct}%)` : ''}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-600 font-medium">
                           {pago.desc}
@@ -1317,12 +1348,12 @@ export default function ServicioArriendoDrawer({
                               )}
                               {uploadingPagoId === pago.id ? "Subiendo..." : "Subir comprobante"}
                               <input
-                                  type="file"
-                                  className="hidden"
-                                  accept=".pdf,.png,.jpg,.jpeg"
-                                  onChange={(e) => handlePagoUpload(e, pago.id)}
-                                  disabled={uploadingPagoId === pago.id}
-                                />
+                                type="file"
+                                className="hidden"
+                                accept=".pdf,.png,.jpg,.jpeg"
+                                onChange={(e) => handlePagoUpload(e, pago.id)}
+                                disabled={uploadingPagoId === pago.id}
+                              />
                             </label>
                           ) : (
                             <span className="text-xs text-slate-400 italic">Registrado en cotización</span>
@@ -1332,7 +1363,14 @@ export default function ServicioArriendoDrawer({
                           {pago.type === "invoice" ? (
                             <div className="font-semibold text-slate-500">Facturado: {formatCLP(pago.monto)}</div>
                           ) : (
-                            <div className="font-bold text-green-600">Pagado: {formatCLP(pago.monto)}</div>
+                            <>
+                              <div className="font-bold text-green-600">Pagado: {formatCLP(pago.monto)}</div>
+                              {pago.is_factoring && pago.factoring_descuento_monto > 0 && (
+                                <div className="text-[10px] text-amber-800 font-medium mt-0.5">
+                                  Líquido: {formatCLP(pago.monto - pago.factoring_descuento_monto)}
+                                </div>
+                              )}
+                            </>
                           )}
                         </td>
                       </tr>
@@ -1482,7 +1520,7 @@ export default function ServicioArriendoDrawer({
                 <div>
                   <span className="text-xs text-blue-600 font-bold uppercase tracking-wider">Avanzar Proceso</span>
                   <p className="text-sm font-bold text-slate-800 mt-0.5">
-                    Cambiar estado a: <span className="text-blue-600">{siguiente === "ACEPTADA" ? "Proyecto Andando" : siguiente.replaceAll("_", " ")}</span>
+                    Cambiar estado a: <span className="text-blue-600">{siguiente === "ACEPTADA" ? "OPERATIVO" : siguiente.replaceAll("_", " ")}</span>
                   </p>
                 </div>
               </button>

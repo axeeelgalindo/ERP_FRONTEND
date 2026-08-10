@@ -100,7 +100,7 @@ export default function EditServicioArriendoDialog({
     if (!open || !session) return;
     (async () => {
       try {
-        const res = await fetch(`${API_URL}/usuarios`, {
+        const res = await fetch(`${API_URL}/usuarios?pageSize=1000`, {
           headers: makeHeaders(session),
           cache: "no-store",
         });
@@ -499,7 +499,7 @@ export default function EditServicioArriendoDialog({
         es_suscripcion: true, // Forzado a true siempre
         moneda: moneda,
         ciclos_mensuales: Number(ciclosMensuales || 12),
-        valor_uf_manual: valorUFManual ? Number(valorUFManual) : null,
+        valor_uf_manual: valorUFManual ? Number(valorUFManual) : (activeUF || 37700),
         ivaRate: tipoIva === "exento" ? 0 : Number(tasaIva || 19) / 100,
       };
 
@@ -1008,15 +1008,22 @@ export default function EditServicioArriendoDialog({
                                 </td>
                                 <td className="p-3">
                                   {moneda === "UF" ? (
-                                    <input 
-                                      type="number"
-                                      placeholder="0.00"
-                                      value={g.monto_uf ?? ""}
-                                      onChange={(e) => setGlosa(idx, { monto_uf: e.target.value })}
-                                      step="0.01"
-                                      min="0"
-                                      className="w-full bg-[#f1f4f6] border border-slate-200 rounded px-2 py-1 font-mono text-sm text-right"
-                                    />
+                                    <div>
+                                      <input 
+                                        type="number"
+                                        placeholder="0.00"
+                                        value={g.monto_uf ?? ""}
+                                        onChange={(e) => setGlosa(idx, { monto_uf: e.target.value })}
+                                        step="0.01"
+                                        min="0"
+                                        className="w-full bg-[#f1f4f6] border border-slate-200 rounded px-2 py-1 font-mono text-sm text-right"
+                                      />
+                                      {Number(g.monto_uf) > 0 && (
+                                        <div className="text-[10px] text-right font-semibold text-emerald-700 mt-0.5">
+                                          ~{formatCLP(Math.round(Number(g.monto_uf) * activeUF))} CLP
+                                        </div>
+                                      )}
+                                    </div>
                                   ) : (
                                     <input 
                                       type="number"
@@ -1028,9 +1035,14 @@ export default function EditServicioArriendoDialog({
                                   )}
                                 </td>
                                 <td className="p-3 text-right">
-                                  <span className="font-mono text-sm text-slate-500">
+                                  <div className="font-mono text-sm font-bold text-slate-800">
                                     {formatCLP(cg.grossMonto || 0)}
-                                  </span>
+                                  </div>
+                                  {moneda === "UF" && Number(cg.grossMontoUf) > 0 && (
+                                    <div className="text-[10px] font-mono text-blue-700">
+                                      ({Number(cg.grossMontoUf).toFixed(2)} UF)
+                                    </div>
+                                  )}
                                 </td>
                                 <td className="p-3 text-center">
                                   <button 
@@ -1059,7 +1071,7 @@ export default function EditServicioArriendoDialog({
                         {moneda === "UF" ? (
                           <>
                             {glosasOk
-                              ? `✅ Tarifa Mensual: ${Number(subtotalNetoUF).toFixed(2)} UF (+ IVA: ${Number(ivaUF).toFixed(2)} UF) = ${Number(totalMensualUF).toFixed(2)} UF (~${formatCLP(totalMensual)} CLP total con IVA) mensual por ${ciclosMensuales} meses.`
+                              ? `✅ Tarifa Mensual: ${Number(subtotalNetoUF).toFixed(2)} UF (~${formatCLP(subtotalNeto)} CLP) (+ IVA: ${Number(ivaUF).toFixed(2)} UF ~${formatCLP(ivaMonto)} CLP) = ${Number(totalMensualUF).toFixed(2)} UF (~${formatCLP(totalMensual)} CLP total con IVA) mensual por ${ciclosMensuales} meses.`
                               : "Revisa que las tarifas en UF sean mayores a 0."}
                           </>
                         ) : (

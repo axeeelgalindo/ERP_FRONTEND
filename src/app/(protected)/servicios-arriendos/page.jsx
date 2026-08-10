@@ -594,7 +594,7 @@ export default function ServiciosArriendosPage() {
             >
               <option value="">Todos los estados</option>
               <option value="COTIZACION">Borrador de Servicio</option>
-              <option value="ACEPTADA">Proyecto Andando</option>
+              <option value="ACEPTADA">OPERATIVO</option>
               <option value="RECHAZADA">Servicio Cancelado</option>
               <option value="FACTURADA">Facturada</option>
               <option value="PAGADA">Pagada</option>
@@ -632,33 +632,29 @@ export default function ServiciosArriendosPage() {
           <nav className="flex bg-slate-200/60 p-1 rounded-xl w-full md:w-auto">
             <button
               onClick={() => handleScaleSelect("todo")}
-              className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-semibold transition ${
-                periodo === "todo" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}
+              className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-semibold transition ${periodo === "todo" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
             >
               Todos
             </button>
             <button
               onClick={() => handleScaleSelect("semanal")}
-              className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-semibold transition ${
-                periodo === "semanal" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}
+              className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-semibold transition ${periodo === "semanal" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
             >
               Semana
             </button>
             <button
               onClick={() => handleScaleSelect("mensual")}
-              className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-semibold transition ${
-                periodo === "mensual" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}
+              className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-semibold transition ${periodo === "mensual" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
             >
               Mes
             </button>
             <button
               onClick={() => handleScaleSelect("anual")}
-              className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-semibold transition ${
-                periodo === "anual" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}
+              className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-semibold transition ${periodo === "anual" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
             >
               Año
             </button>

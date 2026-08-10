@@ -48,6 +48,50 @@ function getSiguienteEstado(c) {
   return c?.estado === "COTIZACION" ? "ACEPTADA" : null;
 }
 
+function renderMoneyWithCLP(value, moneda = "CLP", valorUf = null, valorDolar = null) {
+  if (value == null || Number.isNaN(Number(value))) return "-";
+
+  const m = String(moneda || "CLP").toUpperCase();
+  const numVal = Number(value);
+
+  if (m === "USD") {
+    const usdRate = Number(valorDolar) || 950;
+    const clpVal = Math.round(numVal * usdRate);
+    return (
+      <div className="flex flex-col items-end">
+        <span className="font-bold text-slate-800">
+          US$ {numVal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+        <span className="text-[11px] font-semibold text-emerald-700">
+          ~{formatCLP(clpVal)} CLP
+        </span>
+      </div>
+    );
+  }
+
+  if (m === "UF") {
+    const ufRate = Number(valorUf) || 37700;
+    const clpVal = numVal > 1000 ? numVal : Math.round(numVal * ufRate);
+    const ufVal = numVal > 1000 ? (numVal / ufRate) : numVal;
+    return (
+      <div className="flex flex-col items-end">
+        <span className="font-bold text-blue-800">
+          UF {ufVal.toLocaleString("es-CL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+        <span className="text-[11px] font-semibold text-emerald-700">
+          ~{formatCLP(clpVal)} CLP
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <span className="font-semibold text-slate-800">
+      {formatCLP(numVal)}
+    </span>
+  );
+}
+
 export default function CotizacionesTableLight({
   cotizaciones = [],
   onRowClick,
@@ -132,15 +176,15 @@ export default function CotizacionesTableLight({
                   </td>
 
                   <td className="px-6 py-4 text-sm text-right font-medium">
-                    {formatMoney(c.subtotal, c.moneda)}
+                    {renderMoneyWithCLP(c.subtotal, c.moneda, c.valor_uf_documento, c.valor_dolar_documento)}
                   </td>
 
                   <td className="px-6 py-4 text-sm text-right text-slate-600">
-                    {formatMoney(c.iva, c.moneda)}
+                    {renderMoneyWithCLP(c.iva, c.moneda, c.valor_uf_documento, c.valor_dolar_documento)}
                   </td>
 
                   <td className="px-6 py-4 text-sm text-right font-bold">
-                    {formatMoney(c.total, c.moneda)}
+                    {renderMoneyWithCLP(c.total, c.moneda, c.valor_uf_documento, c.valor_dolar_documento)}
                   </td>
 
                   <td className="px-6 py-4 text-center">

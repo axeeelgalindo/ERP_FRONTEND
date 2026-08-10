@@ -154,6 +154,16 @@ export default function ComprasTable({
                 // “numero” ya lo usas como correlativo
                 const numero = c?.numero ?? c?.n ?? idx + 1;
 
+                const isProyectoAssigned = Boolean(
+                  c?.proyecto_id ||
+                  c?.proyectoId ||
+                  (c?.proyecto && c?.proyecto?.nombre && c?.proyecto?.nombre !== "—" && c?.proyecto?.nombre !== "-")
+                );
+
+                const isAssigned = (c?.destino === "PROYECTO" && isProyectoAssigned) ||
+                  c?.destino === "TALLER" ||
+                  c?.destino === "ADMINISTRACION";
+
                 return (
                   <tr
                     key={c.id}
@@ -198,43 +208,49 @@ export default function ComprasTable({
                     </td>
 
                     <td className="px-3 lg:px-4 py-3 lg:py-3.5">
-                      <div className="flex items-center">
-                        <button
-                          type="button"
-                          onClick={() => onOpenImputacion?.(c)}
-                          className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all border hover:opacity-85 ${
-                            c?.destino === "PROYECTO"
-                              ? "bg-blue-50 text-blue-700 border-blue-200 hover:border-blue-300"
-                              : c?.destino === "TALLER"
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:border-emerald-300"
-                                : c?.destino === "ADMINISTRACION"
-                                  ? "bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-300"
-                                  : "bg-slate-50 text-slate-400 border-dashed border-slate-300 hover:border-slate-400"
-                          }`}
-                          title={
-                            c?.destino === "PROYECTO"
-                              ? `Proyecto: ${proyecto}`
-                              : c?.destino === "TALLER"
-                                ? `Taller (${c.centro_costo || "S/CC"})`
-                                : c?.destino === "ADMINISTRACION"
-                                  ? `Admin (${c.centro_costo || "S/CC"})`
-                                  : "No imputado"
+                      {(() => {
+                        const getDestinoLabel = () => {
+                          if (c?.destino === "PROYECTO") return `Proyecto: ${proyecto}`;
+                          const prefix = c?.destino === "TALLER" ? "Taller" : c?.destino === "ADMINISTRACION" ? "Admin" : "";
+                          if (!prefix) return "No imputado";
+                          const cc = c.centro_costo || "S/CC";
+                          if (c.sub_destino === "PROYECTO_INTERNO" && c.proyecto_interno) {
+                            return `${prefix} (${cc}) - Proy: ${c.proyecto_interno}`;
                           }
-                        >
-                          <span className="max-w-[120px] xl:max-w-[185px] truncate">
-                            {c?.destino === "PROYECTO"
-                              ? `Proyecto: ${proyecto}`
-                              : c?.destino === "TALLER"
-                                ? `Taller (${c.centro_costo || "S/CC"})`
-                                : c?.destino === "ADMINISTRACION"
-                                  ? `Admin (${c.centro_costo || "S/CC"})`
-                                  : "No imputado"}
-                          </span>
-                          <span className="material-symbols-outlined text-[10px] ml-1.5 opacity-60">
-                            edit
-                          </span>
-                        </button>
-                      </div>
+                          if (c.sub_destino === "EPP") {
+                            return `${prefix} (${cc}) - EPP${c.comentario_destino ? `: ${c.comentario_destino}` : ""}`;
+                          }
+                          if (c.sub_destino === "INSUMOS") {
+                            return `${prefix} (${cc}) - Insumos${c.comentario_destino ? `: ${c.comentario_destino}` : ""}`;
+                          }
+                          return `${prefix} (${cc})`;
+                        };
+                        const destLabel = getDestinoLabel();
+
+                        return (
+                          <div className="flex items-center">
+                            <button
+                              type="button"
+                              onClick={() => onOpenImputacion?.(c)}
+                              className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all border hover:opacity-85 ${
+                                isAssigned
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:border-emerald-300"
+                                  : c?.destino === "PROYECTO" || !c?.destino
+                                    ? "bg-blue-50 text-blue-700 border-blue-200 hover:border-blue-300"
+                                    : "bg-slate-50 text-slate-400 border-dashed border-slate-300 hover:border-slate-400"
+                              }`}
+                              title={destLabel}
+                            >
+                              <span className="max-w-[140px] xl:max-w-[210px] truncate">
+                                {destLabel}
+                              </span>
+                              <span className="material-symbols-outlined text-[10px] ml-1.5 opacity-60">
+                                edit
+                              </span>
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     <td className="px-3 lg:px-4 py-3 lg:py-3.5 text-center">

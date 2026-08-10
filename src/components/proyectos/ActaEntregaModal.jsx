@@ -124,7 +124,7 @@ export default function ActaEntregaModal({ open, onClose, proyecto }) {
     const fetchEmpleados = async () => {
       try {
         const API_URL = process.env.NEXT_PUBLIC_API_URL;
-        const res = await fetch(`${API_URL}/usuarios`, {
+        const res = await fetch(`${API_URL}/usuarios?pageSize=1000`, {
           headers: makeHeaders(session),
           cache: "no-store",
         });
@@ -1074,8 +1074,13 @@ export default function ActaEntregaModal({ open, onClose, proyecto }) {
                         onChange={e => {
                           setEmpresaResp(e.target.value);
                           setFirmaEmisorNombre(e.target.value);
+                          const matched = empleados.find(emp => formatNombreEmpleado(emp.nombre) === e.target.value);
+                          if (matched) {
+                            const cargoFound = matched.empleado?.cargo || matched.rol?.nombre || "Responsable entrega";
+                            setFirmaEmisorCargo(cargoFound);
+                          }
                         }}
-                        className="w-full rounded-lg border-[#c1c6d7] p-2 bg-[#f1f4f9] focus:bg-white text-sm"
+                        className="w-full rounded-lg border-[#c1c6d7] p-2 bg-[#f1f4f9] focus:bg-white text-sm font-medium"
                       >
                         <option value="">Seleccione un responsable...</option>
                         {empresaResp && !new Set(empleados.map(e => formatNombreEmpleado(e.nombre))).has(empresaResp) && (
@@ -1083,9 +1088,10 @@ export default function ActaEntregaModal({ open, onClose, proyecto }) {
                         )}
                         {empleados.map(emp => {
                           const formatted = formatNombreEmpleado(emp.nombre);
+                          const detail = emp.empleado?.cargo || emp.rol?.nombre || emp.correo;
                           return (
                             <option key={emp.id} value={formatted}>
-                              {formatted} ({emp.email || emp.username})
+                              {formatted}{detail ? ` (${detail})` : ""}
                             </option>
                           );
                         })}

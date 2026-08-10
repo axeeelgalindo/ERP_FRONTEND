@@ -13,7 +13,7 @@ function EstadoBadge({ estado }) {
     label = "Borrador de Servicio";
     cls = "bg-amber-100 text-amber-700";
   } else if (e === "ACEPTADA") {
-    label = "Proyecto Andando";
+    label = "OPERATIVO";
     cls = "bg-emerald-100 text-emerald-700 font-extrabold";
   } else if (e === "RECHAZADA") {
     label = "Servicio Cancelado";
@@ -39,17 +39,31 @@ export default function ServiciosArriendosTable({
   const formatTarifa = (c) => {
     const totalUF = (c.glosas || []).reduce((acc, g) => acc + Number(g.monto_uf || 0), 0);
     const hasIva = c.iva && c.iva > 0;
+    const ufRate = Number(c.valor_uf_documento) || 37700;
 
     if (c.moneda === "UF") {
-      if (!hasIva) {
-        return `${totalUF.toFixed(2)} UF`;
-      }
       const rate = c.subtotal > 0 ? (c.iva / c.subtotal) : 0.19;
-      const grossUF = totalUF * (1 + rate);
+      const grossUF = hasIva ? totalUF * (1 + rate) : totalUF;
+      const grossCLP = c.total && c.total > grossUF ? c.total : Math.round(grossUF * ufRate);
+      const netCLP = c.subtotal && c.subtotal > totalUF ? c.subtotal : Math.round(totalUF * ufRate);
+
+      if (!hasIva) {
+        return (
+          <div className="flex flex-col items-end">
+            <span className="font-bold text-blue-800">{totalUF.toFixed(2)} UF</span>
+            <span className="text-[11px] font-semibold text-emerald-700">~{formatCLP(netCLP)} CLP</span>
+          </div>
+        );
+      }
       return (
         <div className="flex flex-col items-end">
-          <span className="font-bold text-blue-800">{grossUF.toFixed(2)} UF <span className="text-[10px] text-slate-500 font-normal">incl.</span></span>
-          <span className="text-[11px] text-slate-400 font-normal">Neto: {totalUF.toFixed(2)} UF</span>
+          <span className="font-bold text-blue-800">
+            {grossUF.toFixed(2)} UF <span className="text-[10px] text-slate-500 font-normal">incl.</span>
+          </span>
+          <span className="text-[11px] font-semibold text-emerald-700">
+            ~{formatCLP(grossCLP)} CLP
+          </span>
+          <span className="text-[10px] text-slate-400 font-normal">Neto: {totalUF.toFixed(2)} UF (~{formatCLP(netCLP)})</span>
         </div>
       );
     }

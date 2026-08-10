@@ -46,7 +46,16 @@ export default function CotizacionesSummary({ cotizaciones, filterEstado }) {
 
       countCotizaciones++;
 
-      const cTotal = Number(c.total || 0);
+      let cTotal = Number(c.total || 0);
+      const mUpper = String(c.moneda || "").toUpperCase();
+      if (mUpper === "UF") {
+        const ufRate = Number(c.valor_uf_documento) || 37700;
+        cTotal = cTotal > 1000 ? cTotal : cTotal * ufRate;
+      } else if (mUpper === "USD") {
+        const usdRate = Number(c.valor_dolar_documento) || 950;
+        cTotal = cTotal * usdRate;
+      }
+
       // COT con OC: cualquier estado diferente de COTIZACION y RECHAZADA (aceptadas/orden de venta/etc.)
       const hasOC = c.estado !== "COTIZACION" && c.estado !== "RECHAZADA";
 
