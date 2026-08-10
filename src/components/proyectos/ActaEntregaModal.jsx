@@ -42,7 +42,7 @@ export default function ActaEntregaModal({ open, onClose, proyecto }) {
   const [empresaRut, setEmpresaRut] = useState("78.115.957-3");
   const [empresaDir, setEmpresaDir] = useState("Av. San Agustín S/N, La Paloma PC #38, Puerto Montt");
   const [empresaSucursal, setEmpresaSucursal] = useState("Av. San Agustín S/N, La Paloma PC #38, Puerto Montt");
-  const [empresaResp, setEmpresaResp] = useState("Alexander Contreras Marín");
+  const [empresaResp, setEmpresaResp] = useState("");
 
   // 2. Receptor (Cliente)
   const [clienteRazon, setClienteRazon] = useState("");
@@ -105,8 +105,8 @@ export default function ActaEntregaModal({ open, onClose, proyecto }) {
     "El receptor declara haber recibido los bienes, equipos, documentos o servicios descritos en esta acta. La recepción se entiende conforme, salvo las observaciones y pendientes expresamente registrados en los puntos 5 y 6."
   );
 
-  const [firmaEmisorNombre, setFirmaEmisorNombre] = useState("Alexander Contreras Marín");
-  const [firmaEmisorCargo, setFirmaEmisorCargo] = useState("Responsable entrega");
+  const [firmaEmisorNombre, setFirmaEmisorNombre] = useState("");
+  const [firmaEmisorCargo, setFirmaEmisorCargo] = useState("");
   const [firmaEmisorRut, setFirmaEmisorRut] = useState("78.115.957-3");
 
   const [firmaReceptorNombre, setFirmaReceptorNombre] = useState("");
@@ -162,6 +162,9 @@ export default function ActaEntregaModal({ open, onClose, proyecto }) {
     setStep(1);
     setIsActaFinalizada(false);
     setIsFinishing(false);
+    setEmpresaResp("");
+    setFirmaEmisorNombre("");
+    setFirmaEmisorCargo("");
 
     const today = new Date().toLocaleDateString("es-CL");
     setFecha(today);
@@ -1088,6 +1091,7 @@ export default function ActaEntregaModal({ open, onClose, proyecto }) {
                         )}
                         {empleados
                           .filter(emp => emp.nombre && !emp.nombre.toLowerCase().includes("administrador"))
+                          .filter(emp => emp.eliminado !== true && emp.empleado?.activo !== false && emp.empleado?.eliminado !== true)
                           .map(emp => {
                             const formatted = formatNombreEmpleado(emp.nombre);
                             return { id: emp.id, formatted };
