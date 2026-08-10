@@ -124,7 +124,7 @@ export default function ActaEntregaModal({ open, onClose, proyecto }) {
     const fetchEmpleados = async () => {
       try {
         const API_URL = process.env.NEXT_PUBLIC_API_URL;
-        const res = await fetch(`${API_URL}/usuarios?pageSize=1000`, {
+        const res = await fetch(`${API_URL}/usuarios?all=true&pageSize=100`, {
           headers: makeHeaders(session),
           cache: "no-store",
         });
@@ -1086,15 +1086,18 @@ export default function ActaEntregaModal({ open, onClose, proyecto }) {
                         {empresaResp && !new Set(empleados.map(e => formatNombreEmpleado(e.nombre))).has(empresaResp) && (
                           <option value={empresaResp}>{empresaResp}</option>
                         )}
-                        {empleados.map(emp => {
-                          const formatted = formatNombreEmpleado(emp.nombre);
-                          const detail = emp.empleado?.cargo || emp.rol?.nombre || emp.correo;
-                          return (
-                            <option key={emp.id} value={formatted}>
-                              {formatted}{detail ? ` (${detail})` : ""}
+                        {empleados
+                          .filter(emp => emp.nombre && !emp.nombre.toLowerCase().includes("administrador"))
+                          .map(emp => {
+                            const formatted = formatNombreEmpleado(emp.nombre);
+                            return { id: emp.id, formatted };
+                          })
+                          .filter((item, index, self) => index === self.findIndex(t => t.formatted.toLowerCase() === item.formatted.toLowerCase()))
+                          .map(item => (
+                            <option key={item.id} value={item.formatted}>
+                              {item.formatted}
                             </option>
-                          );
-                        })}
+                          ))}
                       </select>
                     </div>
                   </div>

@@ -142,7 +142,7 @@ export default function EditCotizacionDialog({
     if (!open || !session) return;
     (async () => {
       try {
-        const res = await fetch(`${API_URL}/usuarios?pageSize=1000`, {
+        const res = await fetch(`${API_URL}/usuarios?all=true&pageSize=100`, {
           headers: makeHeaders(session),
           cache: "no-store",
         });
