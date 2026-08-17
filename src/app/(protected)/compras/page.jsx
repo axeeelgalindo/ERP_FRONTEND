@@ -238,6 +238,7 @@ export default function ComprasPage() {
   // lookups
   const [proveedores, setProveedores] = useState([]);
   const [proyectos, setProyectos] = useState([]);
+  const [servicios, setServicios] = useState([]);
   const [lookupsLoading, setLookupsLoading] = useState(false);
   const [lookupsErr, setLookupsErr] = useState("");
 
@@ -369,18 +370,22 @@ export default function ComprasPage() {
       setLookupsLoading(true);
       setLookupsErr("");
 
-      const [rProv, rProy] = await Promise.all([
+      const [rProv, rProy, rCot] = await Promise.all([
         fetch(`${API}/proveedores?page=1&pageSize=100`, {
           headers: makeHeadersJson(session),
         }),
         fetch(`${API}/proyectos?page=1&pageSize=100`, {
           headers: makeHeadersJson(session),
         }),
+        fetch(`${API}/cotizaciones`, {
+          headers: makeHeadersJson(session),
+        }),
       ]);
 
-      const [pProv, pProy] = await Promise.all([
+      const [pProv, pProy, pCot] = await Promise.all([
         jsonOrNull(rProv),
         jsonOrNull(rProy),
+        jsonOrNull(rCot),
       ]);
 
       if (!rProv.ok)
@@ -398,9 +403,16 @@ export default function ComprasPage() {
       const proyArr = Array.isArray(pProy)
         ? pProy
         : pProy?.items || pProy?.rows || pProy?.data || [];
+      const cotArr = Array.isArray(pCot)
+        ? pCot
+        : pCot?.items || pCot?.rows || pCot?.data || [];
+      const servArr = cotArr.filter(
+        (c) => c.es_suscripcion && !c.eliminado
+      );
 
       setProveedores(provArr);
       setProyectos(proyArr);
+      setServicios(servArr);
     } catch (e) {
       setLookupsErr(e?.message || "Error en lookups");
     } finally {
@@ -1170,6 +1182,7 @@ export default function ComprasPage() {
         }
         proveedores={proveedores}
         proyectos={proyectos}
+        servicios={servicios}
         lookupsLoading={lookupsLoading}
         onAddProveedorClick={() => {
           setQuickProvErr("");
@@ -1197,6 +1210,7 @@ export default function ComprasPage() {
         }
         proveedores={proveedores}
         proyectos={proyectos}
+        servicios={servicios}
         lookupsLoading={lookupsLoading}
         onAddProveedorClick={() => {
           setQuickProvErr("");
@@ -1247,6 +1261,7 @@ export default function ComprasPage() {
         }}
         compraSel={compraImputacionSel}
         proyectos={proyectos}
+        servicios={servicios}
         onSave={saveImputacion}
         saving={savingImputacion}
         error={imputacionErr}

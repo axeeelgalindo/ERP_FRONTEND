@@ -40,9 +40,8 @@ export default function EmpleadoFormModal({
   onClose,
   onSave,
   saving,
+  empleadosList = [],
 }) {
-  if (!open) return null;
-
   const [roles, setRoles] = useState([]);
   const [rolesLoading, setRolesLoading] = useState(false);
 
@@ -57,6 +56,8 @@ export default function EmpleadoFormModal({
   const [newCorreo, setNewCorreo] = useState("");
   const [newRolId, setNewRolId] = useState("");
   const [newPassword, setNewPassword] = useState("");
+
+  const [jefesDisponibles, setJefesDisponibles] = useState([]);
 
   const hasUsuario = Boolean(currentEmp?.usuario?.id);
 
@@ -105,6 +106,39 @@ export default function EmpleadoFormModal({
     currentEmp?.usuario?.correo,
   ]);
 
+  // Cargar lista de empleados para jefaturas (independiente de roles)
+  useEffect(() => {
+    if (!open) return;
+
+    if (Array.isArray(empleadosList) && empleadosList.length > 0) {
+      setJefesDisponibles(empleadosList.filter((x) => x.id !== currentEmp?.id));
+    }
+
+    if (!session) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/empleados?pageSize=500&activo=true`, {
+          headers: makeHeaders(session),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const items = json.items || json.data || [];
+          if (!cancelled && items.length > 0) {
+            setJefesDisponibles(items.filter((x) => x.id !== currentEmp?.id));
+          }
+        }
+      } catch (err) {
+        console.error("Error cargando lista de jefaturas:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, session, currentEmp?.id, empleadosList]);
+
   // Cargar roles
   useEffect(() => {
     if (!open) return;
@@ -141,6 +175,8 @@ export default function EmpleadoFormModal({
     const empleadoPatch = {
       cargo: currentEmp?.cargo ?? "",
       telefono: currentEmp?.telefono ?? "",
+      jefe_id: currentEmp?.jefe_id || null,
+      sede: currentEmp?.sede || "PMC",
       fecha_ingreso: currentEmp?.fecha_ingreso || null,
       sueldo_base: currentEmp?.sueldo_base ?? 0,
       activo: !!currentEmp?.activo,
@@ -217,6 +253,8 @@ export default function EmpleadoFormModal({
     () => buildDisplayName(newApellidos, newNombres),
     [newApellidos, newNombres]
   );
+
+  if (!open) return null;
 
   return (
     <Modal
@@ -399,7 +437,7 @@ export default function EmpleadoFormModal({
 
           {/* Datos del empleado */}
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
+            <div>
               <label className="mb-1 block text-xs font-medium text-gray-700">
                 Cargo
               </label>
@@ -415,6 +453,48 @@ export default function EmpleadoFormModal({
                 className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 placeholder="Ej: Jefe de proyecto"
               />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">
+                Jefatura a Cargo (Líder de Equipo)
+              </label>
+              <select
+                value={currentEmp.jefe_id || ""}
+                onChange={(e) =>
+                  onChangeCurrentEmp((prev) => ({
+                    ...prev,
+                    jefe_id: e.target.value || null,
+                  }))
+                }
+                className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+              >
+                <option value="">Sin jefatura (Líder / Directivo)</option>
+                {jefesDisponibles.map((j) => (
+                  <option key={j.id} value={j.id}>
+                    {j.usuario?.nombre || j.cargo || "Empleado"} {j.cargo ? `(${j.cargo})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">
+                Sede / Ciudad Base
+              </label>
+              <select
+                value={currentEmp.sede || "PMC"}
+                onChange={(e) =>
+                  onChangeCurrentEmp((prev) => ({
+                    ...prev,
+                    sede: e.target.value,
+                  }))
+                }
+                className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+              >
+                <option value="PMC">Puerto Montt (PMC)</option>
+                <option value="PUQ">Punta Arenas (PUQ)</option>
+              </select>
             </div>
 
             <div>

@@ -78,6 +78,7 @@ export default function Sidebar() {
         children: [
           { href: "/proyectos", label: "Proyectos", icon: "account_tree", roles: ["superadmin", "admin"] },
           { href: "/kanban", label: "Kanban", icon: "view_kanban", roles: ["superadmin", "admin", "user", "empleado"] },
+          { href: "/reportes/tareas-completadas", label: "Reporte de Tareas", icon: "assignment_turned_in", roles: ["superadmin", "admin", "user", "empleado"] },
           { href: "/hh", label: "HH", icon: "timer", roles: ["superadmin", "admin"] },
         ],
       },

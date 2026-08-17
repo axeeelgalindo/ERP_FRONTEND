@@ -18,6 +18,7 @@ export default function AsignarImputacionModal({
   onClose,
   compraSel,
   proyectos = [],
+  servicios = [],
   onSave,
   saving = false,
   error = "",
@@ -25,6 +26,7 @@ export default function AsignarImputacionModal({
   const [destino, setDestino] = useState("PROYECTO");
   const [centroCosto, setCentroCosto] = useState("");
   const [proyectoId, setProyectoId] = useState("");
+  const [servicioId, setServicioId] = useState("");
 
   const [subDestino, setSubDestino] = useState("GENERAL");
   const [proyectoInternoSel, setProyectoInternoSel] = useState("");
@@ -37,9 +39,17 @@ export default function AsignarImputacionModal({
   // Cargar datos actuales de la compra al abrir
   useEffect(() => {
     if (open && compraSel) {
-      setDestino(compraSel.destino || "PROYECTO");
+      const isServ = compraSel.destino === "SERVICIO" || (compraSel.cotizacion?.es_suscripcion && compraSel.cotizacionId);
+      if (isServ) {
+        setDestino("SERVICIO");
+        setServicioId(compraSel.cotizacionId || compraSel.cotizacion?.id || "");
+        setProyectoId(compraSel.proyecto_id || "");
+      } else {
+        setDestino(compraSel.destino || "PROYECTO");
+        setProyectoId(compraSel.proyecto_id || "");
+        setServicioId("");
+      }
       setCentroCosto(compraSel.centro_costo || "");
-      setProyectoId(compraSel.proyecto_id || "");
 
       const currentSub = compraSel.sub_destino || "GENERAL";
       setSubDestino(currentSub);
@@ -78,6 +88,25 @@ export default function AsignarImputacionModal({
         destino: "PROYECTO",
         centro_costo: null,
         proyecto_id: proyectoId,
+        cotizacionId: null,
+        sub_destino: null,
+        proyecto_interno: null,
+        comentario_destino: null,
+      });
+      return;
+    }
+
+    if (destino === "SERVICIO") {
+      if (!servicioId) {
+        setValidationErr("Debe seleccionar un servicio recurrente.");
+        return;
+      }
+      const servSel = servicios.find((s) => s.id === servicioId);
+      onSave({
+        destino: "SERVICIO",
+        centro_costo: null,
+        cotizacionId: servicioId,
+        proyecto_id: servSel?.proyecto_id || null,
         sub_destino: null,
         proyecto_interno: null,
         comentario_destino: null,
@@ -119,6 +148,7 @@ export default function AsignarImputacionModal({
       destino,
       centro_costo: centroCosto,
       proyecto_id: null,
+      cotizacionId: null,
       sub_destino: subDestino,
       proyecto_interno: subDestino === "PROYECTO_INTERNO" ? finalProyectoInterno : null,
       comentario_destino: (subDestino === "EPP" || subDestino === "INSUMOS") ? finalComentario : null,
@@ -170,9 +200,10 @@ export default function AsignarImputacionModal({
 
         <div className="flex flex-col gap-2">
           <label className="text-xs font-bold text-slate-700">Imputación / Destino Principal *</label>
-          <div className="grid grid-cols-3 gap-2 mt-1">
+          <div className="grid grid-cols-4 gap-2 mt-1">
             {[
               { val: "PROYECTO", lab: "Proyecto", icon: "construction" },
+              { val: "SERVICIO", lab: "Servicio", icon: "room_service" },
               { val: "TALLER", lab: "Taller", icon: "precision_manufacturing" },
               { val: "ADMINISTRACION", lab: "Admin", icon: "corporate_fare" },
             ].map((opt) => (
@@ -181,10 +212,18 @@ export default function AsignarImputacionModal({
                 type="button"
                 onClick={() => {
                   setDestino(opt.val);
-                  if (opt.val !== "PROYECTO") setProyectoId("");
-                  else setCentroCosto("");
+                  if (opt.val === "PROYECTO") {
+                    setCentroCosto("");
+                    setServicioId("");
+                  } else if (opt.val === "SERVICIO") {
+                    setCentroCosto("");
+                    setProyectoId("");
+                  } else {
+                    setProyectoId("");
+                    setServicioId("");
+                  }
                 }}
-                className={`flex flex-col items-center justify-center p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
+                className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all cursor-pointer ${
                   destino === opt.val
                     ? "bg-indigo-50/70 text-[#1e3a8a] border-[#1e3a8a] shadow-sm font-bold"
                     : "bg-slate-50 text-slate-600 border-transparent hover:border-slate-200"
@@ -217,6 +256,30 @@ export default function AsignarImputacionModal({
                 </option>
               ))}
             </select>
+          </div>
+        ) : destino === "SERVICIO" ? (
+          <div className="flex flex-col gap-1.5 mt-1">
+            <label className="text-xs font-bold text-slate-700">Servicio Recurrente de Destino *</label>
+            <select
+              className="w-full h-11 px-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-900 focus:border-[#1e3a8a] text-xs transition-all outline-none"
+              value={servicioId}
+              onChange={(e) => setServicioId(e.target.value)}
+            >
+              <option value="">Seleccione servicio recurrente...</option>
+              {servicios.map((s) => {
+                const num = s.numero ? (s.numero >= 1000000 ? s.numero - 1000000 : s.numero) : "—";
+                const clienteNom = s.cliente?.nombre || "Sin cliente";
+                const asunto = s.asunto || "Servicio Activo";
+                return (
+                  <option key={s.id} value={s.id}>
+                    #{num} · {asunto} ({clienteNom})
+                  </option>
+                );
+              })}
+            </select>
+            <p className="text-[11px] text-slate-500 mt-1">
+              Las compras imputadas a este servicio se cargarán directamente a sus costos operativos continuos.
+            </p>
           </div>
         ) : (
           <div className="flex flex-col gap-4 mt-1">

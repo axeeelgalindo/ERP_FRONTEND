@@ -160,7 +160,14 @@ export default function ComprasTable({
                   (c?.proyecto && c?.proyecto?.nombre && c?.proyecto?.nombre !== "—" && c?.proyecto?.nombre !== "-")
                 );
 
+                const isServicioAssigned = Boolean(
+                  c?.cotizacionId ||
+                  c?.cotizacion?.id ||
+                  (c?.cotizacion && c?.cotizacion?.numero)
+                );
+
                 const isAssigned = (c?.destino === "PROYECTO" && isProyectoAssigned) ||
+                  (c?.destino === "SERVICIO" && isServicioAssigned) ||
                   c?.destino === "TALLER" ||
                   c?.destino === "ADMINISTRACION";
 
@@ -211,6 +218,13 @@ export default function ComprasTable({
                       {(() => {
                         const getDestinoLabel = () => {
                           if (c?.destino === "PROYECTO") return `Proyecto: ${proyecto}`;
+                          if (c?.destino === "SERVICIO") {
+                            const num = c.cotizacion?.numero
+                              ? (c.cotizacion.numero >= 1000000 ? c.cotizacion.numero - 1000000 : c.cotizacion.numero)
+                              : "—";
+                            const asunto = c.cotizacion?.asunto || c.cotizacion?.cliente?.nombre || "Servicio Activo";
+                            return `Servicio #${num}: ${asunto}`;
+                          }
                           const prefix = c?.destino === "TALLER" ? "Taller" : c?.destino === "ADMINISTRACION" ? "Admin" : "";
                           if (!prefix) return "No imputado";
                           const cc = c.centro_costo || "S/CC";
@@ -233,11 +247,13 @@ export default function ComprasTable({
                               type="button"
                               onClick={() => onOpenImputacion?.(c)}
                               className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all border hover:opacity-85 ${
-                                isAssigned
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:border-emerald-300"
-                                  : c?.destino === "PROYECTO" || !c?.destino
-                                    ? "bg-blue-50 text-blue-700 border-blue-200 hover:border-blue-300"
-                                    : "bg-slate-50 text-slate-400 border-dashed border-slate-300 hover:border-slate-400"
+                                c?.destino === "SERVICIO"
+                                  ? "bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-300"
+                                  : isAssigned
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:border-emerald-300"
+                                    : c?.destino === "PROYECTO" || !c?.destino
+                                      ? "bg-blue-50 text-blue-700 border-blue-200 hover:border-blue-300"
+                                      : "bg-slate-50 text-slate-400 border-dashed border-slate-300 hover:border-slate-400"
                               }`}
                               title={destLabel}
                             >

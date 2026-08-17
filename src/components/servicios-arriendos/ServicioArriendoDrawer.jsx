@@ -621,6 +621,14 @@ export default function ServicioArriendoDrawer({
     };
   }, [c, glosas, combinedPayments]);
 
+  const comprasList = useMemo(() => {
+    return Array.isArray(c?.compras) ? c.compras : [];
+  }, [c?.compras]);
+
+  const totalCompras = useMemo(() => {
+    return comprasList.reduce((acc, comp) => acc + Number(comp.total || 0), 0);
+  }, [comprasList]);
+
   const planDates = useMemo(() => {
     const startStr = c?.fecha_inicio_plan || c?.proyecto?.fecha_inicio_plan || c?.fecha_documento || c?.creada_en;
     const getFallbackEndStr = (sStr) => {
@@ -1399,6 +1407,112 @@ export default function ServicioArriendoDrawer({
                 <div className="p-6 bg-slate-50 border border-slate-200 border-dashed rounded-xl text-center flex flex-col items-center gap-2">
                   <span className="text-slate-500 text-sm">No hay pagos registrados para este servicio/arriendo.</span>
                   <span className="font-semibold text-rose-600 text-sm">Restante contrato: {formatCLP(totals.total * (c?.ciclos_mensuales || 12))}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Costos Operativos / Compras Imputadas */}
+          <div>
+            <div className="flex items-center justify-between mb-4 mt-8">
+              <div>
+                <h4 className="text-sm font-bold uppercase tracking-wider text-slate-500">
+                  Costos Operativos / Compras Imputadas
+                </h4>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Compras y facturas de proveedores cargadas a este servicio continuo.
+                </p>
+              </div>
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                {comprasList.length} compra(s)
+              </span>
+            </div>
+
+            <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-4 py-3 bg-slate-50 border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Total Costos Operativos:</span>
+                  <span className="text-sm font-extrabold text-rose-600">
+                    {formatCLP(totalCompras)}
+                  </span>
+                </div>
+                {totals.totalPagado > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Margen Bruto (Cobrado - Costos):</span>
+                    <span className={`text-xs font-extrabold ${totals.totalPagado - totalCompras >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
+                      {formatCLP(totals.totalPagado - totalCompras)}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {comprasList.length > 0 ? (
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold text-slate-600">Fecha</th>
+                      <th className="px-4 py-3 font-semibold text-slate-600">Proveedor / Folio</th>
+                      <th className="px-4 py-3 font-semibold text-slate-600">Estado</th>
+                      <th className="px-4 py-3 font-semibold text-slate-600">Documento</th>
+                      <th className="px-4 py-3 font-semibold text-slate-600 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {comprasList.map((comp) => (
+                      <tr key={comp.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-3 font-medium text-slate-700 whitespace-nowrap text-xs">
+                          {comp.fecha_docto ? fechaCL(comp.fecha_docto) : fechaCL(comp.creada_en)}
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          <div className="font-semibold text-slate-800">
+                            {comp.proveedor?.nombre || "Proveedor"}
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            Folio: {comp.folio || `N° ${comp.numero}`}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            comp.estado === "PAGADA"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-blue-100 text-blue-800"
+                          }`}>
+                            {comp.estado || "ORDEN_COMPRA"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          {comp.factura_url ? (
+                            <button
+                              onClick={() => setViewUrl(getFullUrl(comp.factura_url))}
+                              className="text-blue-600 hover:text-blue-800 text-xs font-semibold flex items-center gap-1 hover:cursor-pointer"
+                            >
+                              <VisibilityOutlinedIcon sx={{ fontSize: 16 }} /> Ver Factura
+                            </button>
+                          ) : (
+                            <span className="text-slate-400 italic text-[11px]">Sin PDF adjunto</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-slate-900 text-xs">
+                          {formatCLP(comp.total)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-slate-100/50 font-semibold border-t border-slate-200">
+                    <tr>
+                      <td className="px-4 py-3 text-right text-slate-500" colSpan={4}>
+                        Total Costos de Compras
+                      </td>
+                      <td className="px-4 py-3 text-right text-rose-700 text-base font-bold">
+                        {formatCLP(totalCompras)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              ) : (
+                <div className="p-6 bg-slate-50 border border-slate-200 border-dashed rounded-xl text-center flex flex-col items-center gap-2">
+                  <span className="text-slate-500 text-sm">No hay compras o costos operativos imputados a este servicio aún.</span>
+                  <span className="text-xs text-slate-400">Puedes asignar compras a este servicio desde la sección de Compras.</span>
                 </div>
               )}
             </div>

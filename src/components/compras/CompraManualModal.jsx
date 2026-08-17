@@ -11,6 +11,7 @@ export default function CompraManualModal({
   session,
   proveedores = [],
   proyectos = [],
+  servicios = [],
   lookupsLoading = false,
   onAddProveedorClick,
 }) {
@@ -19,6 +20,7 @@ export default function CompraManualModal({
   const [destino, setDestino] = useState("PROYECTO");
   const [centroCosto, setCentroCosto] = useState("");
   const [proyectoId, setProyectoId] = useState("");
+  const [servicioId, setServicioId] = useState("");
   const [tipoDoc, setTipoDoc] = useState("33"); // 33: Factura Electrónica, etc.
   const [folio, setFolio] = useState("");
   const [fechaDocto, setFechaDocto] = useState("");
@@ -245,7 +247,8 @@ export default function CompraManualModal({
   const validateForm = () => {
     if (!proveedorId) return "Debe seleccionar un proveedor.";
     if (destino === "PROYECTO" && !proyectoId) return "Debe seleccionar un proyecto para este destino.";
-    if (destino !== "PROYECTO" && !centroCosto) return "Debe seleccionar el centro de costo.";
+    if (destino === "SERVICIO" && !servicioId) return "Debe seleccionar un servicio recurrente.";
+    if ((destino === "TALLER" || destino === "ADMINISTRACION") && !centroCosto) return "Debe seleccionar el centro de costo.";
     if (items.length === 0) return "La orden de compra debe contener al menos un ítem.";
     
     for (const it of items) {
@@ -268,12 +271,13 @@ export default function CompraManualModal({
     setSaving(true);
     setErrorMsg("");
     try {
+      const servSel = servicios.find((s) => s.id === servicioId);
       const payload = {
         proveedorId,
         destino,
-        centro_costo: destino !== "PROYECTO" ? centroCosto : null,
-        proyecto_id: destino === "PROYECTO" ? proyectoId : null,
-        cotizacionId: cotizacionSel?.id || null,
+        centro_costo: (destino === "PROYECTO" || destino === "SERVICIO") ? null : centroCosto,
+        proyecto_id: destino === "PROYECTO" ? proyectoId : (destino === "SERVICIO" ? servSel?.proyecto_id || null : null),
+        cotizacionId: destino === "SERVICIO" ? servicioId : (cotizacionSel?.id || null),
         tipo_doc: Number(tipoDoc),
         folio,
         fecha_docto: new Date(fechaDocto).toISOString(),
@@ -407,9 +411,10 @@ export default function CompraManualModal({
 
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-bold text-slate-700">Destino Principal *</label>
-                <div className="grid grid-cols-3 gap-2 mt-1">
+                <div className="grid grid-cols-4 gap-2 mt-1">
                   {[
                     { val: "PROYECTO", lab: "Proyecto", icon: "construction" },
+                    { val: "SERVICIO", lab: "Servicio", icon: "room_service" },
                     { val: "TALLER", lab: "Taller", icon: "precision_manufacturing" },
                     { val: "ADMINISTRACION", lab: "Admin", icon: "corporate_fare" }
                   ].map((opt) => (
@@ -418,8 +423,16 @@ export default function CompraManualModal({
                       type="button"
                       onClick={() => {
                         setDestino(opt.val);
-                        if (opt.val !== "PROYECTO") setProyectoId("");
-                        else setCentroCosto("");
+                        if (opt.val === "PROYECTO") {
+                          setCentroCosto("");
+                          setServicioId("");
+                        } else if (opt.val === "SERVICIO") {
+                          setCentroCosto("");
+                          setProyectoId("");
+                        } else {
+                          setProyectoId("");
+                          setServicioId("");
+                        }
                       }}
                       className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all cursor-pointer ${
                         destino === opt.val
@@ -454,6 +467,28 @@ export default function CompraManualModal({
                         {p.nombre}
                       </option>
                     ))}
+                  </select>
+                </div>
+              ) : destino === "SERVICIO" ? (
+                <div className="flex flex-col gap-1.5 mt-2">
+                  <label className="text-xs font-bold text-slate-700">Servicio Recurrente *</label>
+                  <select
+                    className="w-full h-11 px-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-900 focus:border-[#1e3a8a] text-xs transition-all"
+                    value={servicioId}
+                    onChange={(e) => setServicioId(e.target.value)}
+                    required={destino === "SERVICIO"}
+                  >
+                    <option value="">Seleccione servicio recurrente...</option>
+                    {servicios.map((s) => {
+                      const num = s.numero ? (s.numero >= 1000000 ? s.numero - 1000000 : s.numero) : "—";
+                      const clienteNom = s.cliente?.nombre || "Sin cliente";
+                      const asunto = s.asunto || "Servicio Activo";
+                      return (
+                        <option key={s.id} value={s.id}>
+                          #{num} · {asunto} ({clienteNom})
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               ) : (

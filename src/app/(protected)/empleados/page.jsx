@@ -422,7 +422,25 @@ export default function EmpleadosPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-base text-secondary">{e?.cargo || "-"}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-base text-secondary font-medium">{e?.cargo || "-"}</span>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${e?.sede === 'PUQ' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}>
+                              {e?.sede || "PMC"}
+                            </span>
+                          </div>
+                          {e?.jefe?.usuario?.nombre ? (
+                            <span className="text-[11px] text-slate-400 mt-0.5">
+                              Jefe: {e.jefe.usuario.nombre}
+                            </span>
+                          ) : e?._count?.subordinados > 0 ? (
+                            <span className="text-[11px] text-primary font-semibold mt-0.5">
+                              Líder ({e._count.subordinados} a cargo)
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
                       <td className="px-6 py-4 text-xs font-medium text-secondary tracking-wider">{e?.telefono || "-"}</td>
                       <td className="px-6 py-4 text-base text-secondary">
                         {e?.fecha_ingreso ? String(e.fecha_ingreso).slice(0, 10) : "-"}
@@ -535,6 +553,7 @@ export default function EmpleadosPage() {
           onClose={closeModal}
           onSave={handleSaveEmpleado}
           saving={saving}
+          empleadosList={empleados}
         />
 
         <EmpleadoDetailDrawer

@@ -1,8 +1,39 @@
-import { formatCurrencyCLP } from "@/lib/formatters";
+"use client";
+
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { TrendingDown, TrendingUp, Presentation, Calendar, CalendarCheck, AlertCircle, Clock } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import {
+  TrendingUp,
+  Presentation,
+  Calendar,
+  CalendarCheck,
+  AlertCircle,
+  Clock,
+  Users,
+  UserPlus,
+  X,
+} from "lucide-react";
+import AsignarEquipoModal from "./AsignarEquipoModal";
+import { makeHeaders } from "@/lib/api";
+
+const API = process.env.NEXT_PUBLIC_API_URL;
 
 export default function ProyectoHeader({ proyecto, metrics, tareas = [] }) {
+  const router = useRouter();
+  const { data: session } = useSession();
+
+  const [openModalEquipo, setOpenModalEquipo] = useState(false);
+  const [empleados, setEmpleados] = useState([]);
+  const [loadingEmpleados, setLoadingEmpleados] = useState(false);
+  const [savingEquipo, setSavingEquipo] = useState(false);
+  const [localMiembros, setLocalMiembros] = useState(proyecto?.miembros || []);
+
+  useEffect(() => {
+    setLocalMiembros(proyecto?.miembros || []);
+  }, [proyecto?.miembros]);
+
   const financiero = metrics?.financiero || {};
   const tareasStats = metrics?.tareas || {};
 
@@ -67,83 +98,273 @@ export default function ProyectoHeader({ proyecto, metrics, tareas = [] }) {
   };
 
   const today = new Date();
-  today.setHours(0,0,0,0);
+  today.setHours(0, 0, 0, 0);
   const finPlanM = fFinPlan ? new Date(fFinPlan) : null;
-  if (finPlanM) finPlanM.setHours(0,0,0,0);
+  if (finPlanM) finPlanM.setHours(0, 0, 0, 0);
 
   const isDelayed = finPlanM && today > finPlanM && progreso < 100;
-  
+
   const statusRealStart = fIniReal ? formatD(fIniReal) : (isTaskInProgress ? "En progreso" : "No iniciada");
   const statusRealEnd = fFinReal && progreso >= 100 ? formatD(fFinReal) : (progreso >= 100 ? "Completada" : (isTaskInProgress ? "En curso" : "Pendiente"));
 
+  // Cargar empleados para el modal
+  const handleOpenEquipoModal = async () => {
+    setOpenModalEquipo(true);
+    if (empleados.length === 0) {
+      try {
+        setLoadingEmpleados(true);
+        const res = await fetch(`${API}/empleados?page=1&pageSize=100`, {
+          headers: makeHeaders(session),
+        });
+        if (!res.ok) throw new Error("Error al cargar empleados");
+        const data = await res.json();
+        setEmpleados(data?.items || data?.rows || data || []);
+      } catch (e) {
+        console.error("Error cargando empleados:", e);
+      } finally {
+        setLoadingEmpleados(false);
+      }
+    }
+  };
+
+  // Guardar asignación de equipo
+  const handleSaveEquipo = async (selectedIds) => {
+    try {
+      setSavingEquipo(true);
+      const res = await fetch(`${API}/proyectos/update/${proyecto.id}`, {
+        method: "PATCH",
+        headers: {
+          ...makeHeaders(session),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          miembros: selectedIds,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData?.message || "Error al actualizar equipo del proyecto");
+      }
+
+      // Optimistic update
+      const updatedMiembros = selectedIds.map((empId) => {
+        const empFound = empleados.find((e) => e.id === empId);
+        const existing = localMiembros.find((m) => (m.empleado_id || m.empleado?.id) === empId);
+        return existing || {
+          id: `temp-${empId}`,
+          proyecto_id: proyecto.id,
+          empleado_id: empId,
+          empleado: empFound || null,
+        };
+      });
+      setLocalMiembros(updatedMiembros);
+      setOpenModalEquipo(false);
+
+      // Sincronizar servidor y resto de componentes
+      router.refresh();
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "No se pudo actualizar el equipo asignado.");
+    } finally {
+      setSavingEquipo(false);
+    }
+  };
+
+  // Quitar miembro individual rápido
+  const handleRemoveMember = async (empId, e) => {
+    e.stopPropagation();
+    const currentIds = localMiembros.map((m) => m.empleado_id || m.empleado?.id).filter(Boolean);
+    const newIds = currentIds.filter((id) => id !== empId);
+    await handleSaveEquipo(newIds);
+  };
+
+  const getInitials = (name) => {
+    if (!name) return "E";
+    const parts = name.trim().split(" ");
+    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  };
+
   return (
     <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-2 p-8 bg-surface-container-lowest rounded-xl shadow-sm relative overflow-hidden flex flex-col justify-between border border-outline-variant/10">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary-container/5 rounded-full -mr-20 -mt-20"></div>
-        <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-4">
-            <span className={`px-3 py-1 text-[11px] font-bold rounded-full uppercase tracking-wider ${getEstadoCls(proyecto.estado, !!proyecto.fecha_inicio_real)}`}>
-              {getEstadoLabel(proyecto.estado, !!proyecto.fecha_inicio_real)}
-            </span>
-            <h1 className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center gap-1">
-              <Presentation size={14} /> Proyecto de Ingeniería
-            </h1>
-          </div>
-          <h2 className="text-3xl font-extrabold text-on-surface tracking-tight mb-3">
-            {proyecto.nombre}
-          </h2>
-          <p className="text-sm text-on-surface-variant max-w-xl leading-relaxed">
-            {proyecto.descripcion || "Sin descripción detallada del proyecto."}
-          </p>
+      <div className="lg:col-span-2 p-7 lg:p-8 bg-surface-container-lowest rounded-xl shadow-sm relative overflow-hidden flex flex-col justify-between border border-outline-variant/10">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary-container/5 rounded-full -mr-20 -mt-20 pointer-events-none"></div>
 
-          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
-            {/* Planificado */}
-            <div className="bg-surface-container-low/50 p-4 rounded-xl border border-outline-variant/30 flex flex-col gap-2 relative overflow-hidden group hover:border-outline-variant/60 transition-colors">
-              <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                <Calendar size={40} />
-              </div>
-              <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest flex items-center gap-1.5">
-                <Calendar size={14} className="text-primary"/> Fechas Planificadas
-              </span>
-              <div className="flex items-center gap-3">
-                <div className="flex flex-col">
-                  <span className="text-[10px] text-on-surface-variant/70 uppercase">Inicio</span>
-                  <span className="text-sm font-semibold text-on-surface">{fIniPlan ? formatD(fIniPlan, true) : "No def."}</span>
+        <div className="relative z-10 flex flex-col justify-between h-full">
+          {/* Main Top Grid: Left Project Info + Right Team Members Zone */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch h-full">
+            {/* Left Col (md:col-span-7): Estado, Título, Descripción y Fechas como Filas */}
+            <div className="md:col-span-7 flex flex-col justify-between gap-5">
+              <div>
+                <div className="flex items-center gap-3 mb-3">
+                  <span className={`px-3 py-1 text-[11px] font-bold rounded-full uppercase tracking-wider ${getEstadoCls(proyecto.estado, !!proyecto.fecha_inicio_real)}`}>
+                    {getEstadoLabel(proyecto.estado, !!proyecto.fecha_inicio_real)}
+                  </span>
+                  <h1 className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center gap-1">
+                    <Presentation size={14} /> Proyecto de Ingeniería
+                  </h1>
                 </div>
-                <span className="text-outline-variant">→</span>
-                <div className="flex flex-col">
-                  <span className="text-[10px] text-on-surface-variant/70 uppercase">Término</span>
-                  <span className="text-sm font-semibold text-on-surface">{fFinPlan ? formatD(fFinPlan, true) : "No def."}</span>
+                <h2 className="text-2xl lg:text-3xl font-extrabold text-on-surface tracking-tight mb-2">
+                  {proyecto.nombre}
+                </h2>
+                <p className="text-sm text-on-surface-variant leading-relaxed">
+                  {proyecto.descripcion || "Sin descripción detallada del proyecto."}
+                </p>
+              </div>
+
+              {/* Fechas estructuradas como filas */}
+              <div className="flex flex-col gap-2.5">
+                {/* Planificado - Fila */}
+                <div className="bg-surface-container-low/50 p-3 rounded-xl border border-outline-variant/30 flex items-center justify-between relative overflow-hidden group hover:border-outline-variant/60 transition-colors">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                      <Calendar size={16} />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">
+                        Fechas Planificadas
+                      </span>
+                      <span className="text-[11px] text-on-surface-variant/70 hidden sm:inline">
+                        Cronograma base
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2.5 sm:gap-3 pr-1">
+                    <div className="flex flex-col text-right sm:text-left">
+                      <span className="text-[9px] text-on-surface-variant/70 uppercase">Inicio</span>
+                      <span className="text-xs font-semibold text-on-surface">{fIniPlan ? formatD(fIniPlan, true) : "No def."}</span>
+                    </div>
+                    <span className="text-outline-variant text-xs">→</span>
+                    <div className="flex flex-col text-right">
+                      <span className="text-[9px] text-on-surface-variant/70 uppercase">Término</span>
+                      <span className="text-xs font-semibold text-on-surface">{fFinPlan ? formatD(fFinPlan, true) : "No def."}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Real - Fila */}
+                <div className={`p-3 rounded-xl border flex items-center justify-between relative overflow-hidden group transition-colors ${
+                  isDelayed && progreso < 100 ? 'bg-error-container/20 border-error/30 hover:border-error/50' : (
+                    progreso >= 100 ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-300' : 'bg-primary-container/10 border-primary/20 hover:border-primary/40'
+                  )
+                }`}>
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                      isDelayed && progreso < 100 ? 'bg-error/10 text-error' : (progreso >= 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-primary/10 text-primary')
+                    }`}>
+                      {isDelayed && progreso < 100 ? <AlertCircle size={16} /> : (progreso >= 100 ? <CalendarCheck size={16} /> : <Clock size={16} />)}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                        progreso >= 100 ? 'text-emerald-700' : (isDelayed ? 'text-error' : 'text-primary')
+                      }`}>
+                        Lo que va realmente
+                      </span>
+                      <span className="text-[11px] text-on-surface-variant/70 hidden sm:inline">
+                        Ejecución en obra
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2.5 sm:gap-3 pr-1">
+                    <div className="flex flex-col text-right sm:text-left">
+                      <span className={`text-[9px] uppercase ${isDelayed && progreso < 100 ? 'text-error/70' : 'text-on-surface-variant/70'}`}>Inicio</span>
+                      <span className="text-xs font-semibold text-on-surface">{statusRealStart}</span>
+                    </div>
+                    <span className={`${isDelayed && progreso < 100 ? 'text-error/40' : 'text-outline-variant'} text-xs`}>→</span>
+                    <div className="flex flex-col text-right">
+                      <span className={`text-[9px] uppercase ${isDelayed && progreso < 100 ? 'text-error/70' : 'text-on-surface-variant/70'}`}>Término</span>
+                      <span className={`text-xs font-semibold ${isDelayed && progreso < 100 ? 'text-error' : 'text-on-surface'}`}>{statusRealEnd}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Real */}
-            <div className={`p-4 rounded-xl border flex flex-col gap-2 relative overflow-hidden group transition-colors ${
-              isDelayed && progreso < 100 ? 'bg-error-container/20 border-error/30 hover:border-error/50' : (
-                progreso >= 100 ? 'bg-emerald-50 border-emerald-200 hover:border-emerald-300' : 'bg-primary-container/10 border-primary/20 hover:border-primary/40'
-              )
-            }`}>
-              <div className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity ${
-                isDelayed && progreso < 100 ? 'text-error' : (progreso >= 100 ? 'text-emerald-600' : 'text-primary')
-              }`}>
-                {isDelayed && progreso < 100 ? <AlertCircle size={40} /> : (progreso >= 100 ? <CalendarCheck size={40} /> : <Clock size={40} />)}
-              </div>
-              <span className={`text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 ${
-                 progreso >= 100 ? 'text-emerald-700' : (isDelayed ? 'text-error' : 'text-primary')
-              }`}>
-                {progreso >= 100 ? <CalendarCheck size={14} /> : (isDelayed ? <AlertCircle size={14} /> : <Clock size={14} />)}
-                Lo que va realmente
-              </span>
-              <div className="flex items-center gap-3">
-                <div className="flex flex-col z-10">
-                  <span className={`text-[10px] uppercase ${isDelayed && progreso < 100 ? 'text-error/70' : 'text-on-surface-variant/70'}`}>Inicio</span>
-                  <span className="text-sm font-semibold text-on-surface">{statusRealStart}</span>
+            {/* Right Col (md:col-span-5): Equipo Asignado ocupando toda la tarjeta derecha */}
+            <div className="md:col-span-5 flex flex-col h-full">
+              <div className="bg-surface-container-low/40 rounded-xl p-4 border border-outline-variant/30 flex flex-col h-full shadow-sm justify-between">
+                {/* Header de la tarjeta de equipo */}
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100/80">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                      <Users size={16} />
+                    </span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-on-surface">
+                      Equipo Asignado
+                    </span>
+                    <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-primary/10 text-primary">
+                      {localMiembros.length}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenEquipoModal}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-primary hover:text-white bg-primary/10 hover:bg-primary rounded-lg border border-primary/20 hover:border-primary transition-all cursor-pointer shadow-xs"
+                    title="Asignar o modificar personal del proyecto"
+                  >
+                    <UserPlus size={13} />
+                    <span>{localMiembros.length > 0 ? "Gestionar" : "+ Asignar"}</span>
+                  </button>
                 </div>
-                <span className={`${isDelayed && progreso < 100 ? 'text-error/40' : 'text-outline-variant'} z-10`}>→</span>
-                <div className="flex flex-col z-10">
-                  <span className={`text-[10px] uppercase ${isDelayed && progreso < 100 ? 'text-error/70' : 'text-on-surface-variant/70'}`}>Término</span>
-                  <span className={`text-sm font-semibold ${isDelayed && progreso < 100 ? 'text-error' : 'text-on-surface'}`}>{statusRealEnd}</span>
+
+                {/* Cuerpo: Lista de Personal Asignado o Estado Vacío ocupando el alto completo */}
+                <div className="flex-1 flex flex-col pt-3 min-h-[160px]">
+                  {localMiembros.length > 0 ? (
+                    <div className="flex flex-col gap-2 overflow-y-auto max-h-[220px] pr-1">
+                      {localMiembros.map((m) => {
+                        const empId = m.empleado_id || m.empleado?.id;
+                        const nombre = m.empleado?.usuario?.nombre || m.empleado?.nombre || "Sin nombre";
+                        const cargo = m.empleado?.cargo || m.empleado?.usuario?.rol?.nombre || "Personal de Proyecto";
+
+                        return (
+                          <div
+                            key={m.id || empId}
+                            className="group flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-100 hover:border-primary/30 hover:shadow-sm transition-all"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/15 to-primary/5 text-primary flex items-center justify-center text-xs font-bold shrink-0 border border-primary/20 shadow-2xs">
+                                {getInitials(nombre)}
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-xs font-bold text-slate-800 truncate leading-tight">
+                                  {nombre}
+                                </span>
+                                <span className="text-[10px] text-slate-400 truncate">
+                                  {cargo}
+                                </span>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={(e) => handleRemoveMember(empId, e)}
+                              className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all shrink-0 ml-1"
+                              title={`Desasignar a ${nombre}`}
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div
+                      onClick={handleOpenEquipoModal}
+                      className="flex-1 rounded-xl border border-dashed border-slate-300 hover:border-primary bg-slate-50/50 hover:bg-primary/5 cursor-pointer text-center flex flex-col items-center justify-center p-6 gap-2 transition-all group"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-slate-100 group-hover:bg-primary/10 text-slate-400 group-hover:text-primary flex items-center justify-center transition-colors">
+                        <UserPlus size={20} />
+                      </div>
+                      <span className="text-xs font-bold text-slate-700 group-hover:text-primary">
+                        Sin personal asignado
+                      </span>
+                      <span className="text-[11px] text-slate-400 group-hover:text-primary/70 max-w-[200px] leading-snug">
+                        Haz clic aquí para asignar el personal a este proyecto
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -151,6 +372,7 @@ export default function ProyectoHeader({ proyecto, metrics, tareas = [] }) {
         </div>
       </div>
 
+      {/* Progress & Financial section */}
       <div className="p-8 bg-surface-container-lowest rounded-xl shadow-sm flex flex-col items-center justify-center text-center border-l-4 border-primary border-t border-r border-b border-outline-variant/10">
         <div className="relative w-40 h-40 flex items-center justify-center mb-6">
           <svg className="w-full h-full transform -rotate-90">
@@ -178,6 +400,17 @@ export default function ProyectoHeader({ proyecto, metrics, tareas = [] }) {
           </Link>
         </div>
       </div>
+
+      {/* Modal Asignar Equipo */}
+      <AsignarEquipoModal
+        open={openModalEquipo}
+        onClose={() => setOpenModalEquipo(false)}
+        proyecto={proyecto}
+        empleados={empleados}
+        loadingEmpleados={loadingEmpleados}
+        onSave={handleSaveEquipo}
+        saving={savingEquipo}
+      />
     </section>
   );
 }
