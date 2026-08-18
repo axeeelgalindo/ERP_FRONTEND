@@ -144,11 +144,14 @@ export default function CompraProvOllamaModal({
           Authorization: `Bearer ${session?.token}`,
           "x-empresa-id": session?.empresaId || "",
         };
-        const res = await fetch(`${API}/cotizaciones?estado=ACEPTADA`, { headers });
+        const res = await fetch(`${API}/cotizaciones`, { headers });
         if (res.ok) {
           const data = await res.json();
-          setTodasLasCotizaciones(data);
-          setCotizacionesList(data);
+          const validas = (Array.isArray(data) ? data : []).filter(
+            (c) => c.estado && c.estado !== "COTIZACION" && c.estado !== "RECHAZADA"
+          );
+          setTodasLasCotizaciones(validas);
+          setCotizacionesList(validas);
         }
       } catch (err) {
         console.error("Error cargando cotizaciones:", err);
