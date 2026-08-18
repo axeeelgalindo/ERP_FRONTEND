@@ -8,6 +8,27 @@ import { useSession, signOut } from "next-auth/react";
 import NavItem from "./NavItem";
 import { Menu, X } from "lucide-react";
 
+function formatNombreUsuario(raw) {
+  if (!raw) return "Usuario";
+  const s = String(raw).trim();
+
+  // Caso 1: Formato "Apellidos, Nombres" (ej: "Galindo Barria, Axel Eduardo")
+  if (s.includes(",")) {
+    const [apellidosPart, nombresPart] = s.split(",");
+    const primerApellido = (apellidosPart || "").trim().split(/\s+/)[0] || "";
+    const primerNombre = (nombresPart || "").trim().split(/\s+/)[0] || "";
+    return `${primerNombre} ${primerApellido}`.trim() || s;
+  }
+
+  // Caso 2: Formato estándar "Nombre Apellido ..." (ej: "Axel Eduardo Galindo")
+  const tokens = s.split(/\s+/).filter(Boolean);
+  if (tokens.length >= 2) {
+    return `${tokens[0]} ${tokens[1]}`;
+  }
+
+  return s;
+}
+
 /**
  * Sidebar responsive + premium "Blue Ingeniería" redesign
  */
@@ -66,10 +87,14 @@ export default function Sidebar() {
     .toString()
     .toLowerCase();
 
-  const userName =
+  const rawName =
     session?.user?.name ||
     session?.user?.nombre ||
-    (session?.user?.email ? session.user.email.split("@")[0] : "Usuario");
+    (session?.user?.email
+      ? session.user.email.split("@")[0].replace(/[._-]/g, " ")
+      : "Usuario");
+
+  const userName = useMemo(() => formatNombreUsuario(rawName), [rawName]);
   const userEmail = session?.user?.email || "";
   const userRole =
     session?.user?.rolNombre ||
@@ -78,7 +103,7 @@ export default function Sidebar() {
 
   const initials = useMemo(() => {
     if (!userName) return "U";
-    const parts = userName.trim().split(/\s+/);
+    const parts = userName.trim().split(/\s+/).filter(Boolean);
     if (parts.length >= 2) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
     }
