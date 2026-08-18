@@ -59,6 +59,69 @@ export default function KanbanPage() {
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [showQuickAddMember, setShowQuickAddMember] = useState(false);
 
+  // Estados para visor de evidencias en modal de detalle / revisión
+  const [detailEvidenceTab, setDetailEvidenceTab] = useState("imagenes");
+  const [detailActiveImgIndex, setDetailActiveImgIndex] = useState(0);
+  const [detailLightboxIndex, setDetailLightboxIndex] = useState(null);
+
+  // Resetear índices de evidencias al cambiar de item
+  useEffect(() => {
+    setDetailActiveImgIndex(0);
+    setDetailLightboxIndex(null);
+    setDetailEvidenceTab("imagenes");
+  }, [selectedItem?.id]);
+
+  // Teclado para lightbox del modal de detalles
+  useEffect(() => {
+    if (detailLightboxIndex === null) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setDetailLightboxIndex(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [detailLightboxIndex]);
+
+  // --- Estados para Modal de Transición de Estado (Elevados al padre para persistir al cambiar de pestaña) ---
+  const [transitionComment, setTransitionComment] = useState("");
+  const [transitionFiles, setTransitionFiles] = useState([]);
+  const [transitionFechaInicio, setTransitionFechaInicio] = useState(new Date().toISOString().split('T')[0]);
+  const [transitionSubmitting, setTransitionSubmitting] = useState(false);
+  const [transitionPreviewIndex, setTransitionPreviewIndex] = useState(null);
+  const [transitionExistingImgError, setTransitionExistingImgError] = useState(false);
+
+  // Sincronizar fecha inicial al abrir una nueva transición
+  useEffect(() => {
+    if (dropTransition) {
+      setTransitionFechaInicio(new Date().toISOString().split('T')[0]);
+      setTransitionExistingImgError(false);
+      setTransitionPreviewIndex(null);
+    }
+  }, [dropTransition?.item?.id, dropTransition?.targetStatus]);
+
+  // Teclado para carrusel de transición
+  useEffect(() => {
+    if (transitionPreviewIndex === null) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setTransitionPreviewIndex(null);
+      if (e.key === "ArrowLeft") {
+        setTransitionPreviewIndex(prev => (prev > 0 ? prev - 1 : transitionFiles.length - 1));
+      }
+      if (e.key === "ArrowRight") {
+        setTransitionPreviewIndex(prev => (prev < transitionFiles.length - 1 ? prev + 1 : 0));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [transitionPreviewIndex, transitionFiles.length]);
+
+  const closeTransitionModal = () => {
+    setDropTransition(null);
+    setTransitionComment("");
+    setTransitionFiles([]);
+    setTransitionPreviewIndex(null);
+    setTransitionExistingImgError(false);
+  };
+
   // Sincronizar proyecto del form con proyecto del filtro
   useEffect(() => {
     if (isAddModalOpen && !formData.proyecto_id && filters.proyecto_id) {
@@ -632,8 +695,8 @@ export default function KanbanPage() {
     );
   };
 
-  // --- Modal de Transición de Estado ---
-  const StatusTransitionModal = () => {
+  // --- Modal de Transición de Estado (Usa estados elevados para persistir datos al cambiar de ventana/pestaña) ---
+  const renderStatusTransitionModal = () => {
     if (!dropTransition) return null;
     const { item, targetStatus } = dropTransition;
     const isStart = targetStatus === "EN CURSO";
@@ -642,24 +705,19 @@ export default function KanbanPage() {
     // Buscar evidencia previa si ya estaba en revisión o tiene evidencias
     const existingEvidence = item.evidencias && item.evidencias.length > 0 ? item.evidencias[0] : null;
 
-    const [comentario, setComentario] = useState("");
-    const [files, setFiles] = useState([]);
-    const [fechaInicio, setFechaInicio] = useState(new Date().toISOString().split('T')[0]);
-    const [submitting, setSubmitting] = useState(false);
-
     const handleConfirm = async () => {
-      setSubmitting(true);
+      setTransitionSubmitting(true);
       try {
         const formData = new FormData();
         formData.append("tipo", item.tipo);
         formData.append("targetStatus", targetStatus);
 
         if (isStart) {
-          formData.append("fecha_inicio_real", fechaInicio);
+          formData.append("fecha_inicio_real", transitionFechaInicio);
         } else {
-          formData.append("comentario", comentario);
+          formData.append("comentario", transitionComment);
           // Mandar cada archivo
-          files.forEach(f => {
+          transitionFiles.forEach(f => {
             formData.append("archivo", f);
           });
         }
@@ -679,140 +737,379 @@ export default function KanbanPage() {
           throw new Error(json.message || "Error al procesar transición");
         }
 
-        setDropTransition(null);
+        closeTransitionModal();
         fetchData(searchTerm);
       } catch (err) {
         alert(err.message);
       } finally {
-        setSubmitting(false);
+        setTransitionSubmitting(false);
       }
     };
 
     return (
-      <div className="fixed inset-0 z-[400] flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setDropTransition(null)}></div>
-        <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden flex flex-col relative shadow-2xl animate-in zoom-in-95 duration-200">
-          <header className="px-8 py-6 border-b border-gray-100 flex justify-between items-center">
-            <div>
-              <h2 className="text-xl font-black text-gray-900">
-                {isStart ? "Iniciar Trabajo" : "Confirmar Evidencia"}
-              </h2>
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
-                {item.nombre}
-              </p>
-            </div>
-            <button onClick={() => setDropTransition(null)} className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400">
-              <span className="material-symbols-outlined">close</span>
-            </button>
-          </header>
-
-          <div className="p-8 space-y-6">
-            {isStart ? (
-              <div className="space-y-2">
-                <label className="text-[11px] font-extrabold text-blue-600 uppercase tracking-widest">Fecha de Inicio Real</label>
-                <input
-                  type="date"
-                  value={fechaInicio}
-                  onChange={(e) => setFechaInicio(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                />
-                <p className="text-[10px] text-gray-400 italic">Indica cuándo comenzaste realmente esta actividad.</p>
+      <>
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={closeTransitionModal}></div>
+          <div className="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col relative shadow-2xl animate-in zoom-in-95 duration-200">
+            {/* Header Fijo */}
+            <header className="px-6 py-4 border-b border-gray-100 flex justify-between items-center shrink-0 bg-white">
+              <div className="min-w-0 pr-3">
+                <h2 className="text-lg font-black text-gray-900 leading-tight">
+                  {isStart ? "Iniciar Trabajo" : "Confirmar Evidencia"}
+                </h2>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5 truncate">
+                  {item.nombre}
+                </p>
               </div>
-            ) : (
-              <div className="space-y-6">
-                {existingEvidence && (
-                  <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 space-y-3">
-                    <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-1">
-                      <span className="material-symbols-outlined text-sm">visibility</span>
-                      Evidencia previa (Cargada en revisión)
-                    </p>
-                    <div className="aspect-video relative rounded-xl overflow-hidden bg-white border border-blue-200">
-                      <img
-                        src={existingEvidence.archivo_url.startsWith('http') ? existingEvidence.archivo_url : `${process.env.NEXT_PUBLIC_API_URL}${existingEvidence.archivo_url.replace('/api', '')}`}
-                        className="w-full h-full object-cover"
-                        alt="Evidencia previa"
-                      />
-                    </div>
-                    {existingEvidence.comentario && (
-                      <p className="text-[11px] text-blue-800 italic">"{existingEvidence.comentario}"</p>
-                    )}
-                  </div>
-                )}
+              <button 
+                onClick={closeTransitionModal} 
+                className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors shrink-0 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </header>
 
+            {/* Cuerpo Scrolleable */}
+            <div className="p-6 space-y-4 flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+              {isStart ? (
                 <div className="space-y-2">
-                  <label className="text-[11px] font-extrabold text-blue-600 uppercase tracking-widest">
-                    {existingEvidence ? "Añadir Nueva Evidencia (Opcional)" : "Evidencia Fotográfica"}
-                  </label>
-                  <div className="relative group">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files)])}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                    />
-                    <div className={`w-full border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center transition-all ${files.length > 0 ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-gray-50 group-hover:border-blue-300 group-hover:bg-blue-50/30'}`}>
-                      <span className={`material-symbols-outlined text-3xl mb-2 ${files.length > 0 ? 'text-green-500' : 'text-gray-400'}`}>
-                        {files.length > 0 ? 'library_add' : 'add_a_photo'}
-                      </span>
-                      <p className={`text-[10px] font-bold uppercase tracking-wider ${files.length > 0 ? 'text-green-600' : 'text-gray-400'}`}>
-                        {files.length > 0 ? `${files.length} archivos seleccionados` : (existingEvidence ? "Añadir más fotos..." : "Subir Fotos de Evidencia")}
-                      </p>
-                    </div>
-                  </div>
-
-                  {files.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2 max-h-32 overflow-y-auto p-1">
-                      {files.map((f, i) => (
-                        <div key={i} className="bg-gray-100 rounded-lg px-2 py-1 flex items-center gap-2 group/item">
-                          <span className="text-[10px] text-gray-600 font-medium truncate max-w-[120px]">{f.name}</span>
-                          <button
-                            onClick={(ev) => {
-                              ev.stopPropagation();
-                              setFiles(prev => prev.filter((_, idx) => idx !== i));
-                            }}
-                            className="text-gray-400 hover:text-red-500 flex items-center"
+                  <label className="text-[11px] font-extrabold text-blue-600 uppercase tracking-widest">Fecha de Inicio Real</label>
+                  <input
+                    type="date"
+                    value={transitionFechaInicio}
+                    onChange={(e) => setTransitionFechaInicio(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2.5 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
+                  <p className="text-[10px] text-gray-400 italic">Indica cuándo comenzaste realmente esta actividad.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Evidencia Previa */}
+                  {existingEvidence && (
+                    <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-3.5 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-black text-blue-700 uppercase tracking-widest flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-sm">visibility</span>
+                          Evidencia previa (Cargada en revisión)
+                        </p>
+                        {existingEvidence.archivo_url && !transitionExistingImgError && (
+                          <a 
+                            href={existingEvidence.archivo_url.startsWith('http') ? existingEvidence.archivo_url : `${process.env.NEXT_PUBLIC_API_URL}${existingEvidence.archivo_url.replace('/api', '')}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-0.5 cursor-pointer"
                           >
-                            <span className="material-symbols-outlined text-sm">cancel</span>
-                          </button>
+                            Ver original <span className="material-symbols-outlined text-xs">open_in_new</span>
+                          </a>
+                        )}
+                      </div>
+
+                      {transitionExistingImgError || !existingEvidence.archivo_url ? (
+                        <div className="py-4 px-4 flex flex-col items-center justify-center text-slate-400 bg-white/70 rounded-xl border border-dashed border-blue-200 text-center">
+                          <span className="material-symbols-outlined text-2xl text-slate-400 mb-1">image_not_supported</span>
+                          <span className="text-[11px] font-bold text-slate-500">Sin archivo o vista previa disponible</span>
                         </div>
-                      ))}
+                      ) : /\.(pdf|doc|docx|xls|xlsx)$/i.test(existingEvidence.archivo_url) ? (
+                        <div className="bg-white border border-blue-200 rounded-xl p-3 flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                            <span className="material-symbols-outlined text-xl">description</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-slate-800 truncate">Documento de Evidencia</p>
+                            <p className="text-[10px] text-slate-400">Clic en 'Ver original' para abrir</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="max-h-44 relative rounded-xl overflow-hidden bg-slate-900/5 border border-blue-200 flex items-center justify-center p-1">
+                          <img
+                            src={existingEvidence.archivo_url.startsWith('http') ? existingEvidence.archivo_url : `${process.env.NEXT_PUBLIC_API_URL}${existingEvidence.archivo_url.replace('/api', '')}`}
+                            className="max-h-44 w-auto object-contain rounded-lg"
+                            alt="Evidencia previa"
+                            onError={() => setTransitionExistingImgError(true)}
+                          />
+                        </div>
+                      )}
+
+                      {existingEvidence.comentario && (
+                        <p className="text-xs text-blue-900 italic bg-white/60 p-2 rounded-lg border border-blue-100">
+                          "{existingEvidence.comentario}"
+                        </p>
+                      )}
                     </div>
                   )}
-                </div>
 
-                <div className="space-y-2">
-                  <label className="text-[11px] font-extrabold text-blue-600 uppercase tracking-widest">Comentario de Cierre</label>
-                  <textarea
-                    value={comentario}
-                    onChange={(e) => setComentario(e.target.value)}
-                    placeholder={existingEvidence ? "Añadir más detalles..." : "Describe lo realizado..."}
-                    rows={3}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-medium text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
-                  />
+                  {/* Zona de Carga de Archivos */}
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-extrabold text-blue-600 uppercase tracking-widest">
+                      {existingEvidence ? "Añadir Nueva Evidencia (Opcional)" : "Evidencia (Fotos o Documentos)"}
+                    </label>
+                    
+                    <div className="relative group">
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                        multiple
+                        onChange={(e) => setTransitionFiles(prev => [...prev, ...Array.from(e.target.files)])}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      />
+                      <div className={`w-full border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center transition-all ${transitionFiles.length > 0 ? 'border-green-400 bg-green-50/50' : 'border-slate-200 bg-slate-50 group-hover:border-blue-300 group-hover:bg-blue-50/30'}`}>
+                        <span className={`material-symbols-outlined text-3xl mb-1 ${transitionFiles.length > 0 ? 'text-green-500' : 'text-slate-400'}`}>
+                          {transitionFiles.length > 0 ? 'library_add' : 'cloud_upload'}
+                        </span>
+                        <p className={`text-xs font-bold uppercase tracking-wider ${transitionFiles.length > 0 ? 'text-green-600' : 'text-slate-500'}`}>
+                          {transitionFiles.length > 0 ? `${transitionFiles.length} archivo(s) seleccionado(s)` : (existingEvidence ? "Añadir más fotos o documentos..." : "Subir fotos, PDF, Word o Excel")}
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          Arrastra o haz clic para seleccionar varios archivos
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Lista con Previsualización de Archivos Subidos (Click para abrir carrusel) */}
+                    {transitionFiles.length > 0 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 max-h-48 overflow-y-auto p-1 custom-scrollbar">
+                        {transitionFiles.map((f, i) => {
+                          const isImage = f.type?.startsWith("image/") || /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(f.name);
+                          const isPdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name);
+                          const isWord = /\.(doc|docx)$/i.test(f.name);
+                          const isExcel = /\.(xls|xlsx|csv)$/i.test(f.name);
+                          const sizeFormatted = f.size > 1024 * 1024 
+                            ? `${(f.size / (1024 * 1024)).toFixed(1)} MB` 
+                            : `${Math.round(f.size / 1024)} KB`;
+
+                          return (
+                            <div 
+                              key={i} 
+                              onClick={() => setTransitionPreviewIndex(i)}
+                              className="relative group bg-white border border-slate-200 rounded-xl p-2 flex items-center gap-2.5 shadow-2xs hover:border-blue-400 hover:shadow-xs transition-all cursor-pointer"
+                              title="Haz clic para ver en pantalla completa"
+                            >
+                              {isImage ? (
+                                <div className="w-10 h-10 rounded-lg bg-slate-100 overflow-hidden shrink-0 border border-slate-200/60 flex items-center justify-center">
+                                  <img src={URL.createObjectURL(f)} alt={f.name} className="w-full h-full object-cover" />
+                                </div>
+                              ) : isPdf ? (
+                                <div className="w-10 h-10 rounded-lg bg-red-50 text-red-600 shrink-0 flex flex-col items-center justify-center border border-red-100">
+                                  <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
+                                </div>
+                              ) : isWord ? (
+                                <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 shrink-0 flex flex-col items-center justify-center border border-blue-100">
+                                  <span className="material-symbols-outlined text-lg">description</span>
+                                </div>
+                              ) : isExcel ? (
+                                <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 shrink-0 flex flex-col items-center justify-center border border-emerald-100">
+                                  <span className="material-symbols-outlined text-lg">table_chart</span>
+                                </div>
+                              ) : (
+                                <div className="w-10 h-10 rounded-lg bg-slate-100 text-slate-600 shrink-0 flex flex-col items-center justify-center border border-slate-200">
+                                  <span className="material-symbols-outlined text-lg">draft</span>
+                                </div>
+                              )}
+
+                              <div className="flex-1 min-w-0 pr-5">
+                                <p className="text-xs font-bold text-slate-800 truncate" title={f.name}>
+                                  {f.name}
+                                </p>
+                                <p className="text-[10px] text-slate-400 font-medium">
+                                  {sizeFormatted} <span className="text-blue-500 ml-1 font-bold">Ver</span>
+                                </p>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={(ev) => {
+                                  ev.stopPropagation();
+                                  setTransitionFiles(prev => prev.filter((_, idx) => idx !== i));
+                                  if (transitionPreviewIndex === i) setTransitionPreviewIndex(null);
+                                }}
+                                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors cursor-pointer"
+                                title="Eliminar archivo"
+                              >
+                                <span className="material-symbols-outlined text-sm">close</span>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Comentario de Cierre */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-extrabold text-blue-600 uppercase tracking-widest">Comentario de Cierre</label>
+                    <textarea
+                      value={transitionComment}
+                      onChange={(e) => setTransitionComment(e.target.value)}
+                      placeholder={existingEvidence ? "Añadir más detalles..." : "Describe el trabajo realizado..."}
+                      rows={3}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2.5 text-sm font-medium text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
+                    />
+                  </div>
                 </div>
+              )}
+            </div>
+
+            {/* Footer Fijo Siempre Visible */}
+            <footer className="px-6 py-3.5 border-t border-gray-100 bg-gray-50/80 flex justify-end gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={closeTransitionModal}
+                className="px-5 py-2 text-gray-500 text-xs font-bold hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={transitionSubmitting || (!isStart && transitionFiles.length === 0 && !existingEvidence)}
+                className="px-6 py-2 bg-gray-900 text-white rounded-xl text-xs font-bold shadow-lg shadow-gray-900/10 hover:shadow-gray-900/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
+              >
+                {transitionSubmitting && <CircularProgress size={14} color="inherit" />}
+                {isStart ? "Comenzar Trabajo" : (isFinish ? "Finalizar Tarea" : "Enviar a Revisión")}
+              </button>
+            </footer>
+          </div>
+        </div>
+
+        {/* CARROUSEL / LIGHTBOX DE PREVISUALIZACIÓN */}
+        {transitionPreviewIndex !== null && transitionFiles[transitionPreviewIndex] && (
+          <div 
+            onClick={() => setTransitionPreviewIndex(null)}
+            className="fixed inset-0 z-[500] bg-black/90 backdrop-blur-md flex flex-col items-center justify-between p-4 animate-in fade-in duration-150 cursor-pointer select-none"
+          >
+            {/* Barra Superior del Carrousel */}
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="w-full flex items-center justify-between text-white px-4 py-2 cursor-default"
+            >
+              <div className="flex items-center gap-3">
+                <span className="bg-white/20 px-2.5 py-1 rounded-full text-xs font-bold tracking-wider">
+                  {transitionPreviewIndex + 1} / {transitionFiles.length}
+                </span>
+                <p className="text-sm font-semibold truncate max-w-xs sm:max-w-md">
+                  {transitionFiles[transitionPreviewIndex].name}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setTransitionPreviewIndex(null)}
+                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center text-white transition-colors cursor-pointer"
+                title="Cerrar (Esc o clic afuera)"
+              >
+                <span className="material-symbols-outlined text-2xl">close</span>
+              </button>
+            </div>
+
+            {/* Zona Principal del Carrousel */}
+            <div 
+              onClick={() => setTransitionPreviewIndex(null)}
+              className="relative flex-1 w-full max-w-4xl flex items-center justify-center p-2"
+            >
+              {/* Botón Anterior */}
+              {transitionFiles.length > 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setTransitionPreviewIndex(prev => (prev > 0 ? prev - 1 : transitionFiles.length - 1));
+                  }}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-slate-900/90 hover:bg-blue-600 border border-white/20 text-white flex items-center justify-center transition-all z-20 cursor-pointer shadow-2xl hover:scale-110 hover:border-blue-400"
+                  title="Anterior (Flecha izquierda)"
+                >
+                  <span className="material-symbols-outlined text-3xl">chevron_left</span>
+                </button>
+              )}
+
+              {/* Contenido Visual con Marco y Borde Delimitador */}
+              <div 
+                onClick={(e) => e.stopPropagation()}
+                className="max-h-[70vh] max-w-full flex items-center justify-center p-2 cursor-default"
+              >
+                {transitionFiles[transitionPreviewIndex].type?.startsWith("image/") || /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(transitionFiles[transitionPreviewIndex].name) ? (
+                  <div className="relative rounded-2xl overflow-hidden border border-white/20 ring-1 ring-black/80 shadow-[0_20px_50px_rgba(0,0,0,0.9)] bg-slate-950/90 flex items-center justify-center">
+                    <img
+                      src={URL.createObjectURL(transitionFiles[transitionPreviewIndex])}
+                      alt={transitionFiles[transitionPreviewIndex].name}
+                      className="max-h-[68vh] max-w-full object-contain rounded-2xl animate-in zoom-in-95 duration-150 cursor-default"
+                    />
+                  </div>
+                ) : transitionFiles[transitionPreviewIndex].type === "application/pdf" || /\.pdf$/i.test(transitionFiles[transitionPreviewIndex].name) ? (
+                  <div className="bg-slate-900 border border-white/20 rounded-2xl p-8 flex flex-col items-center justify-center text-center max-w-md text-white shadow-[0_20px_50px_rgba(0,0,0,0.9)] ring-1 ring-black/80">
+                    <div className="w-20 h-20 rounded-2xl bg-red-500/20 text-red-400 flex items-center justify-center mb-4 border border-red-500/30">
+                      <span className="material-symbols-outlined text-4xl">picture_as_pdf</span>
+                    </div>
+                    <h3 className="text-base font-bold mb-1 truncate max-w-xs">{transitionFiles[transitionPreviewIndex].name}</h3>
+                    <p className="text-xs text-slate-400 mb-6">Documento PDF</p>
+                    <a
+                      href={URL.createObjectURL(transitionFiles[transitionPreviewIndex])}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg transition-all cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-sm">open_in_new</span>
+                      Abrir PDF en nueva pestaña
+                    </a>
+                  </div>
+                ) : (
+                  <div className="bg-slate-900 border border-white/20 rounded-2xl p-8 flex flex-col items-center justify-center text-center max-w-md text-white shadow-[0_20px_50px_rgba(0,0,0,0.9)] ring-1 ring-black/80">
+                    <div className="w-20 h-20 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center mb-4 border border-blue-500/30">
+                      <span className="material-symbols-outlined text-4xl">description</span>
+                    </div>
+                    <h3 className="text-base font-bold mb-1 truncate max-w-xs">{transitionFiles[transitionPreviewIndex].name}</h3>
+                    <p className="text-xs text-slate-400">Documento adjunto</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Botón Siguiente */}
+              {transitionFiles.length > 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setTransitionPreviewIndex(prev => (prev < transitionFiles.length - 1 ? prev + 1 : 0));
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-slate-900/90 hover:bg-blue-600 border border-white/20 text-white flex items-center justify-center transition-all z-20 cursor-pointer shadow-2xl hover:scale-110 hover:border-blue-400"
+                  title="Siguiente (Flecha derecha)"
+                >
+                  <span className="material-symbols-outlined text-3xl">chevron_right</span>
+                </button>
+              )}
+            </div>
+
+            {/* Tira inferior de miniaturas */}
+            {transitionFiles.length > 1 && (
+              <div 
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-2 max-w-xl overflow-x-auto py-2 px-4 custom-scrollbar cursor-default"
+              >
+                {transitionFiles.map((f, idx) => {
+                  const isImg = f.type?.startsWith("image/") || /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(f.name);
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setTransitionPreviewIndex(idx)}
+                      className={`w-12 h-12 rounded-lg overflow-hidden shrink-0 transition-all border-2 cursor-pointer ${
+                        transitionPreviewIndex === idx ? "border-blue-500 scale-105 shadow-md shadow-blue-500/30" : "border-white/20 opacity-50 hover:opacity-100"
+                      }`}
+                    >
+                      {isImg ? (
+                        <img src={URL.createObjectURL(f)} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-slate-800 flex items-center justify-center text-white text-xs">
+                          <span className="material-symbols-outlined text-base">draft</span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
-
-          <footer className="px-8 py-6 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
-            <button
-              onClick={() => setDropTransition(null)}
-              className="px-6 py-2.5 text-gray-400 text-sm font-bold hover:text-gray-600"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleConfirm}
-              disabled={submitting || (!isStart && files.length === 0 && !existingEvidence)}
-              className="px-8 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold shadow-lg shadow-gray-900/10 hover:shadow-gray-900/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {submitting && <CircularProgress size={16} color="inherit" />}
-              {isStart ? "Comenzar Trabajo" : (isFinish ? "Finalizar Tarea" : "Enviar a Revisión")}
-            </button>
-          </footer>
-        </div>
-      </div>
+        )}
+      </>
     );
   };
 
@@ -1197,48 +1494,337 @@ export default function KanbanPage() {
               </div>
             )}
 
-            {/* Evidencias */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Evidencias y Registro de Término</span>
-                <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                  {item.evidencias?.length || 0} Archivos
-                </span>
-              </div>
+            {/* Bloque de Evidencias: ANTES vs DESPUÉS */}
+            {(() => {
+              const allEvidencias = item.evidencias || [];
+              const isDoc = (url) => /\.(pdf|doc|docx|xls|xlsx|csv|txt)$/i.test(url || "");
+              
+              // Separar evidencias antes vs después
+              const isAntes = (ev) => {
+                const com = (ev.comentario || "").toLowerCase();
+                return com.includes("antes") || com.includes("inicial");
+              };
 
-              {item.evidencias?.length > 0 ? (
-                <div className="grid grid-cols-1 gap-6">
-                  {item.evidencias.map((ev, idx) => (
-                    <div key={ev.id || idx} className="bg-gray-50 rounded-3xl overflow-hidden border border-gray-100 group hover:border-blue-200 transition-all">
-                      <div className="aspect-video relative bg-slate-200 flex items-center justify-center overflow-hidden">
-                        <img
-                          src={ev.archivo_url.startsWith('http') ? ev.archivo_url : `${process.env.NEXT_PUBLIC_API_URL}${ev.archivo_url.replace('/api', '')}`}
-                          alt={`Evidencia ${idx}`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                      </div>
-                      <div className="p-6 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Comentario</span>
-                          <span className="text-[9px] text-gray-300">{formatDate(ev.creado_en)}</span>
-                        </div>
-                        <p className="text-gray-700 text-sm italic leading-relaxed">"{ev.comentario || 'Sin comentario proporcionado'}"</p>
-                      </div>
+              const evidenciasAntes = allEvidencias.filter(isAntes);
+              const evidenciasDespues = allEvidencias.filter(e => !isAntes(e));
+
+              const imgDespues = evidenciasDespues.filter(e => !isDoc(e.archivo_url));
+              const docDespues = evidenciasDespues.filter(e => isDoc(e.archivo_url));
+              const currentImgDespues = imgDespues[detailActiveImgIndex] || imgDespues[0];
+
+              return (
+                <div className="space-y-6 pt-2">
+                  {/* --- APARTADO 1: EVIDENCIA INICIAL (ANTES) --- */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black text-slate-700 uppercase tracking-widest flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-base text-amber-500">history_toggle_off</span>
+                        1. Evidencia Inicial (Antes)
+                      </span>
+                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                        evidenciasAntes.length > 0 ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-slate-100 text-slate-400"
+                      }`}>
+                        {evidenciasAntes.length > 0 ? `${evidenciasAntes.length} archivo(s)` : "Sin registro"}
+                      </span>
                     </div>
-                  ))}
+
+                    {evidenciasAntes.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {evidenciasAntes.map((ev, idx) => {
+                          const url = ev.archivo_url.startsWith('http') ? ev.archivo_url : `${process.env.NEXT_PUBLIC_API_URL}${ev.archivo_url.replace('/api', '')}`;
+                          const isFileDoc = isDoc(ev.archivo_url);
+
+                          if (isFileDoc) {
+                            return (
+                              <div key={ev.id || idx} className="bg-amber-50/50 border border-amber-200/80 rounded-2xl p-3 flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                                  <span className="material-symbols-outlined text-xl">description</span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-bold text-slate-800 truncate">Documento Inicial</p>
+                                  <a href={url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-amber-700 hover:underline inline-flex items-center gap-0.5 mt-0.5">
+                                    Abrir documento <span className="material-symbols-outlined text-xs">open_in_new</span>
+                                  </a>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div 
+                              key={ev.id || idx}
+                              onClick={() => {
+                                const targetUrl = url;
+                                setDetailLightboxIndex(0);
+                              }}
+                              className="relative bg-slate-950 rounded-2xl overflow-hidden aspect-video flex items-center justify-center group cursor-pointer shadow-sm border border-slate-800"
+                            >
+                              <img
+                                src={url}
+                                alt="Evidencia Antes"
+                                className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
+                                onError={(e) => {
+                                  e.target.style.display = "none";
+                                  if (e.target.nextSibling) e.target.nextSibling.style.display = "flex";
+                                }}
+                              />
+                              <div className="hidden absolute inset-0 bg-slate-100 flex-col items-center justify-center text-slate-400 text-center p-2">
+                                <span className="material-symbols-outlined text-2xl text-slate-400 mb-0.5">image_not_supported</span>
+                                <span className="text-[10px] font-bold text-slate-500">Imagen no disponible</span>
+                              </div>
+                              <div className="absolute top-2 left-2 bg-amber-500/90 backdrop-blur-xs text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md shadow-xs">
+                                Estado Antes
+                              </div>
+                              <div className="absolute bottom-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <span className="material-symbols-outlined text-sm">zoom_in</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-4 flex items-center gap-3 text-slate-400">
+                        <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-base text-slate-400">hide_image</span>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-600">No se adjuntó evidencia inicial (Antes)</p>
+                          <p className="text-[10px] text-slate-400">Esta tarea fue creada sin fotografía o documento de estado inicial.</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* --- APARTADO 2: EVIDENCIAS DE ENTREGA / TÉRMINO (DESPUÉS) --- */}
+                  <div className="space-y-3 pt-3 border-t border-gray-100">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-[11px] font-black text-slate-700 uppercase tracking-widest flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-base text-blue-600">task_alt</span>
+                        2. Evidencias de Entrega (Después) ({evidenciasDespues.length})
+                      </span>
+
+                      {/* Selector de Pestañas: Fotos vs Documentos */}
+                      {evidenciasDespues.length > 0 && (
+                        <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl">
+                          <button
+                            type="button"
+                            onClick={() => setDetailEvidenceTab("imagenes")}
+                            className={`px-3 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                              detailEvidenceTab === "imagenes"
+                                ? "bg-white text-blue-600 shadow-2xs font-extrabold"
+                                : "text-slate-500 hover:text-slate-800"
+                            }`}
+                          >
+                            <span className="material-symbols-outlined text-sm">photo_library</span>
+                            Fotos ({imgDespues.length})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDetailEvidenceTab("documentos")}
+                            className={`px-3 py-1 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                              detailEvidenceTab === "documentos"
+                                ? "bg-white text-blue-600 shadow-2xs font-extrabold"
+                                : "text-slate-500 hover:text-slate-800"
+                            }`}
+                          >
+                            <span className="material-symbols-outlined text-sm">description</span>
+                            Documentos ({docDespues.length})
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {evidenciasDespues.length === 0 ? (
+                      <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center opacity-70">
+                        <span className="material-symbols-outlined text-3xl mb-1 text-slate-400">pending_actions</span>
+                        <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Sin evidencias de término aún</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">El trabajador adjuntará las evidencias de entrega al pasar a revisión o finalizar.</p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Pestaña: FOTOS (Carrusel) */}
+                        {detailEvidenceTab === "imagenes" && (
+                          <div>
+                            {imgDespues.length > 0 && currentImgDespues ? (
+                              <div className="space-y-3">
+                                {/* Visor Principal de Foto */}
+                                <div className="relative bg-slate-950 rounded-2xl overflow-hidden aspect-video flex items-center justify-center group shadow-md">
+                                  <img
+                                    src={currentImgDespues.archivo_url.startsWith('http') ? currentImgDespues.archivo_url : `${process.env.NEXT_PUBLIC_API_URL}${currentImgDespues.archivo_url.replace('/api', '')}`}
+                                    alt="Evidencia Después"
+                                    onClick={() => setDetailLightboxIndex(detailActiveImgIndex)}
+                                    className="max-h-full max-w-full object-contain cursor-pointer transition-transform duration-300 group-hover:scale-102"
+                                    title="Haz clic para pantalla completa"
+                                  />
+
+                                  {/* Badge Contador */}
+                                  <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full border border-white/10 shadow-sm pointer-events-none">
+                                    {detailActiveImgIndex + 1} / {imgDespues.length}
+                                  </div>
+
+                                  {/* Badge Estado Después */}
+                                  <div className="absolute top-3 left-3 bg-emerald-600/90 backdrop-blur-xs text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md shadow-xs">
+                                    Estado Después (Término)
+                                  </div>
+
+                                  {/* Botón Anterior */}
+                                  {imgDespues.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDetailActiveImgIndex(prev => (prev > 0 ? prev - 1 : imgDespues.length - 1));
+                                      }}
+                                      className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center transition-all opacity-80 group-hover:opacity-100 cursor-pointer shadow-lg hover:scale-110"
+                                      title="Foto anterior"
+                                    >
+                                      <span className="material-symbols-outlined text-xl">chevron_left</span>
+                                    </button>
+                                  )}
+
+                                  {/* Botón Siguiente */}
+                                  {imgDespues.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDetailActiveImgIndex(prev => (prev < imgDespues.length - 1 ? prev + 1 : 0));
+                                      }}
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center transition-all opacity-80 group-hover:opacity-100 cursor-pointer shadow-lg hover:scale-110"
+                                      title="Foto siguiente"
+                                    >
+                                      <span className="material-symbols-outlined text-xl">chevron_right</span>
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Comentario de la Foto Actual */}
+                                {currentImgDespues.comentario && (
+                                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-start gap-2.5">
+                                    <span className="material-symbols-outlined text-base text-slate-400 mt-0.5">comment</span>
+                                    <div className="flex-1">
+                                      <p className="text-xs font-semibold text-slate-700 italic">
+                                        "{currentImgDespues.comentario}"
+                                      </p>
+                                      <span className="text-[9px] text-slate-400 font-bold block mt-1">
+                                        {formatDate(currentImgDespues.creado_en)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Tira de Miniaturas */}
+                                {imgDespues.length > 1 && (
+                                  <div className="flex items-center gap-2 overflow-x-auto py-1 custom-scrollbar">
+                                    {imgDespues.map((ev, idx) => {
+                                      const url = ev.archivo_url.startsWith('http') ? ev.archivo_url : `${process.env.NEXT_PUBLIC_API_URL}${ev.archivo_url.replace('/api', '')}`;
+                                      return (
+                                        <button
+                                          key={ev.id || idx}
+                                          type="button"
+                                          onClick={() => setDetailActiveImgIndex(idx)}
+                                          className={`w-14 h-14 rounded-xl overflow-hidden shrink-0 transition-all border-2 cursor-pointer bg-slate-900 ${
+                                            detailActiveImgIndex === idx
+                                              ? "border-blue-600 scale-105 shadow-md shadow-blue-600/30 ring-2 ring-blue-500/20"
+                                              : "border-slate-200 opacity-60 hover:opacity-100"
+                                          }`}
+                                        >
+                                          <img src={url} alt="" className="w-full h-full object-cover" />
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center opacity-60">
+                                <span className="material-symbols-outlined text-3xl mb-1 text-slate-400">no_photography</span>
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">No se adjuntaron fotos en la entrega</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Pestaña: DOCUMENTOS (PDF, Word, Excel) */}
+                        {detailEvidenceTab === "documentos" && (
+                          <div>
+                            {docDespues.length > 0 ? (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                {docDespues.map((ev, idx) => {
+                                  const url = ev.archivo_url.startsWith('http') ? ev.archivo_url : `${process.env.NEXT_PUBLIC_API_URL}${ev.archivo_url.replace('/api', '')}`;
+                                  const isPdf = /\.pdf$/i.test(ev.archivo_url);
+                                  const isWord = /\.(doc|docx)$/i.test(ev.archivo_url);
+                                  const isExcel = /\.(xls|xlsx|csv)$/i.test(ev.archivo_url);
+                                  const rawFileName = ev.archivo_url.split("/").pop() || `Documento_${idx + 1}`;
+
+                                  return (
+                                    <div key={ev.id || idx} className="bg-white border border-slate-200 hover:border-blue-300 rounded-2xl p-3.5 flex items-start gap-3 shadow-2xs transition-all group">
+                                      {isPdf ? (
+                                        <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 shrink-0 flex flex-col items-center justify-center border border-red-100">
+                                          <span className="material-symbols-outlined text-xl">picture_as_pdf</span>
+                                          <span className="text-[7px] font-black uppercase">PDF</span>
+                                        </div>
+                                      ) : isWord ? (
+                                        <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 shrink-0 flex flex-col items-center justify-center border border-blue-100">
+                                          <span className="material-symbols-outlined text-xl">description</span>
+                                          <span className="text-[7px] font-black uppercase">DOC</span>
+                                        </div>
+                                      ) : isExcel ? (
+                                        <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 shrink-0 flex flex-col items-center justify-center border border-emerald-100">
+                                          <span className="material-symbols-outlined text-xl">table_chart</span>
+                                          <span className="text-[7px] font-black uppercase">XLS</span>
+                                        </div>
+                                      ) : (
+                                        <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 shrink-0 flex flex-col items-center justify-center border border-slate-200">
+                                          <span className="material-symbols-outlined text-xl">draft</span>
+                                          <span className="text-[7px] font-black uppercase">DOC</span>
+                                        </div>
+                                      )}
+
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-bold text-slate-800 truncate" title={rawFileName}>
+                                          {rawFileName}
+                                        </p>
+                                        {ev.comentario && (
+                                          <p className="text-[11px] text-slate-500 italic truncate mt-0.5">
+                                            "{ev.comentario}"
+                                          </p>
+                                        )}
+                                        <div className="flex items-center gap-2 mt-2">
+                                          <a
+                                            href={url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-[10px] font-bold rounded-lg transition-colors cursor-pointer"
+                                          >
+                                            <span className="material-symbols-outlined text-xs">open_in_new</span>
+                                            Abrir documento
+                                          </a>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center opacity-60">
+                                <span className="material-symbols-outlined text-3xl mb-1 text-slate-400">folder_off</span>
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">No se adjuntaron documentos en la entrega</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-              ) : (
-                <div className="bg-gray-50 border border-dashed border-gray-200 rounded-3xl p-12 flex flex-col items-center justify-center text-center opacity-40">
-                  <span className="material-symbols-outlined text-4xl mb-2">add_a_photo</span>
-                  <p className="text-[10px] font-bold uppercase tracking-widest">No hay evidencias cargadas aún</p>
-                </div>
-              )}
-            </div>
+              );
+            })()}
 
             {/* Panel de Revisión (Approve/Reject) */}
             {item.estado === "en_revision" && (
-              <div className="mt-8 pt-8 border-t border-amber-100 bg-amber-50/50 -mx-8 px-8 pb-4">
-                <div className="flex items-center gap-2 mb-4">
+              <div className="mt-6 pt-6 border-t border-amber-100 bg-amber-50/60 -mx-8 px-8 pb-4">
+                <div className="flex items-center gap-2 mb-3">
                   <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600">
                     <span className="material-symbols-outlined text-lg">fact_check</span>
                   </div>
@@ -1248,15 +1834,15 @@ export default function KanbanPage() {
                   </div>
                 </div>
 
-                <div className="bg-white rounded-2xl border border-amber-200 p-5 space-y-4 shadow-sm">
-                  <div className="space-y-2">
+                <div className="bg-white rounded-2xl border border-amber-200 p-4 space-y-3 shadow-2xs">
+                  <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Comentario al Trabajador</label>
                     <textarea
                       value={reviewComment}
                       onChange={(e) => setReviewComment(e.target.value)}
-                      placeholder="Indica qué pareció el trabajo o por qué lo rechazas..."
+                      placeholder="Indica observaciones del trabajo realizado o motivo de rechazo..."
                       rows={3}
-                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 outline-none focus:ring-2 focus:ring-amber-500 transition-all resize-none"
+                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-700 outline-none focus:ring-2 focus:ring-amber-500 transition-all resize-none"
                     />
                   </div>
 
@@ -1264,14 +1850,14 @@ export default function KanbanPage() {
                     <button
                       onClick={() => handleReviewAction(item, "reject")}
                       disabled={submittingReview}
-                      className="flex-1 px-4 py-3 bg-white border border-red-200 text-red-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-50 transition-all flex items-center justify-center gap-2"
+                      className="flex-1 px-4 py-2.5 bg-white border border-red-200 text-red-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-50 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       {submittingReview ? <CircularProgress size={14} color="inherit" /> : <><span className="material-symbols-outlined text-sm">thumb_down</span> Rechazar</>}
                     </button>
                     <button
                       onClick={() => handleReviewAction(item, "approve")}
                       disabled={submittingReview}
-                      className="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2"
+                      className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       {submittingReview ? <CircularProgress size={14} color="inherit" /> : <><span className="material-symbols-outlined text-sm">check_circle</span> Aprobar y Finalizar</>}
                     </button>
@@ -1284,12 +1870,122 @@ export default function KanbanPage() {
           <footer className="px-8 py-6 border-t border-gray-100 bg-gray-50/50 flex justify-end">
             <button
               onClick={() => setSelectedItem(null)}
-              className="px-6 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold shadow-lg shadow-gray-900/10 hover:shadow-gray-900/20 active:scale-95 transition-all"
+              className="px-6 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold shadow-lg shadow-gray-900/10 hover:shadow-gray-900/20 active:scale-95 transition-all cursor-pointer"
             >
               Entendido
             </button>
           </footer>
         </div>
+
+        {/* Lightbox Pantalla Completa en Detalle */}
+        {detailLightboxIndex !== null && (() => {
+          const isDoc = (url) => /\.(pdf|doc|docx|xls|xlsx|csv|txt)$/i.test(url || "");
+          const imgEvidences = (item.evidencias || []).filter(e => !isDoc(e.archivo_url));
+          const activeEv = imgEvidences[detailLightboxIndex] || imgEvidences[0];
+          if (!activeEv) return null;
+          const activeUrl = activeEv.archivo_url.startsWith('http') ? activeEv.archivo_url : `${process.env.NEXT_PUBLIC_API_URL}${activeEv.archivo_url.replace('/api', '')}`;
+
+          return (
+            <div 
+              onClick={() => setDetailLightboxIndex(null)}
+              className="fixed inset-0 z-[600] bg-black/95 backdrop-blur-md flex flex-col items-center justify-between p-4 animate-in fade-in duration-150 cursor-pointer select-none"
+            >
+              {/* Barra Superior */}
+              <div 
+                onClick={(e) => e.stopPropagation()}
+                className="w-full flex items-center justify-between text-white px-4 py-2 cursor-default"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="bg-white/20 px-2.5 py-1 rounded-full text-xs font-bold tracking-wider">
+                    {detailLightboxIndex + 1} / {imgEvidences.length}
+                  </span>
+                  {activeEv.comentario && (
+                    <p className="text-sm font-semibold truncate max-w-xs sm:max-w-md italic text-slate-200">
+                      "{activeEv.comentario}"
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDetailLightboxIndex(null)}
+                  className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center text-white transition-colors cursor-pointer"
+                  title="Cerrar (Esc o clic afuera)"
+                >
+                  <span className="material-symbols-outlined text-2xl">close</span>
+                </button>
+              </div>
+
+              {/* Zona Central */}
+              <div 
+                onClick={() => setDetailLightboxIndex(null)}
+                className="relative flex-1 w-full max-w-5xl flex items-center justify-center p-2"
+              >
+                {imgEvidences.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDetailLightboxIndex(prev => (prev > 0 ? prev - 1 : imgEvidences.length - 1));
+                    }}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-slate-900/90 hover:bg-blue-600 border border-white/20 text-white flex items-center justify-center transition-all z-20 cursor-pointer shadow-2xl hover:scale-110 hover:border-blue-400"
+                    title="Anterior"
+                  >
+                    <span className="material-symbols-outlined text-3xl">chevron_left</span>
+                  </button>
+                )}
+
+                <div 
+                  onClick={(e) => e.stopPropagation()}
+                  className="relative rounded-2xl overflow-hidden border border-white/20 ring-1 ring-black/80 shadow-[0_20px_50px_rgba(0,0,0,0.9)] bg-slate-950/90 flex items-center justify-center cursor-default"
+                >
+                  <img
+                    src={activeUrl}
+                    alt="Evidencia"
+                    className="max-h-[75vh] max-w-full object-contain rounded-2xl animate-in zoom-in-95 duration-150 cursor-default"
+                  />
+                </div>
+
+                {imgEvidences.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDetailLightboxIndex(prev => (prev < imgEvidences.length - 1 ? prev + 1 : 0));
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-slate-900/90 hover:bg-blue-600 border border-white/20 text-white flex items-center justify-center transition-all z-20 cursor-pointer shadow-2xl hover:scale-110 hover:border-blue-400"
+                    title="Siguiente"
+                  >
+                    <span className="material-symbols-outlined text-3xl">chevron_right</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Miniaturas Inferiores */}
+              {imgEvidences.length > 1 && (
+                <div 
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-2 max-w-xl overflow-x-auto py-2 px-4 custom-scrollbar cursor-default"
+                >
+                  {imgEvidences.map((ev, idx) => {
+                    const u = ev.archivo_url.startsWith('http') ? ev.archivo_url : `${process.env.NEXT_PUBLIC_API_URL}${ev.archivo_url.replace('/api', '')}`;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setDetailLightboxIndex(idx)}
+                        className={`w-12 h-12 rounded-lg overflow-hidden shrink-0 transition-all border-2 cursor-pointer ${
+                          detailLightboxIndex === idx ? "border-blue-500 scale-105 shadow-md shadow-blue-500/30" : "border-white/20 opacity-50 hover:opacity-100"
+                        }`}
+                      >
+                        <img src={u} alt="" className="w-full h-full object-cover" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     );
   };
@@ -1502,7 +2198,7 @@ export default function KanbanPage() {
       {renderDetailModal()}
 
       {/* Modal Transición */}
-      <StatusTransitionModal />
+      {renderStatusTransitionModal()}
 
       {/* Modal Agregar Item */}
       {isAddModalOpen && (
