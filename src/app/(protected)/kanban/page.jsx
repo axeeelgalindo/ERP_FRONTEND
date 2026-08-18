@@ -918,8 +918,8 @@ export default function KanbanPage() {
                     className="bg-transparent text-xs font-bold text-gray-700 border-b border-dashed border-gray-300 focus:border-blue-500 outline-none cursor-pointer py-0.5"
                   >
                     <option value="">Sin Asignar</option>
-                    {filterOptions.employees.map(emp => (
-                      <option key={emp.id} value={emp.id}>{formatResponsibleName(emp.nombre)}</option>
+                    {employeeOptions.map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.nombre}</option>
                     ))}
                   </select>
                 </div>
