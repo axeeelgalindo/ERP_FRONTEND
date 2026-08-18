@@ -51,7 +51,7 @@ export default function KanbanPage() {
 
   const [parentOptions, setParentOptions] = useState([]); // Epicas or Tareas
   const [loadingParents, setLoadingParents] = useState(false);
-  
+
   const [taskOptions, setTaskOptions] = useState([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
 
@@ -201,11 +201,26 @@ export default function KanbanPage() {
     setLoading(true);
     try {
       const headers = makeHeaders(session);
+      const projectParam = filters.proyecto_id || "";
+      let finalProyectoId = "";
+      let finalDestino = "";
+      let finalCentroCosto = "";
+
+      if (projectParam.startsWith("DESTINO:")) {
+        const parts = projectParam.split(":");
+        finalDestino = parts[1] || "";
+        finalCentroCosto = parts[2] || "";
+      } else if (projectParam) {
+        finalProyectoId = projectParam;
+      }
+
       const qs = new URLSearchParams({
-        proyecto_id: filters.proyecto_id,
-        responsable_id: filters.responsable_id,
-        periodo: filters.periodo,
-        q: q,
+        ...(finalProyectoId ? { proyecto_id: finalProyectoId } : {}),
+        ...(finalDestino ? { destino: finalDestino } : {}),
+        ...(finalCentroCosto ? { centro_costo: finalCentroCosto } : {}),
+        ...(filters.responsable_id ? { responsable_id: filters.responsable_id } : {}),
+        ...(filters.periodo ? { periodo: filters.periodo } : {}),
+        ...(q ? { q } : {}),
       }).toString();
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/kanban?${qs}`, {
@@ -330,15 +345,15 @@ export default function KanbanPage() {
       const body = {
         estado: estadoParams,
         comentario_revision: reviewComment,
-        ...(action === "approve" ? { 
+        ...(action === "approve" ? {
           avance: 100,
           fecha_fin_real: new Date().toISOString()
         } : {})
       };
-      
+
       const endpoint = isSubtarea ? `tareas-detalle/update/${item.id}` : `tareas/update/${item.id}`;
       const headers = makeHeaders(session);
-      
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/${endpoint}`, {
         method: "PATCH",
         headers: { ...headers, "Content-Type": "application/json" },
@@ -368,24 +383,60 @@ export default function KanbanPage() {
     return d.toLocaleDateString("es-CL", { day: "numeric", month: "short" }).replace(".", "");
   };
 
-  const formatResponsibleName = (fullName) => {
-    if (!fullName || fullName === "Sin Asignar" || fullName === "Proyecto" || fullName === "??") return fullName;
-    if (!fullName.includes(",")) return fullName;
-    const [apellidos, nombres] = fullName.split(",").map(s => s.trim());
-    const firstNombre = nombres.split(" ")[0] || "";
-    return `${firstNombre} ${apellidos}`.trim();
-  };
+  function formatNombreUsuario(raw) {
+    if (!raw || raw === "Sin Asignar" || raw === "Proyecto" || raw === "??") return raw || "Sin Asignar";
+    const s = String(raw).trim();
+    if (s.includes(",")) {
+      const [apellidosPart, nombresPart] = s.split(",");
+      const primerApellido = (apellidosPart || "").trim().split(/\s+/)[0] || "";
+      const primerNombre = (nombresPart || "").trim().split(/\s+/)[0] || "";
+      return `${primerNombre} ${primerApellido}`.trim() || s;
+    }
+    const tokens = s.split(/\s+/).filter(Boolean);
+    if (tokens.length >= 2) {
+      return `${tokens[0]} ${tokens[1]}`;
+    }
+    return s;
+  }
 
-  const SearchableSelect = ({ options, value, onChange, placeholder, label }) => {
+  const projectOptions = useMemo(() => {
+    const dbProjects = (data?.filters?.projects || [])
+      .map(p => ({
+        id: p.id,
+        nombre: `📁 ${p.nombre}`,
+      }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" }));
+
+    return [
+      ...dbProjects,
+      { id: "DESTINO:TALLER", nombre: "🏭 Taller (Todos)" },
+      { id: "DESTINO:TALLER:PMC", nombre: "🏭 Taller - PMC" },
+      { id: "DESTINO:TALLER:PUQ", nombre: "🏭 Taller - PUQ" },
+      { id: "DESTINO:ADMINISTRACION", nombre: "🏢 Administración (Todos)" },
+      { id: "DESTINO:ADMINISTRACION:PMC", nombre: "🏢 Administración - PMC" },
+      { id: "DESTINO:ADMINISTRACION:PUQ", nombre: "🏢 Administración - PUQ" },
+    ];
+  }, [data?.filters?.projects]);
+
+  const employeeOptions = useMemo(() => {
+    return (data?.filters?.employees || [])
+      .map(e => ({
+        id: e.id,
+        nombre: formatNombreUsuario(e.nombre),
+      }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" }));
+  }, [data?.filters?.employees]);
+
+  const SearchableSelect = ({ options, value, onChange, placeholder, label, align = "left" }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState("");
     const containerRef = useRef(null);
-  
+
     const selectedOption = options.find(o => o.id === value);
-    const filteredOptions = options.filter(o => 
+    const filteredOptions = options.filter(o =>
       (o.nombre || "").toLowerCase().includes(search.toLowerCase())
     );
-  
+
     useEffect(() => {
       const handleClickOutside = (e) => {
         if (containerRef.current && !containerRef.current.contains(e.target)) {
@@ -396,27 +447,27 @@ export default function KanbanPage() {
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [isOpen]);
-  
+
     return (
       <div className="relative" ref={containerRef}>
-        <div 
+        <div
           onClick={() => setIsOpen(!isOpen)}
-          className="px-4 py-2.5 bg-white rounded-xl border border-gray-200 text-[11px] font-bold text-gray-600 outline-none focus-within:ring-2 focus-within:ring-blue-600 cursor-pointer flex items-center gap-2 min-w-[180px] hover:border-blue-400 transition-colors shadow-sm"
+          className="px-3 py-1.5 bg-white rounded-xl border border-gray-200 text-xs font-bold text-gray-700 outline-none focus-within:ring-2 focus-within:ring-blue-600 cursor-pointer flex items-center gap-1.5 min-w-[140px] max-w-[190px] hover:border-blue-400 transition-colors shadow-2xs"
         >
-          <span className="text-gray-400 whitespace-nowrap">{label}:</span>
+          <span className="text-gray-400 whitespace-nowrap text-[10px] uppercase tracking-wider">{label}:</span>
           <span className="flex-1 truncate">{selectedOption ? selectedOption.nombre : placeholder}</span>
           <span className={`material-symbols-outlined text-sm text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}>expand_more</span>
         </div>
-        
+
         {isOpen && (
-          <div className="absolute top-full right-0 mt-2 bg-white rounded-xl border border-gray-100 shadow-2xl z-[150] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 w-64">
-            <div className="p-3 border-b border-gray-50 bg-gray-50/50">
+          <div className={`absolute top-full ${align === "right" ? "right-0" : "left-0"} mt-1.5 bg-white rounded-2xl border border-slate-200 shadow-2xl z-[250] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150 w-64 max-w-[90vw]`}>
+            <div className="p-2 border-b border-slate-100 bg-slate-50/80">
               <div className="relative">
-                <span className="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-sm text-gray-400">search</span>
-                <input 
-                  type="text" 
-                  className="w-full bg-white border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-blue-500 transition-all font-medium"
-                  placeholder="Filtrar opciones..."
+                <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">search</span>
+                <input
+                  type="text"
+                  className="w-full bg-white border border-slate-200 rounded-lg pl-7 pr-3 py-1 text-xs outline-none focus:ring-1 focus:ring-blue-500 transition-all font-medium text-slate-700"
+                  placeholder="Buscar opción..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   autoFocus
@@ -425,23 +476,24 @@ export default function KanbanPage() {
               </div>
             </div>
             <div className="max-h-60 overflow-y-auto p-1 custom-scrollbar">
-              <div 
-                className={`px-3 py-2 text-xs rounded-lg cursor-pointer font-bold mb-1 transition-colors ${!value ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:bg-gray-50'}`}
+              <div
+                className={`px-3 py-1.5 text-xs rounded-lg cursor-pointer font-bold mb-0.5 transition-colors ${!value ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:bg-slate-50'}`}
                 onClick={(e) => { e.stopPropagation(); onChange(""); setIsOpen(false); setSearch(""); }}
               >
                 Todos
               </div>
               {filteredOptions.map(opt => (
-                <div 
+                <div
                   key={opt.id}
-                  className={`px-3 py-2 text-xs rounded-lg cursor-pointer mb-1 transition-colors ${value === opt.id ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}
+                  className={`px-3 py-1.5 text-xs rounded-lg cursor-pointer mb-0.5 transition-colors truncate ${value === opt.id ? 'bg-blue-50 text-blue-600 font-bold' : 'text-slate-700 hover:bg-slate-50'}`}
                   onClick={(e) => { e.stopPropagation(); onChange(value === opt.id ? "" : opt.id); setIsOpen(false); setSearch(""); }}
+                  title={opt.nombre}
                 >
                   {opt.nombre}
                 </div>
               ))}
               {filteredOptions.length === 0 && (
-                <div className="px-4 py-6 text-xs text-gray-400 italic text-center">No se encontraron resultados</div>
+                <div className="px-4 py-4 text-xs text-slate-400 italic text-center">No se encontraron resultados</div>
               )}
             </div>
           </div>
@@ -482,7 +534,7 @@ export default function KanbanPage() {
   const renderCard = (item) => {
     const { borderColor, bgType, icon, isOverdue, isRealDelayed } = getTaskStyles(item);
     const isCompletada = ["completada", "finalizado"].includes(item.estado);
-    const formattedName = formatResponsibleName(item.responsable_nombre);
+    const formattedName = formatNombreUsuario(item.responsable_nombre);
     const initials = formattedName && formattedName !== "Sin Asignar"
       ? formattedName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
       : (item.tipo === "EPICA" ? "EP" : "??");
@@ -493,7 +545,7 @@ export default function KanbanPage() {
         draggable="true"
         onDragStart={(e) => onDragStart(e, item.id, item.tipo)}
         onClick={() => setSelectedItem(item)}
-        className={`bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all relative border-l-[4px] ${borderColor} ${isCompletada ? "opacity-75" : ""} cursor-grab active:cursor-grabbing group`}
+        className={`w-full shrink-0 bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all relative border-l-[4px] ${borderColor} ${isCompletada ? "opacity-75" : ""} cursor-grab active:cursor-grabbing group`}
       >
         <div className="p-3">
           <div className="flex justify-between items-start mb-2">
@@ -503,16 +555,14 @@ export default function KanbanPage() {
                 {item.tipo}
               </div>
               {item.tipo === "TAREA" && (
-                <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${
-                  (item.prioridad ?? 2) === 1 ? "bg-green-50 text-green-700 border border-green-200" :
+                <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${(item.prioridad ?? 2) === 1 ? "bg-green-50 text-green-700 border border-green-200" :
                   (item.prioridad ?? 2) === 3 ? "bg-red-50 text-red-700 border border-red-200 animate-pulse" :
-                  "bg-amber-50 text-amber-700 border border-amber-200"
-                }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${
-                    (item.prioridad ?? 2) === 1 ? "bg-green-500" :
+                    "bg-amber-50 text-amber-700 border border-amber-200"
+                  }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${(item.prioridad ?? 2) === 1 ? "bg-green-500" :
                     (item.prioridad ?? 2) === 3 ? "bg-red-500" :
-                    "bg-amber-500"
-                  }`}></span>
+                      "bg-amber-500"
+                    }`}></span>
                   {(item.prioridad ?? 2) === 1 ? "Baja" : (item.prioridad ?? 2) === 3 ? "Alta" : "Media"}
                 </div>
               )}
@@ -588,7 +638,7 @@ export default function KanbanPage() {
     const { item, targetStatus } = dropTransition;
     const isStart = targetStatus === "EN CURSO";
     const isFinish = targetStatus === "COMPLETADO" || targetStatus === "COMPLETADA";
-    
+
     // Buscar evidencia previa si ya estaba en revisión o tiene evidencias
     const existingEvidence = item.evidencias && item.evidencias.length > 0 ? item.evidencias[0] : null;
 
@@ -603,7 +653,7 @@ export default function KanbanPage() {
         const formData = new FormData();
         formData.append("tipo", item.tipo);
         formData.append("targetStatus", targetStatus);
-        
+
         if (isStart) {
           formData.append("fecha_inicio_real", fechaInicio);
         } else {
@@ -660,8 +710,8 @@ export default function KanbanPage() {
             {isStart ? (
               <div className="space-y-2">
                 <label className="text-[11px] font-extrabold text-blue-600 uppercase tracking-widest">Fecha de Inicio Real</label>
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   value={fechaInicio}
                   onChange={(e) => setFechaInicio(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
@@ -677,9 +727,9 @@ export default function KanbanPage() {
                       Evidencia previa (Cargada en revisión)
                     </p>
                     <div className="aspect-video relative rounded-xl overflow-hidden bg-white border border-blue-200">
-                       <img 
-                        src={existingEvidence.archivo_url.startsWith('http') ? existingEvidence.archivo_url : `${process.env.NEXT_PUBLIC_API_URL}${existingEvidence.archivo_url.replace('/api', '')}`} 
-                        className="w-full h-full object-cover" 
+                      <img
+                        src={existingEvidence.archivo_url.startsWith('http') ? existingEvidence.archivo_url : `${process.env.NEXT_PUBLIC_API_URL}${existingEvidence.archivo_url.replace('/api', '')}`}
+                        className="w-full h-full object-cover"
                         alt="Evidencia previa"
                       />
                     </div>
@@ -694,8 +744,8 @@ export default function KanbanPage() {
                     {existingEvidence ? "Añadir Nueva Evidencia (Opcional)" : "Evidencia Fotográfica"}
                   </label>
                   <div className="relative group">
-                    <input 
-                      type="file" 
+                    <input
+                      type="file"
                       accept="image/*"
                       multiple
                       onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files)])}
@@ -716,7 +766,7 @@ export default function KanbanPage() {
                       {files.map((f, i) => (
                         <div key={i} className="bg-gray-100 rounded-lg px-2 py-1 flex items-center gap-2 group/item">
                           <span className="text-[10px] text-gray-600 font-medium truncate max-w-[120px]">{f.name}</span>
-                          <button 
+                          <button
                             onClick={(ev) => {
                               ev.stopPropagation();
                               setFiles(prev => prev.filter((_, idx) => idx !== i));
@@ -733,7 +783,7 @@ export default function KanbanPage() {
 
                 <div className="space-y-2">
                   <label className="text-[11px] font-extrabold text-blue-600 uppercase tracking-widest">Comentario de Cierre</label>
-                  <textarea 
+                  <textarea
                     value={comentario}
                     onChange={(e) => setComentario(e.target.value)}
                     placeholder={existingEvidence ? "Añadir más detalles..." : "Describe lo realizado..."}
@@ -746,13 +796,13 @@ export default function KanbanPage() {
           </div>
 
           <footer className="px-8 py-6 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
-            <button 
+            <button
               onClick={() => setDropTransition(null)}
               className="px-6 py-2.5 text-gray-400 text-sm font-bold hover:text-gray-600"
             >
               Cancelar
             </button>
-            <button 
+            <button
               onClick={handleConfirm}
               disabled={submitting || (!isStart && files.length === 0 && !existingEvidence)}
               className="px-8 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold shadow-lg shadow-gray-900/10 hover:shadow-gray-900/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
@@ -991,8 +1041,8 @@ export default function KanbanPage() {
                             try {
                               const headers = makeHeaders(session);
                               const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tareas-requisito/delete/${req.id}`, {
-                                  method: "DELETE",
-                                  headers,
+                                method: "DELETE",
+                                headers,
                               });
                               if (!res.ok) throw new Error("No se pudo eliminar el requisito");
                               fetchData(searchTerm);
@@ -1083,7 +1133,7 @@ export default function KanbanPage() {
                               });
                               if (!res.ok) throw new Error("No se pudo agregar el requisito");
                               const json = await res.json();
-                              
+
                               setSelectedItem(prev => ({
                                 ...prev,
                                 requisitos: [...(prev.requisitos || []), json.row]
@@ -1201,7 +1251,7 @@ export default function KanbanPage() {
                 <div className="bg-white rounded-2xl border border-amber-200 p-5 space-y-4 shadow-sm">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Comentario al Trabajador</label>
-                    <textarea 
+                    <textarea
                       value={reviewComment}
                       onChange={(e) => setReviewComment(e.target.value)}
                       placeholder="Indica qué pareció el trabajo o por qué lo rechazas..."
@@ -1211,14 +1261,14 @@ export default function KanbanPage() {
                   </div>
 
                   <div className="flex gap-3">
-                    <button 
+                    <button
                       onClick={() => handleReviewAction(item, "reject")}
                       disabled={submittingReview}
                       className="flex-1 px-4 py-3 bg-white border border-red-200 text-red-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-50 transition-all flex items-center justify-center gap-2"
                     >
                       {submittingReview ? <CircularProgress size={14} color="inherit" /> : <><span className="material-symbols-outlined text-sm">thumb_down</span> Rechazar</>}
                     </button>
-                    <button 
+                    <button
                       onClick={() => handleReviewAction(item, "approve")}
                       disabled={submittingReview}
                       className="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2"
@@ -1245,44 +1295,65 @@ export default function KanbanPage() {
   };
 
   return (
-    <div className="bg-[#f8f9fb] text-[#191c1e] min-h-screen overflow-hidden flex flex-col font-sans">
+    <div className="bg-[#f8f9fb] text-[#191c1e] h-[calc(100vh-var(--app-topbar,0px))] max-h-[calc(100vh-var(--app-topbar,0px))] overflow-hidden flex flex-col font-sans">
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300..900&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        .glass-panel { background: rgba(255, 255, 255, 0.82); backdrop-filter: blur(12px); }
-        ::-webkit-scrollbar { width: 5px; height: 5px; }
-        ::-webkit-scrollbar-thumb { background: #c3c5d7; border-radius: 10px; }
+        .glass-panel { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); }
+        
+        /* Scrollbar fino y estético para todo el tablero */
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 5px;
+          height: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(148, 163, 184, 0.4);
+          border-radius: 9999px;
+          transition: background-color 0.2s;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(100, 116, 139, 0.7);
+        }
+        .custom-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+        }
       `}</style>
 
-      <header className="w-full bg-white px-6 pr-14 py-4 flex flex-wrap items-center gap-6 border-b border-gray-200/60 shadow-sm z-10">
-        <div className="flex items-center gap-2.5 mr-6">
-          <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/20">
-            <span className="material-symbols-outlined text-white text-xl">view_kanban</span>
+      <header className="w-full shrink-0 bg-white px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-gray-200/80 shadow-xs z-30">
+        {/* Título & Logo */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center shadow-md shadow-blue-600/20">
+            <span className="material-symbols-outlined text-white text-lg">view_kanban</span>
           </div>
-          <h1 className="text-gray-900 font-extrabold tracking-tight text-xl leading-none">
-            TaskLedger <span className="text-gray-300 font-light mx-1">|</span> <span className="text-gray-500 font-medium">Kanban</span>
+          <h1 className="text-gray-900 font-extrabold tracking-tight uppercase text-base leading-none">
+            Kanban
           </h1>
         </div>
 
-        <div className="flex-1 flex items-center gap-4">
-          <div className="relative flex-grow max-sm:hidden max-w-sm">
-            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-lg">search</span>
+        {/* Buscador y Selector Periodo */}
+        <div className="flex items-center gap-2 flex-1 max-w-md min-w-[200px]">
+          <div className="relative flex-1">
+            <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">search</span>
             <input
-              className="w-full bg-gray-50 border-none ring-1 ring-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 transition-all outline-none text-gray-700"
-              placeholder="Buscar por nombre..."
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-8 pr-3 py-1.5 text-xs focus:ring-2 focus:ring-blue-600 transition-all outline-none text-gray-700 font-medium placeholder:text-gray-400"
+              placeholder="Buscar tareas..."
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
-          <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-xl border border-gray-100">
+          <div className="flex items-center gap-0.5 bg-gray-100/90 p-0.5 rounded-xl shrink-0">
             {["semanal", "mensual", "anual"].map((p) => (
               <button
                 key={p}
                 onClick={() => setFilters(prev => ({ ...prev, periodo: prev.periodo === p ? "" : p }))}
-                className={`px-4 py-1.5 text-[11px] font-bold rounded-lg transition-all uppercase tracking-wider ${filters.periodo === p ? "bg-white text-blue-600 shadow-sm ring-1 ring-gray-100" : "text-gray-400 hover:text-gray-600"
+                className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all uppercase tracking-wider ${filters.periodo === p ? "bg-white text-blue-600 shadow-2xs font-extrabold" : "text-gray-500 hover:text-gray-800"
                   }`}
               >
                 {p}
@@ -1291,21 +1362,24 @@ export default function KanbanPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Filtros Dropdowns y Acciones */}
+        <div className="flex items-center gap-2 shrink-0">
           <SearchableSelect
             label="Miembros"
             placeholder="Todos"
-            options={filterOptions.employees}
+            options={employeeOptions}
             value={filters.responsable_id}
             onChange={(val) => setFilters(prev => ({ ...prev, responsable_id: val, periodo: val ? "" : prev.periodo }))}
+            align="left"
           />
 
           <SearchableSelect
             label="Proyectos"
             placeholder="Todos"
-            options={filterOptions.projects}
+            options={projectOptions}
             value={filters.proyecto_id}
             onChange={(val) => setFilters(prev => ({ ...prev, proyecto_id: val, periodo: val ? "" : prev.periodo }))}
+            align="right"
           />
 
           <button
@@ -1314,9 +1388,9 @@ export default function KanbanPage() {
               setFormData({
                 nombre: "",
                 descripcion: "",
-                proyecto_id: filters.proyecto_id || "",
-                destino: "PROYECTO",
-                centro_costo: "",
+                proyecto_id: filters.proyecto_id?.startsWith("DESTINO:") ? "" : (filters.proyecto_id || ""),
+                destino: filters.proyecto_id?.startsWith("DESTINO:TALLER") ? "TALLER" : filters.proyecto_id?.startsWith("DESTINO:ADMINISTRACION") ? "ADMINISTRACION" : "PROYECTO",
+                centro_costo: filters.proyecto_id?.includes(":PMC") ? "PMC" : filters.proyecto_id?.includes(":PUQ") ? "PUQ" : "",
                 epica_id: "",
                 tarea_id: "",
                 responsable_id: "",
@@ -1329,7 +1403,7 @@ export default function KanbanPage() {
               });
               setIsAddModalOpen(true);
             }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-[11px] font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-all shadow-md shadow-blue-600/20 active:scale-95 cursor-pointer"
           >
             <span className="material-symbols-outlined text-sm">add</span>
             NUEVO
@@ -1337,44 +1411,51 @@ export default function KanbanPage() {
 
           <button
             onClick={() => fetchData(searchTerm)}
-            className="w-10 h-10 flex items-center justify-center text-gray-400 hover:bg-gray-100 rounded-xl transition-all border border-transparent hover:border-gray-200"
+            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-100 rounded-xl transition-all border border-transparent hover:border-gray-200 cursor-pointer"
             title="Refrescar"
           >
-            <span className={`material-symbols-outlined ${loading ? 'animate-spin' : ''}`}>refresh</span>
+            <span className={`material-symbols-outlined text-sm ${loading ? 'animate-spin' : ''}`}>refresh</span>
           </button>
         </div>
       </header>
 
-      <div className="flex-1 overflow-x-auto overflow-y-hidden bg-[#f8f9fb] flex px-2 gap-1 py-1">
+      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden bg-[#f8f9fb] flex px-3 py-3 gap-3">
         {Object.entries(columns).map(([name, tasks]) => (
           <div
             key={name}
             onDragOver={onDragOver}
             onDrop={(e) => onDrop(e, name)}
-            className="flex-shrink-0 w-80 lg:w-[calc(25%-8px)] h-full flex flex-col"
+            className="flex-shrink-0 w-80 lg:w-[calc(25%-10px)] h-full flex flex-col bg-slate-100/60 border border-slate-200/70 rounded-2xl overflow-hidden shadow-2xs relative"
           >
-            <div className="px-5 py-4 flex items-center justify-between sticky top-0 z-10 bg-[#f8f9fb]">
+            {/* Cabecera con efecto frosted glass / transparencia profesional */}
+            <div className="absolute top-0 inset-x-0 z-10 px-4 py-3 h-12 flex items-center justify-between bg-slate-100/80 backdrop-blur-md border-b border-slate-200/60 shadow-2xs">
               <div className="flex items-center gap-2">
-                <span className={`w-1.5 h-1.5 rounded-full ${name === 'POR HACER' ? 'bg-gray-400' :
+                <span className={`w-2 h-2 rounded-full ${name === 'POR HACER' ? 'bg-gray-400' :
                   name === 'EN CURSO' ? 'bg-blue-600' :
                     name === 'EN REVISIÓN' ? 'bg-amber-500' : 'bg-green-500'
                   }`}></span>
-                <h2 className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-gray-500">
+                <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">
                   {name}
                 </h2>
-                <span className="bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                <span className="bg-white/90 backdrop-blur-xs text-slate-600 px-2 py-0.5 rounded-full text-[10px] font-bold border border-slate-200/60 shadow-2xs">
                   {tasks.length}
                 </span>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 pb-24 space-y-4">
-              {tasks.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-48 opacity-10 border-2 border-dashed border-gray-400 rounded-2xl">
-                  <span className="material-symbols-outlined text-5xl">inventory_2</span>
+            {/* Contenedor de tarjetas con pt-14 para permitir paso fluido debajo del header */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-3 pt-14 pb-32 space-y-3.5 custom-scrollbar">
+              {tasks.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-44 opacity-40 border-2 border-dashed border-slate-300 rounded-xl p-4 text-center">
+                  <span className="material-symbols-outlined text-4xl text-slate-400 mb-1">drag_indicator</span>
+                  <span className="text-[11px] font-bold text-slate-500">Arrastra aquí</span>
                 </div>
+              ) : (
+                <>
+                  {tasks.map(renderCard)}
+                  <div className="h-16" />
+                </>
               )}
-              {tasks.map(renderCard)}
             </div>
           </div>
         ))}
@@ -1419,7 +1500,7 @@ export default function KanbanPage() {
 
       {/* Renderizar Modal */}
       {renderDetailModal()}
-      
+
       {/* Modal Transición */}
       <StatusTransitionModal />
 
@@ -1484,8 +1565,8 @@ export default function KanbanPage() {
                           }));
                         }}
                         className={`group relative flex flex-col items-center justify-center p-3 rounded-xl border transition-all ${formData.destino === opt.val
-                            ? "bg-blue-50 text-blue-600 border-blue-200 shadow-sm"
-                            : "bg-gray-50 text-gray-400 border-transparent hover:border-gray-200"
+                          ? "bg-blue-50 text-blue-600 border-blue-200 shadow-sm"
+                          : "bg-gray-50 text-gray-400 border-transparent hover:border-gray-200"
                           }`}
                       >
                         <span className="material-symbols-outlined mb-1 text-xl">{opt.icon}</span>
@@ -1526,7 +1607,7 @@ export default function KanbanPage() {
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Responsable</label>
                     {formData.destino === "PROYECTO" && formData.proyecto_id && (
-                      <button 
+                      <button
                         onClick={() => setShowQuickAddMember(!showQuickAddMember)}
                         className="text-[9px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-0.5"
                         title="Agregar empleado al proyecto"
@@ -1536,55 +1617,55 @@ export default function KanbanPage() {
                       </button>
                     )}
                   </div>
-                  
+
                   {showQuickAddMember && formData.destino === "PROYECTO" ? (
                     <div className="flex gap-2">
-                       <div className="flex-1">
-                          <SearchableSelect
-                            label="E"
-                            placeholder="Buscar empleado..."
-                            options={filterOptions.employees}
-                            value={formData.new_member_id || ""}
-                            onChange={(val) => setFormData({ ...formData, new_member_id: val })}
-                          />
-                       </div>
-                       <button 
-                         disabled={!formData.new_member_id || addingItem}
-                         onClick={async () => {
-                            if (!formData.new_member_id) return;
-                            setAddingItem(true);
-                            try {
-                              const headers = makeHeaders(session);
-                              const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/proyectos/${formData.proyecto_id}/miembros/add`, {
-                                method: "POST",
-                                headers,
-                                body: JSON.stringify({ empleado_id: formData.new_member_id })
-                              });
-                              const json = await res.json();
-                              if (!json.ok) throw new Error(json.message || "Error al agregar");
-                              
-                              // Refresh members
-                              const resP = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/proyectos/${formData.proyecto_id}`, { headers: makeHeaders(session) });
-                              const jsonP = await resP.json();
-                              if (jsonP.ok) {
-                                setProjectMembers((jsonP.row.miembros || []).map(m => ({
-                                  id: m.empleado_id,
-                                  nombre: m.empleado?.usuario?.nombre || "Sin nombre"
-                                })));
-                              }
-                              
-                              setShowQuickAddMember(false);
-                              setFormData(prev => ({ ...prev, new_member_id: "", responsable_id: formData.new_member_id }));
-                            } catch (err) {
-                              alert(err.message);
-                            } finally {
-                              setAddingItem(false);
+                      <div className="flex-1">
+                        <SearchableSelect
+                          label="E"
+                          placeholder="Buscar empleado..."
+                          options={filterOptions.employees}
+                          value={formData.new_member_id || ""}
+                          onChange={(val) => setFormData({ ...formData, new_member_id: val })}
+                        />
+                      </div>
+                      <button
+                        disabled={!formData.new_member_id || addingItem}
+                        onClick={async () => {
+                          if (!formData.new_member_id) return;
+                          setAddingItem(true);
+                          try {
+                            const headers = makeHeaders(session);
+                            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/proyectos/${formData.proyecto_id}/miembros/add`, {
+                              method: "POST",
+                              headers,
+                              body: JSON.stringify({ empleado_id: formData.new_member_id })
+                            });
+                            const json = await res.json();
+                            if (!json.ok) throw new Error(json.message || "Error al agregar");
+
+                            // Refresh members
+                            const resP = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/proyectos/${formData.proyecto_id}`, { headers: makeHeaders(session) });
+                            const jsonP = await resP.json();
+                            if (jsonP.ok) {
+                              setProjectMembers((jsonP.row.miembros || []).map(m => ({
+                                id: m.empleado_id,
+                                nombre: m.empleado?.usuario?.nombre || "Sin nombre"
+                              })));
                             }
-                         }}
-                         className="bg-blue-600 text-white w-10 h-10 rounded-xl flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all shadow-sm"
-                       >
-                         <span className="material-symbols-outlined text-sm">check</span>
-                       </button>
+
+                            setShowQuickAddMember(false);
+                            setFormData(prev => ({ ...prev, new_member_id: "", responsable_id: formData.new_member_id }));
+                          } catch (err) {
+                            alert(err.message);
+                          } finally {
+                            setAddingItem(false);
+                          }
+                        }}
+                        className="bg-blue-600 text-white w-10 h-10 rounded-xl flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all shadow-sm"
+                      >
+                        <span className="material-symbols-outlined text-sm">check</span>
+                      </button>
                     </div>
                   ) : (
                     <SearchableSelect
@@ -1758,11 +1839,10 @@ export default function KanbanPage() {
                           type="button"
                           key={p.val}
                           onClick={() => setFormData({ ...formData, prioridad: p.val })}
-                          className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border transition-all cursor-pointer ${
-                            formData.prioridad === p.val
-                              ? `${p.bg} ${p.text} ${p.border} font-black ring-2 ring-offset-1 ring-blue-500`
-                              : "bg-gray-50 text-gray-400 border-transparent hover:border-gray-200"
-                          }`}
+                          className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border transition-all cursor-pointer ${formData.prioridad === p.val
+                            ? `${p.bg} ${p.text} ${p.border} font-black ring-2 ring-offset-1 ring-blue-500`
+                            : "bg-gray-50 text-gray-400 border-transparent hover:border-gray-200"
+                            }`}
                         >
                           <span className={`w-2 h-2 rounded-full ${p.color}`}></span>
                           <span className="text-[10px] font-extrabold uppercase tracking-wider">{p.lab}</span>
@@ -1787,8 +1867,8 @@ export default function KanbanPage() {
                   <div className="space-y-1.5 md:col-span-2">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Foto Evidencia (Antes de comenzar)</label>
                     <div className="relative group">
-                      <input 
-                        type="file" 
+                      <input
+                        type="file"
                         accept="image/*"
                         onChange={(e) => setEvidenceFile(e.target.files[0] || null)}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
@@ -1848,15 +1928,15 @@ export default function KanbanPage() {
                       body = { ...formData };
                     } else if (formType === "TAREA") {
                       url = `${process.env.NEXT_PUBLIC_API_URL}/tareas/add`;
-                      body = { 
+                      body = {
                         ...formData,
                         requisitos: formData.requisitos || [],
                         evidencia_antes_url: evidenciaAntesUrl
                       };
                     } else if (formType === "SUBTAREA") {
                       url = `${process.env.NEXT_PUBLIC_API_URL}/tareas-detalle/add`;
-                      body = { 
-                        ...formData, 
+                      body = {
+                        ...formData,
                         titulo: formData.nombre, // Subtareas usan titulo
                         evidencia_antes_url: evidenciaAntesUrl
                       };
@@ -1869,7 +1949,7 @@ export default function KanbanPage() {
                     });
                     const json = await res.json();
                     if (!json.ok) throw new Error(json.message || "Error al crear");
-                    
+
                     setIsAddModalOpen(false);
                     setEvidenceFile(null);
                     // Reset formData
