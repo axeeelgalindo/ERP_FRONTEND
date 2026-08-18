@@ -569,7 +569,7 @@ export default function EditServicioArriendoDialog({
             <img 
               alt="Logo Blue Ingeniería" 
               className="h-10 object-contain" 
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuCUDYVzrT2ZdASyjdxzPY6wOiLbC2UF2Of3UTCnVGIRHRiMHnwvq3bK8UXbMcuS0-7cqO2Dy9KDJV2JqLlP8EzJakN9CKOWBKJUbnDT3IdRajpd1GQ4icYIDnAHewBU9M8nV14D6O_UUV_jlF5fjZBP0BlKj0JBSWqhs4_8dvDB-9Cmn6964ZGpm3NNUKcECpK6f17F9-PwUu2Fq2PsJ0KG-XhGPdfTz2SBgiGOZ5ZHKZ44CLhateSAmzmaR1l6VYkwKg"
+              src="/Logo_blue.webp"
             />
             <div className="h-8 w-px bg-slate-200 hidden md:block"></div>
             <div>

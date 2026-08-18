@@ -4,9 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 
-export default function NavItem({ href, label, icon, open, onNavigate, children }) {
+export default function NavItem({
+  href,
+  label,
+  icon,
+  open,
+  isExpanded,
+  onToggle,
+  onNavigate,
+  children,
+}) {
   const pathname = usePathname();
-  const [expanded, setExpanded] = useState(false);   // accordion (sidebar abierto)
+  const [localExpanded, setLocalExpanded] = useState(false); // fallback si no es controlado
   const [flyoutOpen, setFlyoutOpen] = useState(false); // flyout (sidebar cerrado)
   const containerRef = useRef(null);
 
@@ -19,10 +28,13 @@ export default function NavItem({ href, label, icon, open, onNavigate, children 
     ? (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/"))
     : isChildActive;
 
-  // Auto-expand accordion if child path is active
+  const expanded = isExpanded !== undefined ? isExpanded : localExpanded;
+  const toggleExpanded = onToggle || (() => setLocalExpanded((prev) => !prev));
+
+  // Auto-expand accordion if child path is active and uncontrolled
   useEffect(() => {
-    if (isChildActive) setExpanded(true);
-  }, [isChildActive]);
+    if (isChildActive && isExpanded === undefined) setLocalExpanded(true);
+  }, [isChildActive, isExpanded]);
 
   // Close flyout when clicking outside
   useEffect(() => {
@@ -188,18 +200,18 @@ export default function NavItem({ href, label, icon, open, onNavigate, children 
       ) : (
         <div>
           <button
-            onClick={() => setExpanded((prev) => !prev)}
+            onClick={toggleExpanded}
             className={[
               "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 cursor-pointer border-0 bg-transparent text-left",
-              isActive
-                ? "text-blue-700 font-semibold bg-slate-200/50"
+              expanded
+                ? "text-blue-700 font-semibold bg-blue-50/80"
                 : "text-slate-600 hover:text-blue-600 hover:bg-slate-200/50",
             ].join(" ")}
           >
             {icon && (
               <span
                 className="material-symbols-outlined shrink-0"
-                style={{ fontVariationSettings: isActive ? "'FILL' 1" : "'FILL' 0", fontSize: "24px" }}
+                style={{ fontVariationSettings: expanded ? "'FILL' 1" : "'FILL' 0", fontSize: "24px" }}
               >
                 {icon}
               </span>

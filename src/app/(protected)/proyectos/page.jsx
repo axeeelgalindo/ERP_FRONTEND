@@ -1,6 +1,10 @@
-// src/app/(protected)/proyectos/page.jsx
 import { serverApi } from "@/lib/api";
 import ProyectosPageClient from "@/components/proyectos/ProyectosPageClient";
+
+export const metadata = {
+  title: "Proyectos",
+  description: "Administración y seguimiento de proyectos de Blue Ingeniería SPA.",
+};
 
 export default async function ProyectosPage({ searchParams }) {
   const sp = await searchParams;

@@ -1,5 +1,5 @@
-// src/app/not-found.jsx
 import Link from "next/link";
+import Image from "next/image";
 import { Home, Search } from "lucide-react";
 import BackButton from "@/components/ui/BackButton";
 import HideSidebar from "@/components/layout/HideSidebar";
@@ -22,9 +22,21 @@ export default function NotFound() {
       {/* Card */}
       <div className="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="p-8 sm:p-10">
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-            <Search size={14} />
-            Página no encontrada
+          <div className="mb-6 flex items-center justify-between">
+            <Link href="/" aria-label="Ir al inicio de Blue Ingeniería">
+              <Image
+                src="/Logo_blue.webp"
+                alt="Logo Blue Ingeniería"
+                width={150}
+                height={40}
+                className="h-9 w-auto object-contain"
+                priority
+              />
+            </Link>
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+              <Search size={14} />
+              Error 404
+            </div>
           </div>
 
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">

@@ -9,6 +9,14 @@ import ProyectoGanttSection from "@/components/proyectos/ProyectoGanttSection";
 import ProyectoVentasSection from "@/components/proyectos/ProyectoVentasSection";
 import ProyectoTareasEquipoSection from "@/components/proyectos/ProyectoTareasEquipoSection";
 
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+  return {
+    title: `Proyecto #${id}`,
+    description: `Detalles, planificación y avance del proyecto #${id} en Blue Ingeniería ERP.`,
+  };
+}
+
 /**
  * Construye filas para el Gantt:
  * 1

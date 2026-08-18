@@ -1,8 +1,8 @@
 import Image from "next/image";
 
 export const metadata = {
-  title: "Iniciar sesión — ERP",
-  description: "Accede al sistema ERP con tu cuenta.",
+  title: "Iniciar sesión",
+  description: "Acceso seguro al sistema ERP de Blue Ingeniería SPA.",
   robots: { index: false, follow: false },
 };
 
@@ -28,10 +28,14 @@ export default function AuthLayout({ children }) {
         {/* Branding / mensaje */}
         <div className="relative h-full text-white p-10 flex flex-col justify-between overflow-hidden">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-white/10 p-2">
-              <Image src="/favicon-32x32.png" width={28} height={28} alt="ERP | BLUE INGENIERÍA SPA" priority />
-            </div>
-            <span className="text-lg font-semibold tracking-wide">ERP | BLUE INGENIERÍA</span>
+            <Image
+              src="/logoblanco.webp"
+              width={180}
+              height={45}
+              alt="Logo Blue Ingeniería SPA"
+              className="h-10 w-auto object-contain"
+              priority
+            />
           </div>
 
           <div className="pr-6">
@@ -39,7 +43,7 @@ export default function AuthLayout({ children }) {
               Gestión simple, <span className="text-white/90">resultados reales</span>
             </h1>
             <p className="mt-4 text-white/85 max-w-lg">
-              ERP DE BLUE INGENIERÍA SPA es un sistema moderno y eficiente diseñado para optimizar la gestión empresarial.
+              Sistema Integral de Gestión Empresarial (ERP) de Blue Ingeniería SPA, diseñado para la optimización y control total de operaciones, proyectos y finanzas.
             </p>
             <ul className="mt-6 space-y-2 text-white/90">
               <li className="flex items-center gap-2">
@@ -48,11 +52,11 @@ export default function AuthLayout({ children }) {
               </li>
               <li className="flex items-center gap-2">
                 <span className="inline-block h-2 w-2 rounded-full bg-white" />
-                Rendimiento optimizado en dispositivos móviles
+                Rendimiento optimizado en tiempo real
               </li>
               <li className="flex items-center gap-2">
                 <span className="inline-block h-2 w-2 rounded-full bg-white" />
-                Interfaz cuidada y accesible
+                Gestión integral de proyectos y operaciones
               </li>
             </ul>
           </div>
@@ -70,9 +74,15 @@ export default function AuthLayout({ children }) {
         {/* Contenedor centrado y scroll interno si hiciera falta */}
         <div className="relative h-full flex items-center justify-center p-6 sm:p-10 overflow-y-auto">
           <div className="w-full max-w-md">
-            <div className="mb-6 flex items-center gap-3 lg:hidden">
-              <Image src="/favicon-32x32.png" width={24} height={24} alt="SEST" loading="eager" />
-              <span className="text-base font-semibold tracking-wide">SEST</span>
+            <div className="mb-6 flex items-center justify-center lg:hidden">
+              <Image
+                src="/Logo_blue.webp"
+                width={160}
+                height={40}
+                alt="Logo Blue Ingeniería"
+                className="h-9 w-auto object-contain"
+                priority
+              />
             </div>
 
             <section className="bg-white/80 backdrop-blur supports-backdrop-filter:bg-white/60 rounded-2xl shadow-sm ring-1 ring-black/5">
