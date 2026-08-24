@@ -362,7 +362,7 @@ export default function ReporteFinancieroPage({ params }) {
         </div>
         <h3 className="text-lg font-bold text-slate-800">Cargando Reporte Financiero...</h3>
         <p className="text-xs text-slate-400 mt-1 max-w-sm">
-          Sincronizando cobranzas, compras RCV y costeos planificados del proyecto...
+          Sincronizando cobranzas, compras y costeos planificados del proyecto...
         </p>
       </div>
     );
@@ -547,7 +547,7 @@ export default function ReporteFinancieroPage({ params }) {
             <div>
               <div className="flex items-center justify-between mb-2 sm:mb-2.5">
                 <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-indigo-800 bg-indigo-100/80 px-1.5 sm:px-2 py-0.5 rounded-md truncate">
-                  3. Compras RCV ({pctComprasSobreVenta}%)
+                  3. Compras ({pctComprasSobreVenta}%)
                 </span>
                 <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-indigo-600/10 text-indigo-700 flex items-center justify-center font-bold shrink-0">
                   <TrendingUp size={15} />
@@ -577,9 +577,8 @@ export default function ReporteFinancieroPage({ params }) {
                 </div>
               </div>
               <span className="text-[11px] sm:text-xs font-medium text-slate-500 block">Venta Neta − Total Compras</span>
-              <div className={`text-lg sm:text-2xl lg:text-3xl font-black tracking-tight mt-0.5 sm:mt-1 truncate ${
-                kpis.utilidadReal >= 0 ? "text-emerald-700" : "text-red-600"
-              }`}>
+              <div className={`text-lg sm:text-2xl lg:text-3xl font-black tracking-tight mt-0.5 sm:mt-1 truncate ${kpis.utilidadReal >= 0 ? "text-emerald-700" : "text-red-600"
+                }`}>
                 {money(kpis.utilidadReal)}
               </div>
             </div>
@@ -625,11 +624,10 @@ export default function ReporteFinancieroPage({ params }) {
                   <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     🛒 Compras y Materiales
                   </span>
-                  <span className={`text-[10px] sm:text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
-                    Number(costeo.compras?.porcentajeConsumido || 0) > 100
+                  <span className={`text-[10px] sm:text-[11px] font-extrabold px-2 py-0.5 rounded-full ${Number(costeo.compras?.porcentajeConsumido || 0) > 100
                       ? "bg-red-100 text-red-700"
                       : "bg-emerald-100 text-emerald-700"
-                  }`}>
+                    }`}>
                     {costeo.compras?.porcentajeConsumido || 0}% consumido
                   </span>
                 </div>
@@ -1034,19 +1032,16 @@ export default function ReporteFinancieroPage({ params }) {
                     <button
                       type="button"
                       onClick={() => toggleMonth(mes.mesKey)}
-                      className={`w-full p-3.5 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 text-left transition-all duration-200 cursor-pointer ${
-                        isExpanded ? "bg-blue-50/50 border-l-4 border-l-primary shadow-xs" : "hover:bg-slate-50/90"
-                      }`}
+                      className={`w-full p-3.5 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 text-left transition-all duration-200 cursor-pointer ${isExpanded ? "bg-blue-50/50 border-l-4 border-l-primary shadow-xs" : "hover:bg-slate-50/90"
+                        }`}
                     >
                       <div className="flex items-center gap-2.5 sm:gap-3">
-                        <span className={`p-1.5 rounded-lg transition-all duration-200 shrink-0 ${
-                          isExpanded ? "bg-blue-100/80 text-primary scale-105" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                        }`}>
+                        <span className={`p-1.5 rounded-lg transition-all duration-200 shrink-0 ${isExpanded ? "bg-blue-100/80 text-primary scale-105" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                          }`}>
                           <ChevronRight
                             size={16}
-                            className={`transition-transform duration-300 ease-out ${
-                              isExpanded ? "rotate-90 text-primary" : "rotate-0 text-slate-600"
-                            }`}
+                            className={`transition-transform duration-300 ease-out ${isExpanded ? "rotate-90 text-primary" : "rotate-0 text-slate-600"
+                              }`}
                           />
                         </span>
                         <div>
@@ -1108,9 +1103,8 @@ export default function ReporteFinancieroPage({ params }) {
                                 return (
                                   <tr
                                     key={f.id || idx}
-                                    className={`hover:bg-slate-50/80 transition-colors ${
-                                      isNC ? "bg-red-50/30" : ""
-                                    }`}
+                                    className={`hover:bg-slate-50/80 transition-colors ${isNC ? "bg-red-50/30" : ""
+                                      }`}
                                   >
                                     <td className="px-4 py-2.5">
                                       <div className="font-extrabold text-slate-900">
