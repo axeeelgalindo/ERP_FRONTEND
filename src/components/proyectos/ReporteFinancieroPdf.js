@@ -109,29 +109,43 @@ export async function generarReporteFinancieroPDF({ data }) {
   doc.setDrawColor(...borderCol);
   doc.roundedRect(margin, currentY, contentWidth, 38, 6, 6, "FD");
 
+  // Columna 1: Proyecto y Estado
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(...navy);
   doc.text("PROYECTO:", margin + 12, currentY + 15);
-  doc.text("CLIENTE:", margin + 280, currentY + 15);
 
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...dark);
-  const projNombre = doc.splitTextToSize(proyecto.nombre || "—", 240);
-  doc.text(projNombre[0] || "—", margin + 70, currentY + 15);
-
-  const clienteText = `${proyecto.cliente?.nombre || "—"} ${proyecto.cliente?.rut ? `(${proyecto.cliente.rut})` : ""}`;
-  doc.text(clienteText, margin + 330, currentY + 15);
+  const projNombre = doc.splitTextToSize(proyecto.nombre || "—", 185);
+  doc.text(projNombre[0] || "—", margin + 65, currentY + 15);
 
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...slate);
   doc.text("ESTADO:", margin + 12, currentY + 28);
-  doc.text("COTIZACIÓN:", margin + 280, currentY + 28);
 
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...dark);
-  doc.text((proyecto.estado || "ACTIVO").toUpperCase(), margin + 70, currentY + 28);
-  doc.text(`${nroCotStr} · ${money(kpis.montoTotalVentaNeto)} Neto`, margin + 350, currentY + 28);
+  doc.text((proyecto.estado || "ACTIVO").toUpperCase(), margin + 65, currentY + 28);
+
+  // Columna 2: Cliente y Cotización (con ancho acotado para evitar desborde)
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...navy);
+  doc.text("CLIENTE:", margin + 260, currentY + 15);
+
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...dark);
+  const rawCliente = `${proyecto.cliente?.nombre || "—"}${proyecto.cliente?.rut ? ` (${proyecto.cliente.rut})` : ""}`;
+  const clienteLines = doc.splitTextToSize(rawCliente, 205);
+  doc.text(clienteLines[0] || "—", margin + 308, currentY + 15);
+
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...slate);
+  doc.text("COTIZACIÓN:", margin + 260, currentY + 28);
+
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...dark);
+  doc.text(`${nroCotStr} · ${money(kpis.montoTotalVentaNeto)} Neto`, margin + 326, currentY + 28);
 
   currentY += 46;
 
@@ -140,25 +154,29 @@ export async function generarReporteFinancieroPDF({ data }) {
   const cardWidth = (contentWidth - cardGap * 3) / 4;
   const cardHeight = 62;
 
+  const pctComprasSobreVenta = Number(kpis.montoTotalVentaNeto || 0) > 0
+    ? Number(((Number(kpis.montoTotalCompras || 0) / Number(kpis.montoTotalVentaNeto)) * 100).toFixed(1))
+    : 0;
+
   const kpiCards = [
     {
-      title: `1. COBRANZA (${kpis.porcentajeCobrado || 0}%)`,
-      value: money(kpis.montoCobradoNeto),
-      sub: `Bruto: ${money(kpis.montoCobradoBruto)}`,
-      pct: kpis.porcentajeCobrado || 0,
+      title: "1. VENTA TOTAL (100%)",
+      value: money(kpis.montoTotalVentaNeto),
+      sub: `Bruto: ${money(kpis.montoTotalVentaBruto)}`,
+      pct: 100,
       color: blue,
       bgColor: [239, 246, 255],
     },
     {
-      title: `2. SALDO (${kpis.porcentajePendiente || 0}%)`,
-      value: money(kpis.saldoPorCobrarNeto),
-      sub: `Bruto: ${money(kpis.saldoPorCobrarBruto)}`,
-      pct: kpis.porcentajePendiente || 0,
+      title: `2. COBRANZA (${kpis.porcentajeCobrado || 0}%)`,
+      value: money(kpis.montoCobradoNeto),
+      sub: `Por cobrar: ${money(kpis.saldoPorCobrarNeto)} (${kpis.porcentajePendiente || 0}%)`,
+      pct: kpis.porcentajeCobrado || 0,
       color: amber,
       bgColor: [254, 243, 199],
     },
     {
-      title: "3. COMPRAS RCV",
+      title: `3. COMPRAS RCV (${pctComprasSobreVenta}%)`,
       value: money(kpis.montoTotalCompras),
       sub: `Plan: ${money(costeo.compras?.plan)}`,
       pct: Math.min(100, costeo.compras?.porcentajeConsumido || 0),
@@ -168,7 +186,7 @@ export async function generarReporteFinancieroPDF({ data }) {
     {
       title: "4. UTILIDAD REAL",
       value: money(kpis.utilidadReal),
-      sub: `Margen: ${kpis.margenRealPct || 0}%`,
+      sub: `Margen: ${kpis.margenRealPct || 0}% (Plan: ${kpis.margenPlanPct || 0}%)`,
       pct: Math.min(100, Math.max(0, kpis.margenRealPct || 0)),
       color: emerald,
       bgColor: [236, 253, 245],

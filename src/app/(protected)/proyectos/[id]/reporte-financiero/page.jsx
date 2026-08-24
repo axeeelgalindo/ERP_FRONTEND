@@ -345,47 +345,48 @@ export default function ReporteFinancieroPage({ params }) {
   const gastoPromedioPorFactura = useMemo(() => {
     if (facturas.length === 0) return 0;
     return Math.round(Number(kpis.montoTotalCompras || 0) / facturas.length);
-  }, [facturas, kpis]);
+  }, [facturas, kpis.montoTotalCompras]);
+
+  const pctComprasSobreVenta = useMemo(() => {
+    const v = Number(kpis.montoTotalVentaNeto || 0);
+    const c = Number(kpis.montoTotalCompras || 0);
+    if (v <= 0) return 0;
+    return Number(((c / v) * 100).toFixed(1));
+  }, [kpis.montoTotalVentaNeto, kpis.montoTotalCompras]);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin"></div>
-          <h2 className="text-base font-bold text-slate-800">
-            Cargando Reporte Financiero...
-          </h2>
-          <p className="text-xs text-slate-500 max-w-sm">
-            Consolidando cobranza, costeo cotizado y compras de centros de costo.
-          </p>
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-8 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4 animate-bounce">
+          <DollarSign size={28} />
         </div>
+        <h3 className="text-lg font-bold text-slate-800">Cargando Reporte Financiero...</h3>
+        <p className="text-xs text-slate-400 mt-1 max-w-sm">
+          Sincronizando cobranzas, compras RCV y costeos planificados del proyecto...
+        </p>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="bg-white p-8 rounded-2xl shadow-xl border border-red-100 max-w-md w-full text-center space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto font-bold">
-            <AlertCircle size={26} />
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-8">
+        <div className="max-w-md w-full p-6 bg-red-50/60 rounded-2xl border border-red-200 text-center">
+          <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-3">
+            <AlertCircle size={22} />
           </div>
-          <h2 className="text-lg font-bold text-slate-900">
-            Error al Cargar Reporte
-          </h2>
-          <p className="text-xs text-slate-500">
-            {error || "No se pudo recuperar la información financiera del proyecto."}
-          </p>
-          <div className="pt-2 flex justify-center gap-3">
+          <h3 className="text-base font-bold text-red-900">Error al Cargar Reporte</h3>
+          <p className="text-xs text-red-700 mt-1 mb-4">{error || "No se encontraron datos"}</p>
+          <div className="flex gap-2 justify-center">
             <Link
               href={`/proyectos/${id}`}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+              className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors"
             >
               Volver al Proyecto
             </Link>
             <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-primary text-white hover:bg-primary/90 rounded-xl text-xs font-semibold transition-colors"
+              className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 transition-colors"
             >
               Reintentar
             </button>
@@ -478,14 +479,14 @@ export default function ReporteFinancieroPage({ params }) {
         ========================================================================= */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
           {/* 1. Venta Total Neta */}
-          <div className="bg-gradient-to-br from-white to-blue-50/40 p-3.5 sm:p-6 rounded-xl sm:rounded-2xl border border-blue-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
+          <div className="bg-gradient-to-br from-white to-blue-50/40 p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-blue-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
             <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full -mr-8 -mt-8 pointer-events-none"></div>
             <div>
-              <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <div className="flex items-center justify-between mb-2 sm:mb-2.5">
                 <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-blue-700 bg-blue-100/80 px-1.5 sm:px-2 py-0.5 rounded-md truncate">
-                  1. Venta Total Neta
+                  1. Venta Total (100%)
                 </span>
-                <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-blue-600/10 text-blue-600 flex items-center justify-center font-bold shrink-0">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-blue-600/10 text-blue-600 flex items-center justify-center font-bold shrink-0">
                   <DollarSign size={15} />
                 </div>
               </div>
@@ -501,40 +502,54 @@ export default function ReporteFinancieroPage({ params }) {
           </div>
 
           {/* 2. Cobranza (Percibido y Saldo por Cobrar) */}
-          <div className="bg-gradient-to-br from-white to-amber-50/20 p-3.5 sm:p-6 rounded-xl sm:rounded-2xl border border-amber-200/70 shadow-sm relative overflow-hidden flex flex-col justify-between">
+          <div className="bg-gradient-to-br from-white to-amber-50/20 p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-amber-200/70 shadow-sm relative overflow-hidden flex flex-col justify-between">
             <div className="absolute top-0 right-0 w-24 h-24 bg-amber-400/5 rounded-full -mr-8 -mt-8 pointer-events-none"></div>
             <div>
-              <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <div className="flex items-center justify-between mb-2 sm:mb-2.5">
                 <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-amber-800 bg-amber-100/80 px-1.5 sm:px-2 py-0.5 rounded-md truncate">
-                  2. Cobranza ({kpis.porcentajeCobrado || 0}%)
+                  2. Cobranza
                 </span>
-                <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold shrink-0">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold shrink-0">
                   <CreditCard size={15} />
                 </div>
               </div>
-              <span className="text-[11px] sm:text-xs font-medium text-slate-500 block">Percibido (Cobrado Neto)</span>
-              <div className="text-lg sm:text-2xl lg:text-3xl font-black text-amber-900 tracking-tight mt-0.5 sm:mt-1 truncate">
-                {money(kpis.montoCobradoNeto)}
+
+              {/* Percibido */}
+              <div className="pb-2 border-b border-amber-100/70">
+                <span className="text-[10px] sm:text-[11px] font-medium text-slate-500 block">
+                  Percibido ({kpis.porcentajeCobrado || 0}%)
+                </span>
+                <div className="text-base sm:text-xl font-black text-slate-900 tracking-tight mt-0.5 truncate">
+                  {money(kpis.montoCobradoNeto)}
+                </div>
+              </div>
+
+              {/* Por Cobrar */}
+              <div className="pt-2">
+                <span className="text-[10px] sm:text-[11px] font-medium text-amber-800 block">
+                  Por Cobrar ({kpis.porcentajePendiente || 0}%)
+                </span>
+                <div className="text-base sm:text-xl font-black text-amber-900 tracking-tight mt-0.5 truncate">
+                  {money(kpis.saldoPorCobrarNeto)}
+                </div>
               </div>
             </div>
-            <div className="mt-3 sm:mt-4 pt-2.5 sm:pt-3 border-t border-slate-100 text-[10px] sm:text-[11px] text-slate-500 font-medium flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5">
-              <span>Por cobrar:</span>
-              <strong className="text-amber-900 font-bold">
-                {money(kpis.saldoPorCobrarNeto)}{" "}
-                <span className="text-[9px] text-slate-400 font-normal">(Bruto: {money(kpis.saldoPorCobrarBruto)})</span>
-              </strong>
+
+            <div className="mt-2.5 pt-2 border-t border-slate-100 text-[10px] sm:text-[11px] text-slate-500 font-medium flex items-center justify-between">
+              <span>Bruto Saldo:</span>
+              <strong className="text-amber-900 font-bold">{money(kpis.saldoPorCobrarBruto)}</strong>
             </div>
           </div>
 
           {/* 3. Compras Realizadas */}
-          <div className="bg-gradient-to-br from-white to-indigo-50/30 p-3.5 sm:p-6 rounded-xl sm:rounded-2xl border border-indigo-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
+          <div className="bg-gradient-to-br from-white to-indigo-50/30 p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-indigo-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
             <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full -mr-8 -mt-8 pointer-events-none"></div>
             <div>
-              <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <div className="flex items-center justify-between mb-2 sm:mb-2.5">
                 <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider text-indigo-800 bg-indigo-100/80 px-1.5 sm:px-2 py-0.5 rounded-md truncate">
-                  3. Total Compras RCV
+                  3. Compras RCV ({pctComprasSobreVenta}%)
                 </span>
-                <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-indigo-600/10 text-indigo-700 flex items-center justify-center font-bold shrink-0">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-indigo-600/10 text-indigo-700 flex items-center justify-center font-bold shrink-0">
                   <TrendingUp size={15} />
                 </div>
               </div>

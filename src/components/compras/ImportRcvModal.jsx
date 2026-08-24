@@ -45,9 +45,9 @@ export default function ImportRcvModal({
   const [searchTerm, setSearchTerm] = useState("");
 
   // Estado para la barra de asignación masiva
-  const [bulkDestinationType, setBulkDestinationType] = useState("PROYECTO");
+  const [bulkMainType, setBulkMainType] = useState("PROYECTO");
+  const [bulkSubType, setBulkSubType] = useState("TALLER");
   const [bulkProjectId, setBulkProjectId] = useState("");
-  const [bulkSede, setBulkSede] = useState("PMC");
 
   // Al abrir o cambiar los records iniciales, inicializamos items con destino por defecto
   useEffect(() => {
@@ -109,99 +109,59 @@ export default function ImportRcvModal({
       prev.map((it) => {
         if (!selectedIndices.has(it.index)) return it;
 
-        if (bulkDestinationType === "PROYECTO") {
+        if (bulkMainType === "PROYECTO") {
           return {
             ...it,
             destino: "PROYECTO",
             centro_costo: null,
-            proyecto_id: bulkProjectId || null,
+            proyecto_id: bulkProjectId || (proyectos.length > 0 ? proyectos[0].id : null),
           };
         }
 
-        if (bulkDestinationType === "TALLER_PMC") {
-          return {
-            ...it,
-            destino: "TALLER",
-            centro_costo: "PMC",
-            proyecto_id: null,
-          };
-        }
-
-        if (bulkDestinationType === "TALLER_PUQ") {
-          return {
-            ...it,
-            destino: "TALLER",
-            centro_costo: "PUQ",
-            proyecto_id: null,
-          };
-        }
-
-        if (bulkDestinationType === "ADMIN_PMC") {
-          return {
-            ...it,
-            destino: "ADMINISTRACION",
-            centro_costo: "PMC",
-            proyecto_id: null,
-          };
-        }
-
-        if (bulkDestinationType === "ADMIN_PUQ") {
-          return {
-            ...it,
-            destino: "ADMINISTRACION",
-            centro_costo: "PUQ",
-            proyecto_id: null,
-          };
-        }
-
-        return it;
+        return {
+          ...it,
+          destino: bulkSubType,
+          centro_costo: bulkMainType,
+          proyecto_id: null,
+        };
       })
     );
   };
 
-  const getItemSelectValue = (item) => {
+  const getMainSelectValue = (item) => {
     if (item.destino === "PROYECTO") return "PROYECTO";
-    if (item.destino === "TALLER") {
-      return item.centro_costo === "PUQ" ? "TALLER_PUQ" : "TALLER_PMC";
-    }
-    if (item.destino === "ADMINISTRACION") {
-      return item.centro_costo === "PUQ" ? "ADMIN_PUQ" : "ADMIN_PMC";
-    }
-    return "PROYECTO";
+    if (item.centro_costo === "PUQ") return "PUQ";
+    return "PMC";
   };
 
-  const handleDestinationChange = (index, val) => {
+  const getSubSelectValue = (item) => {
+    if (item.destino === "TALLER") return "TALLER";
+    return "ADMINISTRACION";
+  };
+
+  const handleMainChange = (index, val) => {
     if (val === "PROYECTO") {
       updateItem(index, {
         destino: "PROYECTO",
         centro_costo: null,
         proyecto_id: proyectos.length > 0 ? proyectos[0].id : null,
       });
-    } else if (val === "TALLER_PMC") {
+    } else {
+      const current = items.find((it) => it.index === index);
+      const sub = current?.destino === "ADMINISTRACION" ? "ADMINISTRACION" : "TALLER";
       updateItem(index, {
-        destino: "TALLER",
-        centro_costo: "PMC",
-        proyecto_id: null,
-      });
-    } else if (val === "TALLER_PUQ") {
-      updateItem(index, {
-        destino: "TALLER",
-        centro_costo: "PUQ",
-        proyecto_id: null,
-      });
-    } else if (val === "ADMIN_PMC") {
-      updateItem(index, {
-        destino: "ADMINISTRACION",
-        centro_costo: "PMC",
-        proyecto_id: null,
-      });
-    } else if (val === "ADMIN_PUQ") {
-      updateItem(index, {
-        destino: "ADMINISTRACION",
-        centro_costo: "PUQ",
+        destino: sub,
+        centro_costo: val,
         proyecto_id: null,
       });
     }
+  };
+
+  const handleSubChange = (index, val) => {
+    updateItem(index, {
+      destino: val,
+      proyecto_id: null,
+    });
   };
 
   // Filtrado por búsqueda
@@ -245,8 +205,16 @@ export default function ImportRcvModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-fadeIn"
+      onClick={() => {
+        if (!importing) onClose();
+      }}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header Modal */}
         <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
           <div className="flex items-center gap-3">
@@ -266,7 +234,7 @@ export default function ImportRcvModal({
           <button
             onClick={onClose}
             disabled={importing}
-            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-xl transition-colors"
+            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
           >
             <X size={20} />
           </button>
@@ -281,23 +249,23 @@ export default function ImportRcvModal({
               Asignar {selectedIndices.size > 0 ? `(${selectedIndices.size})` : "seleccionados"} a:
             </span>
 
+            {/* Selector Nivel 1: Proyecto, PMC o PUQ */}
             <select
-              value={bulkDestinationType}
-              onChange={(e) => setBulkDestinationType(e.target.value)}
+              value={bulkMainType}
+              onChange={(e) => setBulkMainType(e.target.value)}
               className="text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg font-semibold text-slate-800 focus:ring-2 focus:ring-primary/20 cursor-pointer"
             >
               <option value="PROYECTO">📁 Proyecto</option>
-              <option value="TALLER_PMC">🔧 Taller Puerto Montt (PMC)</option>
-              <option value="TALLER_PUQ">🔧 Taller Punta Arenas (PUQ)</option>
-              <option value="ADMIN_PMC">🏢 Administración Puerto Montt (PMC)</option>
-              <option value="ADMIN_PUQ">🏢 Administración Punta Arenas (PUQ)</option>
+              <option value="PMC">🏢 Puerto Montt (PMC)</option>
+              <option value="PUQ">🏢 Punta Arenas (PUQ)</option>
             </select>
 
-            {bulkDestinationType === "PROYECTO" && (
+            {/* Selector Nivel 2: Proyecto específico */}
+            {bulkMainType === "PROYECTO" && (
               <select
                 value={bulkProjectId}
                 onChange={(e) => setBulkProjectId(e.target.value)}
-                className="text-xs px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg max-w-[220px] text-slate-800 focus:ring-2 focus:ring-primary/20"
+                className="text-xs px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg max-w-[220px] text-slate-800 focus:ring-2 focus:ring-primary/20 cursor-pointer"
               >
                 {proyectos.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -307,11 +275,23 @@ export default function ImportRcvModal({
               </select>
             )}
 
+            {/* Selector Nivel 2: Taller o Administración para PMC/PUQ */}
+            {bulkMainType !== "PROYECTO" && (
+              <select
+                value={bulkSubType}
+                onChange={(e) => setBulkSubType(e.target.value)}
+                className="text-xs px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium focus:ring-2 focus:ring-primary/20 cursor-pointer"
+              >
+                <option value="TALLER">🔧 Taller</option>
+                <option value="ADMINISTRACION">📋 Administración</option>
+              </select>
+            )}
+
             <button
               type="button"
               onClick={applyBulkAssign}
               disabled={selectedIndices.size === 0}
-              className="px-4 py-1.5 bg-primary text-white hover:bg-primary/90 text-xs font-bold rounded-lg disabled:opacity-50 transition-all shadow-xs"
+              className="px-4 py-1.5 bg-primary text-white hover:bg-primary/90 text-xs font-bold rounded-lg disabled:opacity-50 transition-all shadow-xs cursor-pointer"
             >
               Aplicar
             </button>
@@ -353,6 +333,8 @@ export default function ImportRcvModal({
             <tbody className="divide-y divide-slate-100">
               {filteredItems.map((item) => {
                 const isSelected = selectedIndices.has(item.index);
+                const mainVal = getMainSelectValue(item);
+
                 return (
                   <tr
                     key={item.index}
@@ -398,33 +380,43 @@ export default function ImportRcvModal({
                     </td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex flex-wrap items-center gap-2">
-                        {/* Selector de Destino */}
+                        {/* Selector Nivel 1: Proyecto, PMC o PUQ */}
                         <select
-                          value={getItemSelectValue(item)}
-                          onChange={(e) => handleDestinationChange(item.index, e.target.value)}
-                          className="text-xs px-2.5 py-1 bg-white border border-slate-200 rounded-lg font-medium text-slate-800 focus:ring-2 focus:ring-primary/20 cursor-pointer"
+                          value={mainVal}
+                          onChange={(e) => handleMainChange(item.index, e.target.value)}
+                          className="text-xs px-2.5 py-1 bg-white border border-slate-200 rounded-lg font-semibold text-slate-800 focus:ring-2 focus:ring-primary/20 cursor-pointer"
                         >
                           <option value="PROYECTO">📁 Proyecto</option>
-                          <option value="TALLER_PMC">🔧 Taller Puerto Montt (PMC)</option>
-                          <option value="TALLER_PUQ">🔧 Taller Punta Arenas (PUQ)</option>
-                          <option value="ADMIN_PMC">🏢 Administración Puerto Montt (PMC)</option>
-                          <option value="ADMIN_PUQ">🏢 Administración Punta Arenas (PUQ)</option>
+                          <option value="PMC">🏢 Puerto Montt (PMC)</option>
+                          <option value="PUQ">🏢 Punta Arenas (PUQ)</option>
                         </select>
 
-                        {/* Selector de Proyecto específico si aplica */}
-                        {item.destino === "PROYECTO" && (
+                        {/* Selector Nivel 2: Proyecto específico si aplica */}
+                        {mainVal === "PROYECTO" && (
                           <select
                             value={item.proyecto_id || ""}
                             onChange={(e) =>
                               updateItem(item.index, { proyecto_id: e.target.value })
                             }
-                            className="text-xs px-2 py-1 bg-white border border-slate-200 rounded-lg max-w-[220px] text-slate-800 focus:ring-2 focus:ring-primary/20"
+                            className="text-xs px-2 py-1 bg-white border border-slate-200 rounded-lg max-w-[220px] text-slate-800 focus:ring-2 focus:ring-primary/20 cursor-pointer"
                           >
                             {proyectos.map((p) => (
                               <option key={p.id} value={p.id}>
                                 {p.nombre}
                               </option>
                             ))}
+                          </select>
+                        )}
+
+                        {/* Selector Nivel 2: Taller o Administración si es PMC o PUQ */}
+                        {mainVal !== "PROYECTO" && (
+                          <select
+                            value={getSubSelectValue(item)}
+                            onChange={(e) => handleSubChange(item.index, e.target.value)}
+                            className="text-xs px-2 py-1 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium focus:ring-2 focus:ring-primary/20 cursor-pointer"
+                          >
+                            <option value="TALLER">🔧 Taller</option>
+                            <option value="ADMINISTRACION">📋 Administración</option>
                           </select>
                         )}
                       </div>
@@ -461,7 +453,7 @@ export default function ImportRcvModal({
               type="button"
               onClick={onClose}
               disabled={importing}
-              className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+              className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
             >
               Cancelar
             </button>
@@ -470,7 +462,7 @@ export default function ImportRcvModal({
               type="button"
               onClick={handleSubmit}
               disabled={importing || items.length === 0}
-              className="inline-flex items-center gap-2 px-5 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-primary/20 disabled:opacity-60"
+              className="inline-flex items-center gap-2 px-5 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-primary/20 disabled:opacity-60 cursor-pointer"
             >
               {importing ? (
                 <>
