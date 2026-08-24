@@ -346,7 +346,12 @@ export default function ReporteFinancieroPage({ params }) {
                 {proyecto.cliente?.nombre && (
                   <>
                     <span>•</span>
-                    <span>Cliente: <strong className="text-slate-700">{proyecto.cliente.nombre}</strong></span>
+                    <span>
+                      Cliente: <strong className="text-slate-700">{proyecto.cliente.nombre}</strong>
+                      {proyecto.cliente.rut && (
+                        <span className="text-slate-400 font-mono text-[11px] ml-1">({proyecto.cliente.rut})</span>
+                      )}
+                    </span>
                   </>
                 )}
               </p>
