@@ -14,6 +14,7 @@ import CompraProvOllamaModal from "@/components/compras/CompraProvOllamaModal";
 import QuickProveedorModal from "@/components/compras/QuickProveedorModal";
 import VincularCotizacionModal from "@/components/compras/VincularCotizacionModal";
 import AsignarImputacionModal from "@/components/compras/AsignarImputacionModal";
+import ImportRcvModal from "@/components/compras/ImportRcvModal";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -212,6 +213,9 @@ export default function ComprasPage() {
   const [importing, setImporting] = useState(false);
   const [importErr, setImportErr] = useState("");
   const [importResult, setImportResult] = useState(null);
+  const [openRcvModal, setOpenRcvModal] = useState(false);
+  const [rcvRecords, setRcvRecords] = useState([]);
+  const [importingRcv, setImportingRcv] = useState(false);
 
   // ===== Upload PDF =====
   const [uploadingId, setUploadingId] = useState(null);
@@ -472,45 +476,107 @@ export default function ComprasPage() {
   }, [bundle, rows]);
 
   /* =========================
-     Import CSV
+     Import CSV & RCV Modal
   ========================= */
+  function parseRcvCsv(text) {
+    const lines = text.split(/\r\n|\n|\r/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length < 2) return [];
+
+    const delimiter = lines[0].includes(";") ? ";" : ",";
+    const rawHeaders = lines[0].split(delimiter).map((h) => h.trim().replace(/^["']|["']$/g, ""));
+
+    const results = [];
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line) continue;
+      const vals = line.split(delimiter).map((v) => v.trim().replace(/^["']|["']$/g, ""));
+      const row = {};
+      rawHeaders.forEach((h, idx) => {
+        row[h] = vals[idx] ?? "";
+      });
+
+      const tipoDoc = row["Tipo Doc"] || row["tipo_doc"] || "33";
+      const rutProv = row["RUT Proveedor"] || row["rut_proveedor"] || row["RUT"] || "";
+      const razon = row["Razon Social"] || row["razon_social"] || row["Proveedor"] || "";
+      const folio = row["Folio"] || row["folio"] || "";
+      const fechaDocto = row["Fecha Docto"] || row["fecha_docto"] || "";
+      const fechaRecep = row["Fecha Recepcion"] || row["fecha_recepcion"] || "";
+      const montoRaw = String(row["Monto Total"] || row["total"] || "0").replace(/[^0-9]/g, "");
+      const montoTotal = parseInt(montoRaw, 10) || 0;
+
+      if (folio && (rutProv || razon)) {
+        results.push({
+          tipo_doc: tipoDoc,
+          rut_proveedor: rutProv,
+          razon_social: razon || rutProv,
+          folio: folio,
+          fecha_docto: fechaDocto,
+          fecha_recepcion: fechaRecep,
+          monto_total: montoTotal,
+        });
+      }
+    }
+    return results;
+  }
+
   async function handleImportCSV(file) {
     if (!session || !file) return;
 
     try {
-      setImporting(true);
       setImportErr("");
       setImportResult(null);
 
-      const fd = new FormData();
-      fd.append("file", file);
+      const text = await file.text();
+      const parsed = parseRcvCsv(text);
 
-      const res = await fetch(`${API}/compras/import-csv`, {
+      if (!parsed || parsed.length === 0) {
+        throw new Error("No se encontraron registros válidos en el archivo CSV.");
+      }
+
+      if (proyectos.length === 0) {
+        loadLookups();
+      }
+
+      setRcvRecords(parsed);
+      setOpenRcvModal(true);
+    } catch (e) {
+      setImportErr(e?.message || "Error al leer el archivo CSV");
+      triggerToast(e?.message || "Error al procesar CSV", "error");
+    }
+  }
+
+  async function handleConfirmImportClassified(classifiedItems) {
+    if (!session || !classifiedItems || classifiedItems.length === 0) return;
+
+    try {
+      setImportingRcv(true);
+      setImportErr("");
+
+      const res = await fetch(`${API}/compras/import-classified`, {
         method: "POST",
-        headers: makeHeadersMultipart(session),
-        body: fd,
+        headers: makeHeadersJson(session),
+        body: JSON.stringify({ items: classifiedItems }),
       });
 
       const payload = await jsonOrNull(res);
       if (!res.ok) {
-        const msg =
-          payload?.message ||
-          payload?.msg ||
-          payload?.error ||
-          payload?.detalle ||
-          "Error importando CSV";
-        throw new Error(msg);
+        throw new Error(payload?.message || payload?.error || "Error al importar compras clasificadas");
       }
 
       setImportResult(payload);
+      setOpenRcvModal(false);
+      setRcvRecords([]);
+
+      triggerToast(`Se importaron exitosamente ${payload.created || 0} documentos.`, "success");
 
       setPage(1);
       await loadCompras({ page: 1, pageSize });
       await loadLookups();
     } catch (e) {
-      setImportErr(e?.message || "Error importando CSV");
+      setImportErr(e?.message || "Error importando compras");
+      triggerToast(e?.message || "Error en la importación", "error");
     } finally {
-      setImporting(false);
+      setImportingRcv(false);
     }
   }
 
@@ -1265,6 +1331,16 @@ export default function ComprasPage() {
         onSave={saveImputacion}
         saving={savingImputacion}
         error={imputacionErr}
+      />
+
+      {/* MODAL RCV INTERACTIVO DE ASIGNACIÓN */}
+      <ImportRcvModal
+        open={openRcvModal}
+        onClose={() => setOpenRcvModal(false)}
+        records={rcvRecords}
+        proyectos={proyectos}
+        onImport={handleConfirmImportClassified}
+        importing={importingRcv}
       />
 
       {/* ===== MODAL CONFIRMACION DE PAGO ===== */}

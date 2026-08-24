@@ -14,6 +14,8 @@ import {
   Users,
   UserPlus,
   X,
+  FileText,
+  BarChart3,
 } from "lucide-react";
 import AsignarEquipoModal from "./AsignarEquipoModal";
 import { makeHeaders } from "@/lib/api";
@@ -393,10 +395,16 @@ export default function ProyectoHeader({ proyecto, metrics, tareas = [] }) {
 
         <div className="space-y-2 w-full bg-surface-container-low/30 p-4 rounded-lg">
           <Link
+            href={`/proyectos/${proyecto.id}/reporte-financiero`}
+            className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-on-primary px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm shadow-primary/20"
+          >
+            <BarChart3 size={16} /> Reporte Financiero
+          </Link>
+          <Link
             href={`/proyectos/${proyecto.id}/devengado`}
             className="w-full flex items-center justify-center gap-2 bg-on-surface hover:bg-on-surface/90 text-surface px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm"
           >
-            <TrendingUp size={16} /> Resumen Financiero
+            <TrendingUp size={16} /> Resumen Devengado
           </Link>
         </div>
       </div>
