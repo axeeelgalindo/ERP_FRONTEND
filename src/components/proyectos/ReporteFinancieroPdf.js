@@ -176,7 +176,7 @@ export async function generarReporteFinancieroPDF({ data }) {
       bgColor: [254, 243, 199],
     },
     {
-      title: `3. COMPRAS RCV (${pctComprasSobreVenta}%)`,
+      title: `3. COMPRAS (${pctComprasSobreVenta}%)`,
       value: money(kpis.montoTotalCompras),
       sub: `Plan: ${money(costeo.compras?.plan)}`,
       pct: Math.min(100, costeo.compras?.porcentajeConsumido || 0),
@@ -428,10 +428,10 @@ export async function generarReporteFinancieroPDF({ data }) {
       Number(f.tipo_doc) === 33
         ? "Fact. Elec. (33)"
         : Number(f.tipo_doc) === 34
-        ? "Exenta (34)"
-        : Number(f.tipo_doc) === 61
-        ? "NC (61)"
-        : `Doc. ${f.tipo_doc}`;
+          ? "Exenta (34)"
+          : Number(f.tipo_doc) === 61
+            ? "NC (61)"
+            : `Doc. ${f.tipo_doc}`;
 
     return [
       `#${f.folio || f.numero}`,

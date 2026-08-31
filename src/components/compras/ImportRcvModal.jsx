@@ -183,10 +183,15 @@ export default function ImportRcvModal({
     let countAdminPUQ = 0;
     let countTallerPMC = 0;
     let countTallerPUQ = 0;
+    let countExistentes = 0;
+    let countNuevas = 0;
     let totalMonto = 0;
 
     items.forEach((it) => {
       totalMonto += Number(it.monto_total || 0);
+      if (it.ya_cargada) countExistentes++;
+      else countNuevas++;
+
       if (it.destino === "PROYECTO") countProy++;
       else if (it.destino === "ADMINISTRACION" && it.centro_costo === "PUQ") countAdminPUQ++;
       else if (it.destino === "ADMINISTRACION") countAdminPMC++;
@@ -194,7 +199,16 @@ export default function ImportRcvModal({
       else if (it.destino === "TALLER") countTallerPMC++;
     });
 
-    return { countProy, countAdminPMC, countAdminPUQ, countTallerPMC, countTallerPUQ, totalMonto };
+    return {
+      countProy,
+      countAdminPMC,
+      countAdminPUQ,
+      countTallerPMC,
+      countTallerPUQ,
+      countExistentes,
+      countNuevas,
+      totalMonto,
+    };
   }, [items]);
 
   const handleSubmit = async () => {
@@ -222,11 +236,23 @@ export default function ImportRcvModal({
               <FileSpreadsheet size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                Clasificación de Documentos RCV
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-slate-900">
+                  Clasificación de Documentos RCV
+                </h2>
+                {summary.countExistentes > 0 && (
+                  <span className="text-[11px] font-semibold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200">
+                    {summary.countExistentes} por asignar
+                  </span>
+                )}
+                {summary.countNuevas > 0 && (
+                  <span className="text-[11px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                    {summary.countNuevas} nuevas
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate-500">
-                Asigna el Centro de Costo (Pto. Montt, Punta Arenas, Taller, Administración o Proyecto) antes de importar.
+                Asigna el Centro de Costo o Proyecto antes de importar. Las facturas ya asignadas a proyectos fueron descartadas automáticamente.
               </p>
             </div>
           </div>
@@ -357,8 +383,25 @@ export default function ImportRcvModal({
                       />
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-extrabold text-slate-900">
-                        #{item.folio}
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-extrabold text-slate-900">
+                          #{item.folio}
+                        </span>
+                        {item.ya_cargada ? (
+                          <span
+                            className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200"
+                            title="Esta factura ya está en la base de datos sin asignar. Al importar se actualizará su proyecto/centro de costo."
+                          >
+                            Sin Asignar
+                          </span>
+                        ) : (
+                          <span
+                            className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200"
+                            title="Documento nuevo"
+                          >
+                            Nueva
+                          </span>
+                        )}
                       </div>
                       <div className="text-[10px] text-slate-400">
                         Doc. {item.tipo_doc || item["Tipo Doc"]}

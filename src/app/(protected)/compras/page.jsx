@@ -537,7 +537,37 @@ export default function ComprasPage() {
         loadLookups();
       }
 
-      setRcvRecords(parsed);
+      // Verificar documentos contra BD para descartar las ya asignadas a COT
+      const checkRes = await fetch(`${API}/compras/check-rcv`, {
+        method: "POST",
+        headers: makeHeadersJson(session),
+        body: JSON.stringify({ items: parsed }),
+      });
+
+      const checkData = await jsonOrNull(checkRes);
+      if (!checkRes.ok) {
+        throw new Error(checkData?.message || checkData?.error || "Error al verificar documentos RCV");
+      }
+
+      const validItems = checkData.validItems || [];
+      const discardedCount = checkData.discardedCount || 0;
+
+      if (validItems.length === 0) {
+        triggerToast(
+          `Todas las facturas (${discardedCount}) ya se encuentran cargadas y asignadas a proyectos/COT.`,
+          "info"
+        );
+        return;
+      }
+
+      if (discardedCount > 0) {
+        triggerToast(
+          `Se descartaron ${discardedCount} facturas ya asignadas a proyectos/COT. Quedan ${validItems.length} para clasificar/asignar.`,
+          "info"
+        );
+      }
+
+      setRcvRecords(validItems);
       setOpenRcvModal(true);
     } catch (e) {
       setImportErr(e?.message || "Error al leer el archivo CSV");
@@ -567,7 +597,16 @@ export default function ComprasPage() {
       setOpenRcvModal(false);
       setRcvRecords([]);
 
-      triggerToast(`Se importaron exitosamente ${payload.created || 0} documentos.`, "success");
+      const createdCount = payload.created || 0;
+      const updatedCount = payload.updated || 0;
+
+      if (createdCount > 0 && updatedCount > 0) {
+        triggerToast(`Se importaron ${createdCount} documentos nuevos y se asignaron ${updatedCount} existentes a COT.`, "success");
+      } else if (updatedCount > 0) {
+        triggerToast(`Se asignaron exitosamente ${updatedCount} documentos existentes a COT.`, "success");
+      } else {
+        triggerToast(`Se importaron exitosamente ${createdCount} documentos.`, "success");
+      }
 
       setPage(1);
       await loadCompras({ page: 1, pageSize });

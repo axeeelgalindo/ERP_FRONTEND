@@ -57,7 +57,8 @@ export function nextEstados(estadoActual) {
   if (estadoActual === "ACEPTADA") return ["ORDEN_VENTA"];
   if (estadoActual === "ORDEN_VENTA") return ["POR_FACTURAR"];
   if (estadoActual === "POR_FACTURAR") return ["FACTURADA"];
-  if (estadoActual === "FACTURADA") return ["PAGADA"];
+  // ✅ FACTURADA -> solo se da por pagada registrando pagos/comprobantes al 100%
+  if (estadoActual === "FACTURADA") return [];
   if (estadoActual === "PAGADA") return ["ENTREGADO"];
   // ✅ finales: ENTREGADO, RECHAZADA, etc.
   return [];

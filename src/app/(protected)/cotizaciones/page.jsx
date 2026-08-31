@@ -135,14 +135,15 @@ export default function CotizacionesPage() {
     const aceptada = [];
 
     for (const c of cotizaciones) {
-      if (c.eliminado) continue;
-
-      // Calcular avance de facturación real de los adjuntos FAC
-      const pctFacturado = (c.adjuntos || [])
-        .filter(a => a.tipo === "fac")
-        .reduce((acc, a) => acc + (Number(a.porcentaje) || 0), 0);
+      if (c.eliminado || c.es_suscripcion) continue;
 
       const isActiva = c.estado !== "COTIZACION" && c.estado !== "RECHAZADA";
+      if (!isActiva) continue;
+
+      // 1. Calcular avance de facturación real de los adjuntos FAC
+      const pctFacturado = (c.adjuntos || [])
+        .filter((a) => a.tipo === "fac")
+        .reduce((acc, a) => acc + (Number(a.porcentaje) || 0), 0);
 
       // Guardamos el porcentaje facturado calculado en el objeto de la cotización
       const cotConPct = {
@@ -150,52 +151,55 @@ export default function CotizacionesPage() {
         pct_facturado_calculado: pctFacturado,
       };
 
-      // 1) Pagado parcial: avance_pago_pct > 0 y < 99.9 (solo para cotizaciones activas/aceptadas)
-      const pctPago = c.avance_pago_pct || 0;
-      if (isActiva && pctPago > 0 && pctPago < 99.9 && c.estado !== "PAGADA") {
-        pagadoParcial.push(cotConPct);
+      // 2. Calcular pago real
+      const total = Number(c.total) || 0;
+      const totalPagado = c.total_pagado ?? (c.pagos?.filter(p => !p.eliminado).reduce((a, p) => a + Number(p.monto || 0), 0) || 0);
+      const pctPago = total > 0 ? (totalPagado / total) * 100 : (c.avance_pago_pct || 0);
+
+      // 1) Si ya está pagada al 100% (por estado PAGADA o por comprobantes que cubren el 100%), SALE DEL CUADRO
+      const isPagada100 = c.estado === "PAGADA" || (total > 0 && totalPagado >= total * 0.999) || pctPago >= 99.9;
+      if (isPagada100) {
+        continue;
       }
 
-      // Determinar si es facturada total o parcial basada en pctFacturado
-      let esFacturadaTotal = false;
-      let esFacturadaParcial = false;
+      // 3. Determinar estados de facturación y adjuntos
+      let isFacturada100 = false;
+      let isFacturadaParcial = false;
 
-      if (isActiva) {
-        if (pctFacturado >= 99.9) {
-          esFacturadaTotal = true;
-        } else if (pctFacturado > 0) {
-          esFacturadaParcial = true;
-        } else {
-          // Fallback al estado de la base de datos si no hay facturas subidas en el sistema (0%)
-          const estadoFacturado = c.estado === "FACTURADA" || c.estado === "PAGADA" || c.estado === "ENTREGADO";
-          if (estadoFacturado) {
-            esFacturadaTotal = true;
-          }
+      if (pctFacturado >= 99.9) {
+        isFacturada100 = true;
+      } else if (pctFacturado > 0) {
+        isFacturadaParcial = true;
+      } else {
+        // Fallback al estado de la base de datos si no hay facturas subidas en el sistema
+        const estadoFacturado = c.estado === "FACTURADA" || c.estado === "ENTREGADO";
+        if (estadoFacturado) {
+          isFacturada100 = true;
         }
       }
 
-      // 2) Facturada 100%
-      if (isActiva && esFacturadaTotal) {
-        facturada100.push(cotConPct);
-      }
+      const isPagadaParcial = pctPago > 0 && !isPagada100;
+      const hasHES = Boolean(c.doc_hes_url || c.adjuntos?.some((a) => a.tipo === "hes"));
+      const hasOC = Boolean(c.doc_oc_url || c.adjuntos?.some((a) => a.tipo === "oc") || c.estado === "ORDEN_VENTA");
 
-      // 3) Facturada parcial
-      if (isActiva && esFacturadaParcial) {
+      // 4. Clasificación MUTUAMENTE EXCLUYENTE con estricta jerarquía (sin clonación entre columnas):
+      // Regla 3: Si algo está facturado parcial y pagado parcial a la vez, solo se debe tomar como facturado parcial.
+      if (isFacturadaParcial) {
         facturadaParcial.push(cotConPct);
-      }
-
-      // 4) HES: tiene doc_hes_url o adjunto tipo hes
-      if (c.doc_hes_url || c.adjuntos?.some((a) => a.tipo === "hes")) {
+      } else if (isPagadaParcial) {
+        // Facturada 100% que tiene pagos parciales
+        pagadoParcial.push(cotConPct);
+      } else if (isFacturada100) {
+        // Facturada 100% sin pagos aún
+        facturada100.push(cotConPct);
+      } else if (hasHES) {
+        // Tiene HES (sin facturar)
         hes.push(cotConPct);
-      }
-
-      // 5) OC: tiene doc_oc_url o adjunto tipo oc
-      if (c.doc_oc_url || c.adjuntos?.some((a) => a.tipo === "oc")) {
+      } else if (hasOC) {
+        // Tiene OC (sin HES y sin facturar)
         oc.push(cotConPct);
-      }
-
-      // 6) Aceptada: estado === ACEPTADA
-      if (c.estado === "ACEPTADA") {
+      } else if (c.estado === "ACEPTADA" || isActiva) {
+        // Aceptada inicial
         aceptada.push(cotConPct);
       }
     }
