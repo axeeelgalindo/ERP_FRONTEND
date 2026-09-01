@@ -55,12 +55,13 @@ export default function IndependentRendicionModal({
   const [docEntregaFile, setDocEntregaFile] = useState(null);
   const [docEntregaName, setDocEntregaName] = useState("");
   const [items, setItems] = useState([
-    { fecha: "", descripcion: "", monto: "", categoria: "", comprobante_file: null, comprobante_name: "" }
+    { fecha: "", descripcion: "", monto: "", categoria: "", proveedor: "", rut_proveedor: "", tipo_doc: "BOLETA", folio: "", comprobante_file: null, comprobante_name: "" }
   ]);
 
   // Data for selects
   const [proyectos, setProyectos] = useState([]);
   const [empleados, setEmpleados] = useState([]);
+  const [proveedores, setProveedores] = useState([]);
   const [filterQ, setFilterQ] = useState("");
   const [filterE, setFilterE] = useState("");
 
@@ -111,13 +112,17 @@ export default function IndependentRendicionModal({
             descripcion: it.descripcion || "",
             monto: it.monto || "",
             categoria: it.categoria || "",
+            proveedor: it.proveedor || "",
+            rut_proveedor: it.rut_proveedor || "",
+            tipo_doc: it.tipo_doc || "BOLETA",
+            folio: it.folio || "",
             comprobante_url: it.comprobante_url || null,
             comprobante_file: null,
             comprobante_name: it.comprobante_url ? "Comprobante cargado" : ""
           })));
         } else {
           setItems([
-            { fecha: "", descripcion: "", monto: "", categoria: "", comprobante_file: null, comprobante_name: "" }
+            { fecha: "", descripcion: "", monto: "", categoria: "", proveedor: "", rut_proveedor: "", tipo_doc: "BOLETA", folio: "", comprobante_file: null, comprobante_name: "" }
           ]);
         }
       } else {
@@ -133,7 +138,7 @@ export default function IndependentRendicionModal({
         setDocEntregaFile(null);
         setDocEntregaName("");
         setItems([
-          { fecha: "", descripcion: "", monto: "", categoria: "", comprobante_file: null, comprobante_name: "" }
+          { fecha: "", descripcion: "", monto: "", categoria: "", proveedor: "", rut_proveedor: "", tipo_doc: "BOLETA", folio: "", comprobante_file: null, comprobante_name: "" }
         ]);
       }
     }
@@ -142,7 +147,13 @@ export default function IndependentRendicionModal({
   async function loadInitialData() {
     if (!session) return;
     const token = session?.accessToken || session?.user?.accessToken || "";
-    const empresaId = session?.user?.empresaId ?? session?.user?.empresa?.id ?? session?.empresaId ?? null;
+    const empresaId =
+      session?.user?.empresaId ??
+      session?.empresaId ??
+      session?.user?.empresa?.id ??
+      session?.user?.empresa_id ??
+      session?.empresa_id ??
+      null;
 
     const headers = {
       "Content-Type": "application/json",
@@ -150,31 +161,61 @@ export default function IndependentRendicionModal({
       ...(empresaId ? { "x-empresa-id": String(empresaId) } : {}),
     };
     try {
-      const [resP, resE] = await Promise.all([
+      const [resP, resE, resProv] = await Promise.all([
         fetch(`${apiBase}/proyectos?pageSize=1000`, { headers }),
-        fetch(`${apiBase}/empleados?pageSize=1000`, { headers })
+        fetch(`${apiBase}/empleados?pageSize=1000`, { headers }),
+        fetch(`${apiBase}/proveedores?pageSize=1000`, { headers })
       ]);
       const dataP = await jsonOrNull(resP);
       const dataE = await jsonOrNull(resE);
+      const dataProv = await jsonOrNull(resProv);
 
-      const arrP = Array.isArray(dataP?.items) ? dataP.items : Array.isArray(dataP?.data) ? dataP.data : Array.isArray(dataP) ? dataP : [];
-      const arrE = Array.isArray(dataE?.items) ? dataE.items : Array.isArray(dataE?.data) ? dataE.data : Array.isArray(dataE) ? dataE : [];
+      const arrP = Array.isArray(dataP?.items) ? dataP.items : Array.isArray(dataP?.data) ? dataP.data : Array.isArray(dataP?.rows) ? dataP.rows : Array.isArray(dataP) ? dataP : [];
+      const arrE = Array.isArray(dataE?.items) ? dataE.items : Array.isArray(dataE?.data) ? dataE.data : Array.isArray(dataE?.rows) ? dataE.rows : Array.isArray(dataE) ? dataE : [];
+      const arrProv = Array.isArray(dataProv?.rows) ? dataProv.rows : Array.isArray(dataProv?.items) ? dataProv.items : Array.isArray(dataProv?.data) ? dataProv.data : Array.isArray(dataProv) ? dataProv : [];
 
       setProyectos(arrP);
       setEmpleados(arrE);
+      setProveedores(arrProv.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "")));
     } catch (e) {
       console.error(e);
       setProyectos([]);
       setEmpleados([]);
+      setProveedores([]);
     }
   }
 
   const totalItems = useMemo(() => items.reduce((acc, it) => acc + Number(it.monto || 0), 0), [items]);
   const balance = totalItems - Number(montoEntregado || 0);
 
-  const addItem = () => setItems([...items, { fecha: "", descripcion: "", monto: "", categoria: "", comprobante_file: null, comprobante_name: "" }]);
+  const addItem = () =>
+    setItems([
+      ...items,
+      {
+        fecha: "",
+        descripcion: "",
+        monto: "",
+        categoria: "",
+        proveedor: "",
+        rut_proveedor: "",
+        tipo_doc: "BOLETA",
+        folio: "",
+        comprobante_file: null,
+        comprobante_name: "",
+      },
+    ]);
   const removeItem = (idx) => setItems(items.filter((_, i) => i !== idx));
-  const updateItem = (idx, key, val) => setItems(items.map((it, i) => i === idx ? { ...it, [key]: val } : it));
+  const updateItem = (idx, patchOrKey, maybeVal) => {
+    setItems((prevItems) =>
+      prevItems.map((it, i) => {
+        if (i !== idx) return it;
+        if (typeof patchOrKey === "object" && patchOrKey !== null) {
+          return { ...it, ...patchOrKey };
+        }
+        return { ...it, [patchOrKey]: maybeVal };
+      })
+    );
+  };
 
   const handleSave = async () => {
     setErr("");
@@ -182,7 +223,7 @@ export default function IndependentRendicionModal({
     if (destino === "PROYECTO" && !proyectoId) return setErr("Seleccione un proyecto");
     if (destino !== "PROYECTO" && !centroCosto) return setErr("Seleccione un centro de costo");
 
-    const validItems = items.filter(it => it.descripcion || it.monto);
+    const validItems = items.filter(it => it.descripcion || it.monto || it.proveedor);
 
     setLoading(true);
     try {
@@ -198,6 +239,10 @@ export default function IndependentRendicionModal({
           descripcion: it.descripcion,
           monto: Number(it.monto || 0),
           categoria: it.categoria || null,
+          proveedor: it.proveedor || null,
+          rut_proveedor: it.rut_proveedor || null,
+          tipo_doc: it.tipo_doc || null,
+          folio: it.folio || null,
           comprobante_url: it.comprobante_url || null
         }))
       };
@@ -526,14 +571,152 @@ export default function IndependentRendicionModal({
                         <span className="material-symbols-outlined text-xl">delete</span>
                       </button>
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {/* Selector / Input Proveedor */}
                         <div className="md:col-span-2">
-                          <label className="block text-[9px] font-bold text-outline uppercase mb-1">Descripción del Ítem</label>
-                          <input className="w-full rounded-lg border-none bg-surface-container-lowest text-on-surface font-medium text-sm focus:ring-2 focus:ring-primary/20 h-10 px-3 transition-colors" value={it.descripcion} onChange={e => updateItem(idx, "descripcion", e.target.value)} placeholder="Ej: Pasajes, almuerzo, etc." />
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-[9px] font-bold text-outline uppercase">
+                              Proveedor
+                            </label>
+                            {it.is_manual_prov ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  updateItem(idx, "is_manual_prov", false);
+                                  updateItem(idx, "proveedor", "");
+                                  updateItem(idx, "rut_proveedor", "");
+                                }}
+                                className="text-[10px] text-primary font-bold hover:underline flex items-center gap-0.5"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">list</span>
+                                Elegir de lista
+                              </button>
+                            ) : null}
+                          </div>
+
+                          {!it.is_manual_prov ? (
+                            <select
+                              className="w-full rounded-lg border-none bg-surface-container-lowest text-on-surface font-bold text-sm focus:ring-2 focus:ring-primary/20 h-10 px-3 cursor-pointer"
+                              value={
+                                it.proveedor_id ||
+                                proveedores.find(
+                                  (p) =>
+                                    p.nombre &&
+                                    p.nombre.trim().toUpperCase() === (it.proveedor || "").trim().toUpperCase()
+                                )?.id ||
+                                (it.proveedor ? "__OTRO_MANUAL__" : "")
+                              }
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === "__OTRO_MANUAL__") {
+                                  updateItem(idx, {
+                                    is_manual_prov: true,
+                                    proveedor: "",
+                                    rut_proveedor: "",
+                                    proveedor_id: "",
+                                  });
+                                } else if (!val) {
+                                  updateItem(idx, {
+                                    is_manual_prov: false,
+                                    proveedor: "",
+                                    rut_proveedor: "",
+                                    proveedor_id: "",
+                                  });
+                                } else {
+                                  const p = proveedores.find((prov) => String(prov.id) === String(val));
+                                  if (p) {
+                                    updateItem(idx, {
+                                      is_manual_prov: false,
+                                      proveedor: p.nombre,
+                                      rut_proveedor: p.rut || "",
+                                      proveedor_id: p.id,
+                                    });
+                                  }
+                                }
+                              }}
+                            >
+                              <option value="">-- Seleccionar Proveedor --</option>
+                              {proveedores.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.nombre} {p.rut ? `(${p.rut})` : ""}
+                                </option>
+                              ))}
+                              <option value="__OTRO_MANUAL__" className="font-bold text-primary">
+                                + Agregar nuevo / No está en la lista
+                              </option>
+                            </select>
+                          ) : (
+                            <input
+                              autoFocus
+                              className="w-full rounded-lg border-none bg-surface-container-lowest text-on-surface font-medium text-sm focus:ring-2 focus:ring-primary/20 h-10 px-3 transition-colors uppercase"
+                              value={it.proveedor || ""}
+                              onChange={(e) => updateItem(idx, "proveedor", e.target.value)}
+                              placeholder="Escribir nombre del proveedor..."
+                            />
+                          )}
                         </div>
+
+                        {/* RUT Proveedor */}
+                        <div>
+                          <label className="block text-[9px] font-bold text-outline uppercase mb-1">
+                            RUT Proveedor
+                          </label>
+                          <input
+                            className={`w-full rounded-lg border-none text-on-surface font-medium text-sm focus:ring-2 focus:ring-primary/20 h-10 px-3 transition-colors ${
+                              !it.is_manual_prov && it.proveedor
+                                ? "bg-surface-container-lowest font-bold text-slate-700"
+                                : "bg-surface-container-lowest"
+                            }`}
+                            value={it.rut_proveedor || ""}
+                            onChange={(e) => updateItem(idx, "rut_proveedor", e.target.value)}
+                            placeholder={it.proveedor ? "Sin RUT registrado" : "Ej: 76.123.456-7"}
+                          />
+                        </div>
+
+                        {/* Tipo Documento */}
+                        <div>
+                          <label className="block text-[9px] font-bold text-outline uppercase mb-1">
+                            Tipo Documento
+                          </label>
+                          <select
+                            className="w-full rounded-lg border-none bg-surface-container-lowest text-on-surface font-bold text-sm focus:ring-2 focus:ring-primary/20 h-10 px-3 cursor-pointer uppercase"
+                            value={it.tipo_doc || "BOLETA"}
+                            onChange={(e) => updateItem(idx, "tipo_doc", e.target.value)}
+                          >
+                            <option value="BOLETA">BOLETA</option>
+                            <option value="FACTURA">FACTURA</option>
+                            <option value="FACTURA EXENTA">FACTURA EXENTA</option>
+                            <option value="VOUCHER">VOUCHER</option>
+                            <option value="BOLETA HONORARIOS">BOLETA HONORARIOS</option>
+                            <option value="COMPROBANTE">COMPROBANTE</option>
+                          </select>
+                        </div>
+
+                        {/* Folio / N° */}
+                        <div>
+                          <label className="block text-[9px] font-bold text-outline uppercase mb-1">
+                            Folio / N° (Opcional)
+                          </label>
+                          <input
+                            className="w-full rounded-lg border-none bg-surface-container-lowest text-on-surface font-medium text-sm focus:ring-2 focus:ring-primary/20 h-10 px-3 transition-colors"
+                            value={it.folio || ""}
+                            onChange={(e) => updateItem(idx, "folio", e.target.value)}
+                            placeholder="Ej: 12345 (opcional)"
+                          />
+                        </div>
+
+                        {/* Descripción */}
+                        <div className="md:col-span-3">
+                          <label className="block text-[9px] font-bold text-outline uppercase mb-1">Descripción del Ítem / Detalle</label>
+                          <input className="w-full rounded-lg border-none bg-surface-container-lowest text-on-surface font-medium text-sm focus:ring-2 focus:ring-primary/20 h-10 px-3 transition-colors" value={it.descripcion} onChange={e => updateItem(idx, "descripcion", e.target.value)} placeholder="Ej: Almuerzo equipo, combustible ruta, etc." />
+                        </div>
+
+                        {/* Monto */}
                         <div>
                           <label className="block text-[9px] font-bold text-outline uppercase mb-1">Monto ($)</label>
                           <input className="w-full rounded-lg border-none bg-surface-container-lowest text-on-surface font-black text-sm focus:ring-2 focus:ring-primary/20 h-10 px-3" type="number" value={it.monto} onChange={e => updateItem(idx, "monto", e.target.value)} />
                         </div>
+
+                        {/* Categoría */}
                         <div>
                           <label className="block text-[9px] font-bold text-outline uppercase mb-1">Categoría</label>
                           <select className="w-full rounded-lg border-none bg-surface-container-lowest text-on-surface font-bold text-sm focus:ring-2 focus:ring-primary/20 h-10 px-3 cursor-pointer" value={it.categoria} onChange={e => updateItem(idx, "categoria", e.target.value)}>

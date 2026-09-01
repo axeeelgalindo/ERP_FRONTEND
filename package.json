@@ -19,6 +19,7 @@
     "@mui/x-date-pickers": "^9.0.0",
     "dayjs": "1.11.19",
     "docx-preview": "^0.3.7",
+    "exceljs": "^4.4.0",
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "0.553.0",

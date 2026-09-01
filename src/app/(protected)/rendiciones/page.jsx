@@ -12,6 +12,7 @@ import RendicionKpis from "@/components/rendiciones/RendicionKpis";
 import RendicionTable from "@/components/rendiciones/RendicionTable";
 import RendicionDetailDrawer from "@/components/rendiciones/RendicionDetailDrawer";
 import IndependentRendicionModal from "@/components/rendiciones/IndependentRendicionModal";
+import RendicionesExportModal from "@/components/rendiciones/RendicionesExportModal";
 import Pagination from "@/components/ui/Pagination";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -74,6 +75,7 @@ export default function RendicionesPage() {
   const [selectedRendicion, setSelectedRendicion] = useState(null);
   const [openDrawer, setOpenDrawer] = useState(false);
   const [openCreate, setOpenCreate] = useState(false);
+  const [openExport, setOpenExport] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [rendicionToEdit, setRendicionToEdit] = useState(null);
   const [toast, setToast] = useState({ open: false, msg: "", type: "success" });
@@ -286,13 +288,22 @@ export default function RendicionesPage() {
             <h1 className="text-3xl font-black text-white tracking-tight">Rendiciones</h1>
             <p className="text-slate-400 text-sm mt-1">Gestión inteligente de gastos y reembolsos.</p>
           </div>
-          <button
-            onClick={() => { setRendicionToEdit(null); setOpenCreate(true); }}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white text-slate-900 rounded-xl font-bold text-sm shadow-lg hover:bg-slate-100 transition-all active:scale-95"
-          >
-            <span className="material-symbols-outlined text-base">add</span>
-            Nueva Rendición
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setOpenExport(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-emerald-950/20 transition-all active:scale-95 border border-emerald-400/30 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base">table_chart</span>
+              Exportar Excel
+            </button>
+            <button
+              onClick={() => { setRendicionToEdit(null); setOpenCreate(true); }}
+              className="flex items-center gap-2 px-5 py-2.5 bg-white text-slate-900 rounded-xl font-bold text-sm shadow-lg hover:bg-slate-100 transition-all active:scale-95 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base">add</span>
+              Nueva Rendición
+            </button>
+          </div>
         </div>
       </div>
 
@@ -488,6 +499,12 @@ export default function RendicionesPage() {
         apiBase={API}
         onSaved={loadData}
         rendicionToEdit={rendicionToEdit}
+      />
+
+      <RendicionesExportModal
+        open={openExport}
+        onClose={() => setOpenExport(false)}
+        rendiciones={data}
       />
 
       {/* ===== MODAL CONFIRMACION DE ELIMINACION ===== */}

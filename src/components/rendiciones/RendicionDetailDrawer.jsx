@@ -41,8 +41,18 @@ export default function RendicionDetailDrawer({
 
   // Estados para agregar ítems
   const [isAddingItem, setIsAddingItem] = useState(false);
-  const [newItem, setNewItem] = useState({ descripcion: "", monto: "", fecha: new Date().toISOString().split("T")[0], categoria: "Gasto General" });
+  const [newItem, setNewItem] = useState({
+    descripcion: "",
+    monto: "",
+    fecha: new Date().toISOString().split("T")[0],
+    categoria: "Alimentación",
+    proveedor: "",
+    rut_proveedor: "",
+    tipo_doc: "BOLETA",
+    folio: "",
+  });
   const [savingItem, setSavingItem] = useState(false);
+  const [proveedores, setProveedores] = useState([]);
 
   // Estados para agregar anticipos
   const [isAddingAnticipo, setIsAddingAnticipo] = useState(false);
@@ -62,6 +72,25 @@ export default function RendicionDetailDrawer({
   const [availableCompras, setAvailableCompras] = useState([]);
   const [loadingCompras, setLoadingCompras] = useState(false);
   const [compraSearch, setCompraSearch] = useState("");
+
+  const fetchProveedores = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/proveedores?pageSize=1000`, {
+        headers: makeHeaders(session),
+      });
+      const data = await res.json();
+      const list = Array.isArray(data?.rows) ? data.rows : Array.isArray(data?.items) ? data.items : Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+      setProveedores(list.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "")));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    if (open) {
+      fetchProveedores();
+    }
+  }, [open]);
   const fetchAvailableCompras = async (query = "") => {
     setLoadingCompras(true);
     try {
@@ -212,6 +241,10 @@ export default function RendicionDetailDrawer({
         descripcion: it.descripcion,
         monto: it.monto,
         categoria: it.categoria,
+        proveedor: it.proveedor,
+        rut_proveedor: it.rut_proveedor,
+        tipo_doc: it.tipo_doc,
+        folio: it.folio,
         comprobante_url: it.comprobante_url
       }));
 
@@ -235,7 +268,16 @@ export default function RendicionDetailDrawer({
       if (!res.ok) throw new Error("Error al agregar ítem");
       
       setIsAddingItem(false);
-      setNewItem({ descripcion: "", monto: "", fecha: new Date().toISOString().split("T")[0], categoria: "Gasto General" });
+      setNewItem({
+        descripcion: "",
+        monto: "",
+        fecha: new Date().toISOString().split("T")[0],
+        categoria: "Alimentación",
+        proveedor: "",
+        rut_proveedor: "",
+        tipo_doc: "BOLETA",
+        folio: "",
+      });
       onRefresh?.();
     } catch (e) {
       alert(e.message);
@@ -625,12 +667,139 @@ export default function RendicionDetailDrawer({
 
             {isAddingItem && (
               <div className="bg-slate-50 border border-secondary/20 rounded-2xl p-5 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Proveedor */}
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Descripción</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Proveedor</label>
+                      {newItem.is_manual_prov && (
+                        <button
+                          type="button"
+                          onClick={() => setNewItem({ ...newItem, is_manual_prov: false, proveedor: "", rut_proveedor: "" })}
+                          className="text-[10px] text-secondary font-bold hover:underline"
+                        >
+                          Elegir de lista
+                        </button>
+                      )}
+                    </div>
+                    {!newItem.is_manual_prov ? (
+                      <select 
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-1 focus:ring-secondary outline-none shadow-sm cursor-pointer font-bold"
+                        value={
+                          newItem.proveedor_id ||
+                          proveedores.find(
+                            (p) =>
+                              p.nombre &&
+                              p.nombre.trim().toUpperCase() === (newItem.proveedor || "").trim().toUpperCase()
+                          )?.id ||
+                          (newItem.proveedor ? "__OTRO_MANUAL__" : "")
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === "__OTRO_MANUAL__") {
+                            setNewItem((prev) => ({
+                              ...prev,
+                              is_manual_prov: true,
+                              proveedor: "",
+                              rut_proveedor: "",
+                              proveedor_id: "",
+                            }));
+                          } else if (!val) {
+                            setNewItem((prev) => ({
+                              ...prev,
+                              is_manual_prov: false,
+                              proveedor: "",
+                              rut_proveedor: "",
+                              proveedor_id: "",
+                            }));
+                          } else {
+                            const p = proveedores.find((prov) => String(prov.id) === String(val));
+                            if (p) {
+                              setNewItem((prev) => ({
+                                ...prev,
+                                is_manual_prov: false,
+                                proveedor: p.nombre,
+                                rut_proveedor: p.rut || "",
+                                proveedor_id: p.id,
+                              }));
+                            }
+                          }
+                        }}
+                      >
+                        <option value="">-- Seleccionar Proveedor --</option>
+                        {proveedores.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.nombre} {p.rut ? `(${p.rut})` : ""}
+                          </option>
+                        ))}
+                        <option value="__OTRO_MANUAL__" className="font-bold text-secondary">
+                          + Agregar nuevo / No está en la lista
+                        </option>
+                      </select>
+                    ) : (
+                      <input 
+                        type="text" 
+                        autoFocus
+                        placeholder="Escribir nombre del proveedor..."
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-1 focus:ring-secondary outline-none shadow-sm uppercase"
+                        value={newItem.proveedor}
+                        onChange={e => setNewItem({...newItem, proveedor: e.target.value})}
+                      />
+                    )}
+                  </div>
+
+                  {/* RUT Proveedor */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">RUT Proveedor</label>
                     <input 
                       type="text" 
-                      placeholder="Ej: Combustible, Peaje..."
+                      placeholder={newItem.proveedor ? "Sin RUT registrado" : "Ej: 76.123.456-7"}
+                      className={`w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-1 focus:ring-secondary outline-none shadow-sm ${
+                        !newItem.is_manual_prov && newItem.proveedor ? "font-bold text-slate-700" : ""
+                      }`}
+                      value={newItem.rut_proveedor}
+                      onChange={e => setNewItem({...newItem, rut_proveedor: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Tipo Doc */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Tipo Documento</label>
+                    <select 
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-1 focus:ring-secondary outline-none shadow-sm uppercase"
+                      value={newItem.tipo_doc}
+                      onChange={e => setNewItem({...newItem, tipo_doc: e.target.value})}
+                    >
+                      <option value="BOLETA">BOLETA</option>
+                      <option value="FACTURA">FACTURA</option>
+                      <option value="FACTURA EXENTA">FACTURA EXENTA</option>
+                      <option value="VOUCHER">VOUCHER</option>
+                      <option value="BOLETA HONORARIOS">BOLETA HONORARIOS</option>
+                      <option value="COMPROBANTE">COMPROBANTE</option>
+                    </select>
+                  </div>
+
+                  {/* Folio */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Folio / N° (Opcional)</label>
+                    <input 
+                      type="text" 
+                      placeholder="Ej: 12345 (opcional)"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-1 focus:ring-secondary outline-none shadow-sm"
+                      value={newItem.folio}
+                      onChange={e => setNewItem({...newItem, folio: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Descripción / Detalle</label>
+                    <input 
+                      type="text" 
+                      placeholder="Ej: Combustible, Peaje, Almuerzo..."
                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-1 focus:ring-secondary outline-none shadow-sm"
                       value={newItem.descripcion}
                       onChange={e => setNewItem({...newItem, descripcion: e.target.value})}
@@ -664,11 +833,13 @@ export default function RendicionDetailDrawer({
                       value={newItem.categoria}
                       onChange={e => setNewItem({...newItem, categoria: e.target.value})}
                     >
+                      <option value="Alimentación">Alimentación</option>
                       <option value="Combustible">Combustible</option>
                       <option value="Peaje">Peaje</option>
-                      <option value="Alimentación">Alimentación</option>
                       <option value="Materiales">Materiales</option>
                       <option value="Transporte">Transporte</option>
+                      <option value="Alojamiento">Alojamiento</option>
+                      <option value="Servicios">Servicios</option>
                       <option value="Otros">Otros</option>
                     </select>
                   </div>
@@ -704,7 +875,7 @@ export default function RendicionDetailDrawer({
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-on-surface leading-tight truncate uppercase tracking-tight">{it.descripcion}</p>
                     <p className="text-[11px] text-on-surface-variant font-medium mt-0.5 uppercase tracking-tighter">
-                      {it.categoria || "Gasto General"} • {fmtDateDMY(it.fecha)}
+                      {it.categoria || "Gasto General"} • {fmtDateDMY(it.fecha)} {it.proveedor ? `• ${it.proveedor}` : ""} {it.rut_proveedor ? `(${it.rut_proveedor})` : ""}
                     </p>
                   </div>
                   <div className="text-right ml-4 flex items-center gap-4">
