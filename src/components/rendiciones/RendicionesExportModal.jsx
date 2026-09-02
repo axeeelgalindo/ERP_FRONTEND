@@ -217,8 +217,11 @@ export default function RendicionesExportModal({
         });
       });
 
+      const itemCompraIds = new Set((r.items || []).map((it) => it.compra_id).filter(Boolean));
+
       // 2. Facturas ERP vinculadas
       (r.compras || []).forEach((c) => {
+        if (itemCompraIds.has(c.id)) return; // Ya exportada como ítem de la rendición
         const docDate = c.fecha_docto
           ? dayjs(c.fecha_docto)
           : c.creada_en

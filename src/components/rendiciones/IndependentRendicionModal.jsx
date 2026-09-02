@@ -1,15 +1,12 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import dayjs from "dayjs";
+import FacturaSelectorModal from "./FacturaSelectorModal";
 
 function toCLP(v) {
   const n = Number(v ?? 0);
-  if (!Number.isFinite(n)) return "-";
-  return n.toLocaleString("es-CL", {
-    style: "currency",
-    currency: "CLP",
-    maximumFractionDigits: 0,
-  });
+  return `$ ${n.toLocaleString("es-CL")}`;
 }
 
 async function jsonOrNull(res) {
@@ -55,8 +52,24 @@ export default function IndependentRendicionModal({
   const [docEntregaFile, setDocEntregaFile] = useState(null);
   const [docEntregaName, setDocEntregaName] = useState("");
   const [items, setItems] = useState([
-    { fecha: "", descripcion: "", monto: "", categoria: "", proveedor: "", rut_proveedor: "", tipo_doc: "BOLETA", folio: "", comprobante_file: null, comprobante_name: "" }
+    {
+      fecha: "",
+      descripcion: "",
+      monto: "",
+      categoria: "",
+      proveedor: "",
+      rut_proveedor: "",
+      tipo_doc: "BOLETA",
+      folio: "",
+      compra_id: null,
+      comprobante_file: null,
+      comprobante_name: "",
+    },
   ]);
+
+  // Modal selector de facturas ERP
+  const [openFacturaSelector, setOpenFacturaSelector] = useState(false);
+  const [activeItemIndexForFactura, setActiveItemIndexForFactura] = useState(null);
 
   // Data for selects
   const [proyectos, setProyectos] = useState([]);
@@ -116,13 +129,14 @@ export default function IndependentRendicionModal({
             rut_proveedor: it.rut_proveedor || "",
             tipo_doc: it.tipo_doc || "BOLETA",
             folio: it.folio || "",
+            compra_id: it.compra_id || null,
             comprobante_url: it.comprobante_url || null,
             comprobante_file: null,
             comprobante_name: it.comprobante_url ? "Comprobante cargado" : ""
           })));
         } else {
           setItems([
-            { fecha: "", descripcion: "", monto: "", categoria: "", proveedor: "", rut_proveedor: "", tipo_doc: "BOLETA", folio: "", comprobante_file: null, comprobante_name: "" }
+            { fecha: "", descripcion: "", monto: "", categoria: "", proveedor: "", rut_proveedor: "", tipo_doc: "BOLETA", folio: "", compra_id: null, comprobante_file: null, comprobante_name: "" }
           ]);
         }
       } else {
@@ -138,7 +152,7 @@ export default function IndependentRendicionModal({
         setDocEntregaFile(null);
         setDocEntregaName("");
         setItems([
-          { fecha: "", descripcion: "", monto: "", categoria: "", proveedor: "", rut_proveedor: "", tipo_doc: "BOLETA", folio: "", comprobante_file: null, comprobante_name: "" }
+          { fecha: "", descripcion: "", monto: "", categoria: "", proveedor: "", rut_proveedor: "", tipo_doc: "BOLETA", folio: "", compra_id: null, comprobante_file: null, comprobante_name: "" }
         ]);
       }
     }
@@ -200,6 +214,7 @@ export default function IndependentRendicionModal({
         rut_proveedor: "",
         tipo_doc: "BOLETA",
         folio: "",
+        compra_id: null,
         comprobante_file: null,
         comprobante_name: "",
       },
@@ -217,13 +232,49 @@ export default function IndependentRendicionModal({
     );
   };
 
+  const handleSelectFactura = (compra) => {
+    if (activeItemIndexForFactura === null || !compra) return;
+    const rut = compra.rut_proveedor || compra.proveedor?.rut || "";
+    const razon = compra.razon_social || compra.proveedor?.nombre || "";
+    const folio = compra.folio || String(compra.numero || "");
+    const fecha = compra.fecha_docto
+      ? dayjs(compra.fecha_docto).format("YYYY-MM-DD")
+      : dayjs(compra.creada_en).format("YYYY-MM-DD");
+    const itemsDesc = (compra.items || [])
+      .map((it) => it.item || it.tipoItem?.nombre)
+      .filter(Boolean)
+      .join(", ");
+    const descFinal =
+      itemsDesc ||
+      compra.comentario_destino ||
+      compra.sub_destino ||
+      compra.observaciones ||
+      "COMPRA FACTURA";
+
+    let tipoDoc = "FACTURA";
+    if (compra.tipo_doc === 34) tipoDoc = "FACTURA EXENTA";
+    else if (compra.tipo_doc === 39 || compra.tipo_doc === 41) tipoDoc = "BOLETA";
+
+    updateItem(activeItemIndexForFactura, {
+      proveedor: razon,
+      rut_proveedor: rut,
+      tipo_doc: tipoDoc,
+      folio,
+      monto: compra.total || 0,
+      fecha,
+      descripcion: descFinal,
+      compra_id: compra.id,
+      is_manual_prov: true,
+    });
+  };
+
   const handleSave = async () => {
     setErr("");
     if (!empleadoId) return setErr("Seleccione un empleado");
     if (destino === "PROYECTO" && !proyectoId) return setErr("Seleccione un proyecto");
     if (destino !== "PROYECTO" && !centroCosto) return setErr("Seleccione un centro de costo");
 
-    const validItems = items.filter(it => it.descripcion || it.monto || it.proveedor);
+    const validItems = items.filter(it => it.descripcion || it.monto || it.proveedor || it.compra_id);
 
     setLoading(true);
     try {
@@ -243,6 +294,7 @@ export default function IndependentRendicionModal({
           rut_proveedor: it.rut_proveedor || null,
           tipo_doc: it.tipo_doc || null,
           folio: it.folio || null,
+          compra_id: it.compra_id || null,
           comprobante_url: it.comprobante_url || null
         }))
       };
@@ -723,6 +775,43 @@ export default function IndependentRendicionModal({
                             {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                           </select>
                         </div>
+                        {/* Botón Vincular Factura ERP */}
+                        <div className="md:col-span-4 flex items-center justify-between p-2.5 bg-primary/[0.03] rounded-xl border border-primary/10">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveItemIndexForFactura(idx);
+                                setOpenFacturaSelector(true);
+                              }}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                                it.compra_id
+                                  ? "bg-primary text-white shadow-sm"
+                                  : "bg-surface text-primary border border-primary/30 hover:bg-primary hover:text-white"
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+                              {it.compra_id
+                                ? `FACTURA ERP VINCULADA (FOLIO: ${it.folio || "S/N"})`
+                                : "+ VINCULAR FACTURA DEL ERP"}
+                            </button>
+                            {it.compra_id && (
+                              <button
+                                type="button"
+                                onClick={() => updateItem(idx, { compra_id: null })}
+                                className="text-xs font-bold text-error/80 hover:text-error hover:underline ml-2"
+                              >
+                                Desvincular
+                              </button>
+                            )}
+                          </div>
+                          {it.compra_id && (
+                            <span className="text-[11px] text-primary font-bold hidden sm:inline">
+                              Datos y glosas importados desde el ERP
+                            </span>
+                          )}
+                        </div>
+
                         <div className="md:col-span-4 flex items-center gap-4 mt-2 p-3 bg-surface-container-lowest/50 rounded-xl border border-outline-variant/5">
                           <label className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-outline-variant/30 text-[10px] font-bold cursor-pointer hover:bg-white transition-all shadow-sm">
                             <span className="material-symbols-outlined text-[16px]">attach_file</span>
@@ -803,6 +892,17 @@ export default function IndependentRendicionModal({
           </button>
         </div>
       </div>
+
+      <FacturaSelectorModal
+        open={openFacturaSelector}
+        onClose={() => {
+          setOpenFacturaSelector(false);
+          setActiveItemIndexForFactura(null);
+        }}
+        onSelect={handleSelectFactura}
+        session={session}
+        apiBase={apiBase}
+      />
     </div>
   );
 }

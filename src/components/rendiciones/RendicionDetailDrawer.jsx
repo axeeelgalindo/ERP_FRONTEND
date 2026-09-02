@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
+import dayjs from "dayjs";
 import { makeHeaders } from "@/lib/api";
 import FilePreviewModal from "@/components/ui/FilePreviewModal";
+import FacturaSelectorModal from "./FacturaSelectorModal";
 
 function toCLP(v) {
   const n = Number(v ?? 0);
@@ -38,6 +40,7 @@ export default function RendicionDetailDrawer({
   const [newPaidAmount, setNewPaidAmount] = useState("");
   const [uploadingDoc, setUploadingDoc] = useState(null); // 'entrega' | 'reembolso'
   const [viewUrl, setViewUrl] = useState(null);
+  const [openFacturaModal, setOpenFacturaModal] = useState(false);
 
   // Estados para agregar ítems
   const [isAddingItem, setIsAddingItem] = useState(false);
@@ -50,6 +53,7 @@ export default function RendicionDetailDrawer({
     rut_proveedor: "",
     tipo_doc: "BOLETA",
     folio: "",
+    compra_id: null,
   });
   const [savingItem, setSavingItem] = useState(false);
   const [proveedores, setProveedores] = useState([]);
@@ -245,6 +249,7 @@ export default function RendicionDetailDrawer({
         rut_proveedor: it.rut_proveedor,
         tipo_doc: it.tipo_doc,
         folio: it.folio,
+        compra_id: it.compra_id || null,
         comprobante_url: it.comprobante_url
       }));
 
@@ -277,6 +282,7 @@ export default function RendicionDetailDrawer({
         rut_proveedor: "",
         tipo_doc: "BOLETA",
         folio: "",
+        compra_id: null,
       });
       onRefresh?.();
     } catch (e) {
@@ -284,6 +290,43 @@ export default function RendicionDetailDrawer({
     } finally {
       setSavingItem(false);
     }
+  };
+
+  const handleSelectFacturaInDrawer = (compra) => {
+    if (!compra) return;
+    const rut = compra.rut_proveedor || compra.proveedor?.rut || "";
+    const razon = compra.razon_social || compra.proveedor?.nombre || "";
+    const folio = compra.folio || String(compra.numero || "");
+    const fecha = compra.fecha_docto
+      ? dayjs(compra.fecha_docto).format("YYYY-MM-DD")
+      : dayjs(compra.creada_en).format("YYYY-MM-DD");
+    const itemsDesc = (compra.items || [])
+      .map((it) => it.item || it.tipoItem?.nombre)
+      .filter(Boolean)
+      .join(", ");
+    const descFinal =
+      itemsDesc ||
+      compra.comentario_destino ||
+      compra.sub_destino ||
+      compra.observaciones ||
+      "COMPRA FACTURA";
+
+    let tipoDoc = "FACTURA";
+    if (compra.tipo_doc === 34) tipoDoc = "FACTURA EXENTA";
+    else if (compra.tipo_doc === 39 || compra.tipo_doc === 41) tipoDoc = "BOLETA";
+
+    setNewItem((prev) => ({
+      ...prev,
+      proveedor: razon,
+      rut_proveedor: rut,
+      tipo_doc: tipoDoc,
+      folio,
+      monto: String(compra.total || 0),
+      fecha,
+      descripcion: descFinal,
+      compra_id: compra.id,
+      is_manual_prov: true,
+    }));
   };
 
   const handleAddAnticipo = async () => {
@@ -844,6 +887,40 @@ export default function RendicionDetailDrawer({
                     </select>
                   </div>
                 </div>
+                {/* Botón Vincular Factura ERP */}
+                <div className="flex items-center justify-between p-2.5 bg-secondary/[0.04] rounded-xl border border-secondary/20">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setOpenFacturaModal(true)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                        newItem.compra_id
+                          ? "bg-secondary text-white shadow-sm"
+                          : "bg-white text-secondary border border-secondary/30 hover:bg-secondary hover:text-white"
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+                      {newItem.compra_id
+                        ? `FACTURA VINCULADA (FOLIO: ${newItem.folio || "S/N"})`
+                        : "+ VINCULAR FACTURA DEL ERP"}
+                    </button>
+                    {newItem.compra_id && (
+                      <button
+                        type="button"
+                        onClick={() => setNewItem({ ...newItem, compra_id: null })}
+                        className="text-xs font-bold text-error hover:underline ml-2"
+                      >
+                        Desvincular
+                      </button>
+                    )}
+                  </div>
+                  {newItem.compra_id && (
+                    <span className="text-[11px] text-secondary font-bold hidden sm:inline">
+                      Datos importados desde el ERP
+                    </span>
+                  )}
+                </div>
+
                 <div className="flex justify-end gap-3 pt-2">
                   <button 
                     onClick={() => setIsAddingItem(false)}
@@ -873,7 +950,14 @@ export default function RendicionDetailDrawer({
                     </span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-on-surface leading-tight truncate uppercase tracking-tight">{it.descripcion}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-bold text-on-surface leading-tight truncate uppercase tracking-tight">{it.descripcion}</p>
+                      {it.compra_id && (
+                        <span className="text-[10px] font-black px-2 py-0.5 bg-primary/10 text-primary rounded-md">
+                          FACTURA #{it.folio || it.compra?.folio || "ERP"}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[11px] text-on-surface-variant font-medium mt-0.5 uppercase tracking-tighter">
                       {it.categoria || "Gasto General"} • {fmtDateDMY(it.fecha)} {it.proveedor ? `• ${it.proveedor}` : ""} {it.rut_proveedor ? `(${it.rut_proveedor})` : ""}
                     </p>
@@ -964,6 +1048,13 @@ export default function RendicionDetailDrawer({
           )}
         </footer>
       </aside>
+
+      <FacturaSelectorModal
+        open={openFacturaModal}
+        onClose={() => setOpenFacturaModal(false)}
+        onSelect={handleSelectFacturaInDrawer}
+        session={session}
+      />
 
       <FilePreviewModal 
         open={!!viewUrl} 
