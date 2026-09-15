@@ -73,6 +73,8 @@ export default function ProyectosPageClient({
   initialQ = "",
   initialEstado = "",
   initialClienteId = "",
+  initialSort = "numero",
+  initialOrder = "desc",
   // handlers (puedes conectarlos a tu modal/API)
   onEditProyecto,
   onDeleteProyecto,
@@ -93,6 +95,8 @@ export default function ProyectosPageClient({
   const [filterQ, setFilterQ] = useState(initialQ || "");
   const [filterEstado, setFilterEstado] = useState(initialEstado || "");
   const [filterClienteId, setFilterClienteId] = useState(initialClienteId || "");
+  const [filterSort, setFilterSort] = useState(initialSort || "numero");
+  const [filterOrder, setFilterOrder] = useState(initialOrder || "desc");
 
   const [clientes, setClientes] = useState([]);
   const [loadingClientes, setLoadingClientes] = useState(false);
@@ -144,13 +148,17 @@ export default function ProyectosPageClient({
     setFilterQ(initialQ || "");
     setFilterEstado(initialEstado || "");
     setFilterClienteId(initialClienteId || "");
-  }, [initialQ, initialEstado, initialClienteId]);
+    setFilterSort(initialSort || "numero");
+    setFilterOrder(initialOrder || "desc");
+  }, [initialQ, initialEstado, initialClienteId, initialSort, initialOrder]);
 
   // Aplicar filtros en la URL
-  const applyFilters = (newQ, newEstado, newClienteId) => {
+  const applyFilters = (newQ, newEstado, newClienteId, newSort = filterSort, newOrder = filterOrder) => {
     const params = {
       page: "1", // reset a página 1 al filtrar
       pageSize: String(pageSize),
+      sort: newSort,
+      order: newOrder,
     };
     if (newQ) params.q = newQ;
     if (newEstado) params.estado = newEstado;
@@ -163,19 +171,33 @@ export default function ProyectosPageClient({
   // Cambios inmediatos
   const handleEstadoChange = (newEst) => {
     setFilterEstado(newEst);
-    applyFilters(filterQ, newEst, filterClienteId);
+    applyFilters(filterQ, newEst, filterClienteId, filterSort, filterOrder);
   };
 
   const handleClienteIdChange = (newCliId) => {
     setFilterClienteId(newCliId);
-    applyFilters(filterQ, filterEstado, newCliId);
+    applyFilters(filterQ, filterEstado, newCliId, filterSort, filterOrder);
+  };
+
+  const handleSortChange = (newSort, newOrder) => {
+    setFilterSort(newSort);
+    setFilterOrder(newOrder);
+    applyFilters(filterQ, filterEstado, filterClienteId, newSort, newOrder);
+  };
+
+  const handleToggleSort = (field) => {
+    let nextOrder = "desc";
+    if (filterSort === field) {
+      nextOrder = filterOrder === "desc" ? "asc" : "desc";
+    }
+    handleSortChange(field, nextOrder);
   };
 
   // Debounce búsqueda de texto
   useEffect(() => {
     const timer = setTimeout(() => {
       if (filterQ !== initialQ) {
-        applyFilters(filterQ, filterEstado, filterClienteId);
+        applyFilters(filterQ, filterEstado, filterClienteId, filterSort, filterOrder);
       }
     }, 400);
     return () => clearTimeout(timer);
@@ -370,6 +392,8 @@ export default function ProyectosPageClient({
     const params = {
       page: String(p),
       pageSize: String(pageSize),
+      sort: filterSort,
+      order: filterOrder,
     };
     if (filterQ) params.q = filterQ;
     if (filterEstado) params.estado = filterEstado;
@@ -452,6 +476,9 @@ export default function ProyectosPageClient({
         onEstado={handleEstadoChange}
         clienteId={filterClienteId}
         onClienteId={handleClienteIdChange}
+        sort={filterSort}
+        order={filterOrder}
+        onSortChange={handleSortChange}
         clientes={clientes}
         loadingClientes={loadingClientes}
         loading={loading}
@@ -467,6 +494,9 @@ export default function ProyectosPageClient({
           pageSize={pageSize}
           total={total}
           onPageChange={(p) => goTo(p)}
+          sort={filterSort}
+          order={filterOrder}
+          onToggleSort={handleToggleSort}
           onEdit={(row) => {
             setEditingProyecto(row);
             setOpenModal(true);

@@ -49,7 +49,7 @@ export default function ImportRcvModal({
   const [bulkSubType, setBulkSubType] = useState("TALLER");
   const [bulkProjectId, setBulkProjectId] = useState("");
 
-  // Al abrir o cambiar los records iniciales, inicializamos items con destino por defecto
+  // Al abrir o cambiar los records iniciales, inicializamos items con casilla de proyecto vacía
   useEffect(() => {
     if (!open || !records || records.length === 0) {
       setItems([]);
@@ -57,23 +57,19 @@ export default function ImportRcvModal({
       return;
     }
 
-    const defaultProjId = proyectos.length > 0 ? proyectos[0].id : "";
-
     const initial = records.map((r, idx) => ({
       ...r,
       index: idx,
-      // Destino por defecto: PROYECTO si hay proyectos disponibles, de lo contrario ADMINISTRACION PMC
+      // Destino por defecto: PROYECTO con proyecto_id vacío para seleccionar solo cuando es debido
       destino: "PROYECTO",
-      centro_costo: "PMC",
-      proyecto_id: defaultProjId,
+      centro_costo: null,
+      proyecto_id: null,
     }));
 
     setItems(initial);
     setSelectedIndices(new Set());
-    if (defaultProjId) {
-      setBulkProjectId(defaultProjId);
-    }
-  }, [open, records, proyectos]);
+    setBulkProjectId("");
+  }, [open, records]);
 
   // Selección individual
   const toggleSelect = (idx) => {
@@ -114,7 +110,7 @@ export default function ImportRcvModal({
             ...it,
             destino: "PROYECTO",
             centro_costo: null,
-            proyecto_id: bulkProjectId || (proyectos.length > 0 ? proyectos[0].id : null),
+            proyecto_id: bulkProjectId || null,
           };
         }
 
@@ -144,7 +140,7 @@ export default function ImportRcvModal({
       updateItem(index, {
         destino: "PROYECTO",
         centro_costo: null,
-        proyecto_id: proyectos.length > 0 ? proyectos[0].id : null,
+        proyecto_id: null,
       });
     } else {
       const current = items.find((it) => it.index === index);
@@ -179,6 +175,7 @@ export default function ImportRcvModal({
   // Resumen de distribución
   const summary = useMemo(() => {
     let countProy = 0;
+    let countSinAsignar = 0;
     let countAdminPMC = 0;
     let countAdminPUQ = 0;
     let countTallerPMC = 0;
@@ -192,15 +189,23 @@ export default function ImportRcvModal({
       if (it.ya_cargada) countExistentes++;
       else countNuevas++;
 
-      if (it.destino === "PROYECTO") countProy++;
-      else if (it.destino === "ADMINISTRACION" && it.centro_costo === "PUQ") countAdminPUQ++;
-      else if (it.destino === "ADMINISTRACION") countAdminPMC++;
-      else if (it.destino === "TALLER" && it.centro_costo === "PUQ") countTallerPUQ++;
-      else if (it.destino === "TALLER") countTallerPMC++;
+      if (it.destino === "PROYECTO") {
+        if (it.proyecto_id) countProy++;
+        else countSinAsignar++;
+      } else if (it.destino === "ADMINISTRACION" && it.centro_costo === "PUQ") {
+        countAdminPUQ++;
+      } else if (it.destino === "ADMINISTRACION") {
+        countAdminPMC++;
+      } else if (it.destino === "TALLER" && it.centro_costo === "PUQ") {
+        countTallerPUQ++;
+      } else if (it.destino === "TALLER") {
+        countTallerPMC++;
+      }
     });
 
     return {
       countProy,
+      countSinAsignar,
       countAdminPMC,
       countAdminPUQ,
       countTallerPMC,
@@ -293,6 +298,7 @@ export default function ImportRcvModal({
                 onChange={(e) => setBulkProjectId(e.target.value)}
                 className="text-xs px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg max-w-[220px] text-slate-800 focus:ring-2 focus:ring-primary/20 cursor-pointer"
               >
+                <option value="">-- Seleccionar Proyecto --</option>
                 {proyectos.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.nombre}
@@ -439,10 +445,15 @@ export default function ImportRcvModal({
                           <select
                             value={item.proyecto_id || ""}
                             onChange={(e) =>
-                              updateItem(item.index, { proyecto_id: e.target.value })
+                              updateItem(item.index, { proyecto_id: e.target.value || null })
                             }
-                            className="text-xs px-2 py-1 bg-white border border-slate-200 rounded-lg max-w-[220px] text-slate-800 focus:ring-2 focus:ring-primary/20 cursor-pointer"
+                            className={`text-xs px-2 py-1 bg-white border rounded-lg max-w-[220px] focus:ring-2 focus:ring-primary/20 cursor-pointer ${
+                              !item.proyecto_id
+                                ? "border-amber-300 text-slate-500 font-medium"
+                                : "border-slate-200 text-slate-800 font-semibold"
+                            }`}
                           >
+                            <option value="">-- Sin Proyecto / Seleccionar --</option>
                             {proyectos.map((p) => (
                               <option key={p.id} value={p.id}>
                                 {p.nombre}
@@ -477,18 +488,38 @@ export default function ImportRcvModal({
             <span>
               Total: <strong>{items.length} docs ({toCLP(summary.totalMonto)})</strong>
             </span>
-            <span>•</span>
-            <span className="text-blue-700 font-semibold">
-              {summary.countProy} en Proyectos
-            </span>
-            <span>•</span>
-            <span className="text-slate-700 font-semibold">
-              {summary.countAdminPMC + summary.countTallerPMC} PMC
-            </span>
-            <span>•</span>
-            <span className="text-indigo-700 font-semibold">
-              {summary.countAdminPUQ + summary.countTallerPUQ} PUQ
-            </span>
+            {summary.countProy > 0 && (
+              <>
+                <span>•</span>
+                <span className="text-blue-700 font-semibold">
+                  {summary.countProy} en Proyectos
+                </span>
+              </>
+            )}
+            {summary.countSinAsignar > 0 && (
+              <>
+                <span>•</span>
+                <span className="text-amber-700 font-semibold">
+                  {summary.countSinAsignar} sin proyecto
+                </span>
+              </>
+            )}
+            {(summary.countAdminPMC + summary.countTallerPMC > 0) && (
+              <>
+                <span>•</span>
+                <span className="text-slate-700 font-semibold">
+                  {summary.countAdminPMC + summary.countTallerPMC} PMC
+                </span>
+              </>
+            )}
+            {(summary.countAdminPUQ + summary.countTallerPUQ > 0) && (
+              <>
+                <span>•</span>
+                <span className="text-indigo-700 font-semibold">
+                  {summary.countAdminPUQ + summary.countTallerPUQ} PUQ
+                </span>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-3 justify-end">

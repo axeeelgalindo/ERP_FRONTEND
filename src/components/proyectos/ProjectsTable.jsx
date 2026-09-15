@@ -7,6 +7,9 @@ import {
   Play,
   CheckCircle2,
   FileText,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -208,6 +211,9 @@ export default function ProjectsTable({
   pageSize = 10,
   total = 0,
   onPageChange,
+  sort = "numero",
+  order = "desc",
+  onToggleSort,
 }) {
   const router = useRouter();
   if (loading) {
@@ -236,8 +242,23 @@ export default function ProjectsTable({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-gray-200  bg-gray-50/50 ">
-              <th className="p-5 text-sm font-semibold text-gray-500 ">
-                Nombre
+              <th
+                className="p-5 text-sm font-semibold text-gray-700 cursor-pointer select-none hover:text-blue-600 transition-colors"
+                onClick={() => onToggleSort && onToggleSort("numero")}
+                title="Clic para alternar orden numérico"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span>Proyecto / N° COT</span>
+                  {sort === "numero" || sort === "nombre" ? (
+                    order === "asc" ? (
+                      <ArrowUp size={15} className="text-blue-600" />
+                    ) : (
+                      <ArrowDown size={15} className="text-blue-600" />
+                    )
+                  ) : (
+                    <ArrowUpDown size={14} className="text-gray-400 opacity-60" />
+                  )}
+                </div>
               </th>
               <th className="p-5 text-sm font-semibold text-gray-500 ">
                 Cliente

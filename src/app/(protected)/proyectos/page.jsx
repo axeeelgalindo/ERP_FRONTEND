@@ -14,6 +14,8 @@ export default async function ProyectosPage({ searchParams }) {
   const q = sp?.q || "";
   const estado = sp?.estado || "";
   const clienteId = sp?.clienteId || "";
+  const sort = sp?.sort || "numero";
+  const order = sp?.order || "desc";
 
   let items = [];
   let total = 0;
@@ -22,6 +24,8 @@ export default async function ProyectosPage({ searchParams }) {
     const params = {
       page: String(page),
       pageSize: String(pageSize),
+      sort,
+      order,
     };
     if (q) params.q = q;
     if (estado) params.estado = estado;
@@ -49,6 +53,8 @@ export default async function ProyectosPage({ searchParams }) {
       initialQ={q}
       initialEstado={estado}
       initialClienteId={clienteId}
+      initialSort={sort}
+      initialOrder={order}
     />
   );
 }

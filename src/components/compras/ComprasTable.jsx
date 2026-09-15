@@ -217,7 +217,9 @@ export default function ComprasTable({
                     <td className="px-3 lg:px-4 py-3 lg:py-3.5">
                       {(() => {
                         const getDestinoLabel = () => {
-                          if (c?.destino === "PROYECTO") return `Proyecto: ${proyecto}`;
+                          if (c?.destino === "PROYECTO") {
+                            return isProyectoAssigned ? `Proyecto: ${proyecto}` : "Sin Asignar";
+                          }
                           if (c?.destino === "SERVICIO") {
                             const num = c.cotizacion?.numero
                               ? (c.cotizacion.numero >= 1000000 ? c.cotizacion.numero - 1000000 : c.cotizacion.numero)
@@ -226,7 +228,7 @@ export default function ComprasTable({
                             return `Servicio #${num}: ${asunto}`;
                           }
                           const prefix = c?.destino === "TALLER" ? "Taller" : c?.destino === "ADMINISTRACION" ? "Admin" : "";
-                          if (!prefix) return "No imputado";
+                          if (!prefix) return "Sin Asignar";
                           const cc = c.centro_costo || "S/CC";
                           if (c.sub_destino === "PROYECTO_INTERNO" && c.proyecto_interno) {
                             return `${prefix} (${cc}) - Proy: ${c.proyecto_interno}`;
@@ -251,9 +253,7 @@ export default function ComprasTable({
                                   ? "bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-300"
                                   : isAssigned
                                     ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:border-emerald-300"
-                                    : c?.destino === "PROYECTO" || !c?.destino
-                                      ? "bg-blue-50 text-blue-700 border-blue-200 hover:border-blue-300"
-                                      : "bg-slate-50 text-slate-400 border-dashed border-slate-300 hover:border-slate-400"
+                                    : "bg-slate-50 text-slate-500 border-dashed border-slate-300 hover:border-slate-400"
                               }`}
                               title={destLabel}
                             >
