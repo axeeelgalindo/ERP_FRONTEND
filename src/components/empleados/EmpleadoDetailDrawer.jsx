@@ -3,15 +3,19 @@
 import React, { useState, useEffect } from "react";
 import {
   X, Folder, FileText, FolderPlus, UploadCloud,
-  Trash2, ChevronRight, Eye, MoreVertical, Search, Download
+  Trash2, ChevronRight, Eye, MoreVertical, Search, Download, Palmtree
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { makeHeaders } from "@/lib/api";
+import EmpleadoVacacionesTab from "./EmpleadoVacacionesTab";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function EmpleadoDetailDrawer({ open, onClose, empleado }) {
   const { data: session } = useSession();
+
+  // Pestaña activa dentro del Drawer
+  const [activeTab, setActiveTab] = useState("documentos"); // "documentos" | "vacaciones"
 
   // === ESTADOS PARA EL GESTOR DOCUMENTAL ===
   const [fileSystem, setFileSystem] = useState([]);
@@ -426,149 +430,174 @@ export default function EmpleadoDetailDrawer({ open, onClose, empleado }) {
             </div>
           </div>
 
-          {/* GESTOR DOCUMENTAL (Documents Section) */}
-          <div className="space-y-6">
-            <span className="text-sm font-bold text-slate-400 uppercase tracking-widest mr-2 hidden sm:block">Documentos</span>
-
-            <div
-              className={`bg-white rounded-2xl border ${isDragging ? 'border-blue-500 ring-4 ring-blue-500/20 bg-blue-50/50' : 'border-slate-200'} overflow-hidden transition-all h-[400px] flex flex-col`}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
+          {/* Selector de Pestañas del Perfil */}
+          <div className="flex items-center gap-2 border-b border-slate-200 pb-1">
+            <button
+              type="button"
+              onClick={() => setActiveTab("documentos")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "documentos"
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                  : "text-slate-600 hover:bg-slate-200/60 hover:text-slate-900"
+              }`}
             >
+              <Folder className="w-4 h-4" />
+              Gestor Documental
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("vacaciones")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "vacaciones"
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                  : "text-slate-600 hover:bg-slate-200/60 hover:text-slate-900"
+              }`}
+            >
+              <Palmtree className="w-4 h-4" />
+              Vacaciones & Permisos
+            </button>
+          </div>
 
-              {/* Toolbar Drive */}
-              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    onClick={() => setCurrentFolderId(null)}
-                    className="text-slate-800 hover:text-blue-600 hover:cursor-pointer hover:bg-blue-50 px-2 py-1 rounded-md transition-colors font-medium text-sm"
-                  >
-                    /
-                  </button>
+          {/* VISTA SEGÚN PESTAÑA */}
+          {activeTab === "vacaciones" ? (
+            <EmpleadoVacacionesTab empleado={empleado} session={session} />
+          ) : (
+            /* GESTOR DOCUMENTAL (Documents Section) */
+            <div className="space-y-6">
+              <span className="text-sm font-bold text-slate-400 uppercase tracking-widest mr-2 hidden sm:block">Documentos</span>
 
-                  {showEllipsis && (
-                    <>
-                      <ChevronRight className="w-4 h-4 text-slate-400" />
-                      <button
-                        onClick={() => setCurrentFolderId(breadcrumbs[breadcrumbs.length - 4].id)}
-                        className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 font-medium text-sm px-2 py-1 rounded-md transition-colors"
-                        title="Ir a carpeta anterior"
-                      >
-                        ...
-                      </button>
-                    </>
-                  )}
+              <div
+                className={`bg-white rounded-2xl border ${isDragging ? 'border-blue-500 ring-4 ring-blue-500/20 bg-blue-50/50' : 'border-slate-200'} overflow-hidden transition-all h-[400px] flex flex-col`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
 
-                  {visibleBreadcrumbs.map((crumb) => (
-                    <React.Fragment key={crumb.id}>
-                      <ChevronRight className="w-4 h-4 text-slate-400" />
-                      <button
-                        onClick={() => setCurrentFolderId(crumb.id)}
-                        className="text-slate-500 hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-md transition-colors font-medium text-sm truncate max-w-[120px]"
-                        title={crumb.name}
-                      >
-                        {crumb.name}
-                      </button>
-                    </React.Fragment>
-                  ))}
-                </div>
-
-                <div className="flex space-x-2 shrink-0 ml-4">
-                  <button
-                    onClick={() => setShowNewFolderDialog(true)}
-                    className="flex items-center px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-                  >
-                    <FolderPlus className="h-4 w-4 mr-2" />
-                    Nueva Carpeta
-                  </button>
-
-                  <div className="relative">
-                    <input
-                      type="file"
-                      id="file-upload"
-                      className="hidden"
-                      multiple
-                      onChange={handleFileUpload}
-                    />
-                    <label
-                      htmlFor="file-upload"
-                      className="flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+                {/* Toolbar Drive */}
+                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => setCurrentFolderId(null)}
+                      className="text-slate-800 hover:text-blue-600 hover:cursor-pointer hover:bg-blue-50 px-2 py-1 rounded-md transition-colors font-medium text-sm"
                     >
-                      <UploadCloud className="h-4 w-4 mr-2" />
-                      Subir Archivo
+                      /
+                    </button>
+
+                    {showEllipsis && (
+                      <>
+                        <span className="text-slate-400 text-sm">...</span>
+                        <ChevronRight className="w-4 h-4 text-slate-400" />
+                      </>
+                    )}
+
+                    {visibleBreadcrumbs.map((crumb, idx) => {
+                      const isLast = idx === visibleBreadcrumbs.length - 1;
+                      return (
+                        <div key={crumb.id} className="flex items-center gap-2">
+                          <button
+                            onClick={() => setCurrentFolderId(crumb.id)}
+                            className={`hover:text-blue-600 hover:underline px-2 py-1 rounded-md transition-colors text-sm ${
+                              isLast ? 'font-bold text-blue-600' : 'text-slate-800'
+                            }`}
+                          >
+                            {crumb.name}
+                          </button>
+                          {!isLast && <ChevronRight className="w-4 h-4 text-slate-400" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Acciones Drive */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowNewFolderDialog(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-2xs"
+                    >
+                      <FolderPlus className="w-4 h-4 text-blue-500" />
+                      Nueva Carpeta
+                    </button>
+
+                    <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer shadow-2xs">
+                      <UploadCloud className="w-4 h-4" />
+                      Subir
+                      <input
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={handleFileUpload}
+                      />
                     </label>
                   </div>
                 </div>
-              </div>
 
-              {/* Listado de Archivos/Carpetas */}
-              <div className="flex-1 overflow-y-auto relative">
-                {isDragging && (
-                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-blue-50/80 backdrop-blur-sm border-2 border-dashed border-blue-400 m-2 rounded-xl">
-                    <div className="flex flex-col items-center text-blue-600">
-                      <UploadCloud className="w-12 h-12 mb-2 animate-bounce" />
-                      <p className="font-semibold text-lg">Suelta los archivos aquí</p>
+                {/* Listado de Archivos/Carpetas */}
+                <div className="flex-1 overflow-y-auto relative">
+                  {isDragging && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-blue-50/80 backdrop-blur-sm border-2 border-dashed border-blue-400 m-2 rounded-xl">
+                      <div className="flex flex-col items-center text-blue-600">
+                        <UploadCloud className="w-12 h-12 mb-2 animate-bounce" />
+                        <p className="font-semibold text-lg">Suelta los archivos aquí</p>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {isLoadingFiles ? (
-                  <div className="h-full flex flex-col items-center justify-center text-slate-400">
-                    <p className="font-medium text-slate-600 animate-pulse">Cargando documentos...</p>
-                  </div>
-                ) : currentItems.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-slate-400 p-8 text-center">
-                    <div className="bg-slate-50 p-4 rounded-full mb-3">
-                      <Folder className="w-10 h-10 text-slate-300" />
+                  {isLoadingFiles ? (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                      <p className="font-medium text-slate-600 animate-pulse">Cargando documentos...</p>
                     </div>
-                    <p className="font-medium text-slate-600">Esta carpeta está vacía</p>
-                    <p className="text-sm mt-1">Arrastra archivos aquí, usa el botón de subir o crea carpetas.</p>
-                  </div>
-                ) : (
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10 shadow-sm">
-                      <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        <th 
-                          className="px-6 py-3 cursor-pointer hover:bg-slate-200 transition-colors select-none"
-                          onClick={() => handleSort('name')}
-                        >
-                          Nombre {sortColumn === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
-                        </th>
-                        <th 
-                          className="px-6 py-3 cursor-pointer hover:bg-slate-200 transition-colors select-none"
-                          onClick={() => handleSort('date')}
-                        >
-                          Modificado {sortColumn === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
-                        </th>
-                        <th 
-                          className="px-6 py-3 cursor-pointer hover:bg-slate-200 transition-colors select-none"
-                          onClick={() => handleSort('size')}
-                        >
-                          Tamaño {sortColumn === 'size' && (sortDirection === 'asc' ? '↑' : '↓')}
-                        </th>
-                        <th className="px-6 py-3"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {currentItems
-                        .sort((a, b) => {
-                          if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
-                          let valA, valB;
-                          if (sortColumn === 'name') {
-                            valA = a.name.toLowerCase();
-                            valB = b.name.toLowerCase();
-                          } else if (sortColumn === 'date') {
-                            valA = new Date(a.createdAt).getTime();
-                            valB = new Date(b.createdAt).getTime();
-                          } else if (sortColumn === 'size') {
-                            valA = parseSizeToKb(a.size);
-                            valB = parseSizeToKb(b.size);
-                          }
-                          if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-                          if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
-                          return 0;
-                        })
+                  ) : currentItems.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-400 p-8 text-center">
+                      <div className="bg-slate-50 p-4 rounded-full mb-3">
+                        <Folder className="w-10 h-10 text-slate-300" />
+                      </div>
+                      <p className="font-medium text-slate-600">Esta carpeta está vacía</p>
+                      <p className="text-sm mt-1">Arrastra archivos aquí, usa el botón de subir o crea carpetas.</p>
+                    </div>
+                  ) : (
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10 shadow-sm">
+                        <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          <th 
+                            className="px-6 py-3 cursor-pointer hover:bg-slate-200 transition-colors select-none"
+                            onClick={() => handleSort('name')}
+                          >
+                            Nombre {sortColumn === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
+                          </th>
+                          <th 
+                            className="px-6 py-3 cursor-pointer hover:bg-slate-200 transition-colors select-none"
+                            onClick={() => handleSort('date')}
+                          >
+                            Modificado {sortColumn === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
+                          </th>
+                          <th 
+                            className="px-6 py-3 cursor-pointer hover:bg-slate-200 transition-colors select-none"
+                            onClick={() => handleSort('size')}
+                          >
+                            Tamaño {sortColumn === 'size' && (sortDirection === 'asc' ? '↑' : '↓')}
+                          </th>
+                          <th className="px-6 py-3"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {currentItems
+                          .sort((a, b) => {
+                            if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+                            let valA, valB;
+                            if (sortColumn === 'name') {
+                              valA = a.name.toLowerCase();
+                              valB = b.name.toLowerCase();
+                            } else if (sortColumn === 'date') {
+                              valA = new Date(a.createdAt).getTime();
+                              valB = new Date(b.createdAt).getTime();
+                            } else if (sortColumn === 'size') {
+                              valA = parseSizeToKb(a.size);
+                              valB = parseSizeToKb(b.size);
+                            }
+                            if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+                            if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+                            return 0;
+                          })
                         .map((item) => (
                           <tr
                             key={item.id}
@@ -712,8 +741,8 @@ export default function EmpleadoDetailDrawer({ open, onClose, empleado }) {
                 </button>
               )}
             </div>
-
           </div>
+        )}
         </div>
       </div>
 

@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 
 import EmpleadoFormModal from "@/components/empleados/EmpleadoFormModal";
 import EmpleadoDetailDrawer from "@/components/empleados/EmpleadoDetailDrawer";
-import { Eye } from "lucide-react";
+import VacacionesGeneralView from "@/components/empleados/VacacionesGeneralView";
+import { Eye, Users, Palmtree } from "lucide-react";
 import { makeHeaders } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -29,6 +30,9 @@ const fmtCLP = (n) =>
 export default function EmpleadosPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
+
+  // Pestaña principal del módulo: "empleados" | "vacaciones"
+  const [mainTab, setMainTab] = useState("empleados");
 
   // ✅ Estados SIEMPRE declarados antes de cualquier return
   const [loading, setLoading] = useState(false);
@@ -296,36 +300,78 @@ export default function EmpleadosPage() {
           </div>
         ) : null}
 
-        {/* Bento Stats / Summary Bar */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm flex items-center">
-            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary mr-4">
-              <span className="material-symbols-outlined">badge</span>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-secondary uppercase tracking-wider">Registrados</p>
-              <p className="text-3xl font-bold text-on-surface leading-none mt-1">{total}</p>
-            </div>
-          </div>
-          <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm flex items-center">
-            <div className="w-12 h-12 bg-tertiary/10 rounded-full flex items-center justify-center text-tertiary mr-4">
-              <span className="material-symbols-outlined">person_add</span>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-secondary uppercase tracking-wider">Ingresos del Mes</p>
-              <p className="text-3xl font-bold text-on-surface leading-none mt-1">{ingresosDelMes}</p>
-            </div>
-          </div>
-          <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm flex items-center">
-            <div className="w-12 h-12 bg-primary-container/10 rounded-full flex items-center justify-center text-primary-container mr-4">
-              <span className="material-symbols-outlined">groups</span>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-secondary uppercase tracking-wider">Empleados Activos</p>
-              <p className="text-3xl font-bold text-on-surface leading-none mt-1">{activosCount} de {total}</p>
-            </div>
-          </div>
+        {/* Main Tab Switcher */}
+        <div className="flex items-center gap-2 border-b border-outline-variant/30 pb-3 mb-8">
+          <button
+            onClick={() => setMainTab("empleados")}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
+              mainTab === "empleados"
+                ? "bg-primary text-on-primary shadow-md shadow-primary/20"
+                : "bg-surface-container-lowest text-secondary hover:text-on-surface hover:bg-surface-container"
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            Personal & Documentos
+          </button>
+          <button
+            onClick={() => setMainTab("vacaciones")}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
+              mainTab === "vacaciones"
+                ? "bg-primary text-on-primary shadow-md shadow-primary/20"
+                : "bg-surface-container-lowest text-secondary hover:text-on-surface hover:bg-surface-container"
+            }`}
+          >
+            <Palmtree className="w-4 h-4" />
+            Gestión de Vacaciones
+          </button>
         </div>
+
+        {mainTab === "vacaciones" ? (
+          <VacacionesGeneralView
+            session={session}
+            onSelectEmpleado={(empId) => {
+              const found = empleados.find((e) => e.id === empId);
+              if (found) {
+                setCurrentViewEmp(found);
+                setOpenDrawer(true);
+              } else {
+                setCurrentViewEmp({ id: empId });
+                setOpenDrawer(true);
+              }
+            }}
+          />
+        ) : (
+          <>
+            {/* Bento Stats / Summary Bar */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+              <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm flex items-center">
+                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary mr-4">
+                  <span className="material-symbols-outlined">badge</span>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-secondary uppercase tracking-wider">Registrados</p>
+                  <p className="text-3xl font-bold text-on-surface leading-none mt-1">{total}</p>
+                </div>
+              </div>
+              <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm flex items-center">
+                <div className="w-12 h-12 bg-tertiary/10 rounded-full flex items-center justify-center text-tertiary mr-4">
+                  <span className="material-symbols-outlined">person_add</span>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-secondary uppercase tracking-wider">Ingresos del Mes</p>
+                  <p className="text-3xl font-bold text-on-surface leading-none mt-1">{ingresosDelMes}</p>
+                </div>
+              </div>
+              <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm flex items-center">
+                <div className="w-12 h-12 bg-primary-container/10 rounded-full flex items-center justify-center text-primary-container mr-4">
+                  <span className="material-symbols-outlined">groups</span>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-secondary uppercase tracking-wider">Empleados Activos</p>
+                  <p className="text-3xl font-bold text-on-surface leading-none mt-1">{activosCount} de {total}</p>
+                </div>
+              </div>
+            </div>
 
         {/* Data Table Container */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
@@ -543,6 +589,8 @@ export default function EmpleadosPage() {
             </div>
           )}
         </div>
+        </>
+        )}
 
         <EmpleadoFormModal
           open={openModal}

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { makeHeaders } from "@/lib/api";
+import { isFeriadoChile } from "@/lib/diasHabiles";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -47,6 +48,34 @@ export default function AsistenciaMensualPage() {
   const currentDayNum = today.getDate();
   const currentMonthNum = today.getMonth() + 1;
   const currentYearNum = today.getFullYear();
+
+  // Scroll container reference & focus to today helper
+  const tableContainerRef = useRef(null);
+
+  const scrollToToday = useCallback((smooth = true) => {
+    if (!tableContainerRef.current) return;
+    const container = tableContainerRef.current;
+    const stickyWidth = 430; // 260px (Empleado) + 170px (Cargo)
+    const visibleWidth = Math.max(container.clientWidth - stickyWidth, 200);
+    // Offset to center today's column (dayNum is 1-indexed, each col is 46px)
+    const dayCenterOffset = (currentDayNum - 1) * 46 + 23;
+    const targetScroll = Math.max(0, dayCenterOffset - visibleWidth / 2);
+
+    container.scrollTo({
+      left: targetScroll,
+      behavior: smooth ? "smooth" : "auto",
+    });
+  }, [currentDayNum]);
+
+  // Auto-scroll to today whenever current month is viewed
+  useEffect(() => {
+    if (mes === currentMonthNum && anio === currentYearNum) {
+      const timer = setTimeout(() => {
+        scrollToToday(false);
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [mes, anio, currentMonthNum, currentYearNum, scrollToToday]);
 
   // Filter States
   const [q, setQ] = useState("");
@@ -333,6 +362,24 @@ export default function AsistenciaMensualPage() {
               ))}
             </select>
 
+            {/* Quick button to center Today */}
+            <button
+              type="button"
+              onClick={() => {
+                if (mes !== currentMonthNum || anio !== currentYearNum) {
+                  setMes(currentMonthNum);
+                  setAnio(currentYearNum);
+                } else {
+                  scrollToToday(true);
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary font-bold text-sm hover:cursor-pointer transition-all duration-150 shadow-2xs"
+              title="Centrar en el día de hoy"
+            >
+              <span className="material-symbols-outlined text-[18px]">today</span>
+              Hoy
+            </button>
+
             <button
               onClick={handleExportCSV}
               disabled={empleadosData.length === 0}
@@ -414,38 +461,71 @@ export default function AsistenciaMensualPage() {
 
         {/* Matrix Grid Card Wrapper */}
         <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-sm overflow-hidden flex flex-col">
-          <div className="overflow-x-auto w-full max-w-full">
-            <table className="w-full border-collapse border-spacing-0">
+          <div
+            ref={tableContainerRef}
+            className="overflow-x-auto w-full max-w-full custom-scrollbar overscroll-x-contain [transform:translateZ(0)] [will-change:scroll-position]"
+          >
+            <table className="w-max min-w-full table-fixed border-separate border-spacing-0">
               <thead>
-                <tr className="bg-slate-100/80 border-b border-outline-variant">
+                <tr className="bg-slate-100">
                   {/* Sticky columns for Employee and Cargo */}
-                  <th className="sticky left-0 bg-slate-100 z-20 px-6 py-4 text-left text-xs font-bold text-secondary uppercase tracking-wider min-w-[200px] border-r border-slate-200">
+                  <th className="sticky left-0 bg-slate-100 z-30 px-5 py-4 text-left text-xs font-bold text-secondary uppercase tracking-wider w-[260px] min-w-[260px] max-w-[260px] border-b border-r border-slate-200">
                     Empleado
                   </th>
-                  <th className="sticky left-[200px] bg-slate-100 z-20 px-6 py-4 text-left text-xs font-bold text-secondary uppercase tracking-wider min-w-[150px] border-r border-slate-200">
+                  <th className="sticky left-[260px] bg-slate-100 z-30 px-4 py-4 text-left text-xs font-bold text-secondary uppercase tracking-wider w-[170px] min-w-[170px] max-w-[170px] border-b border-r-2 border-slate-300">
                     Cargo
                   </th>
 
                   {/* Day Columns */}
                   {Array.from({ length: daysInMonth }).map((_, i) => {
                     const dayNum = i + 1;
+                    const dateObj = new Date(Date.UTC(anio, mes - 1, dayNum));
+                    const dayOfWeek = dateObj.getUTCDay(); // 0: Dom, 6: Sab
+                    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                    const isHoliday = isFeriadoChile(dateObj);
                     const isToday = currentDayNum === dayNum && currentMonthNum === mes && currentYearNum === anio;
+
+                    const headerBg = isToday
+                      ? "bg-amber-300/90 border-amber-400 text-amber-950 shadow-inner"
+                      : isHoliday
+                      ? "bg-rose-200 border-rose-300 text-rose-950"
+                      : isWeekend
+                      ? "bg-slate-200 border-slate-300 text-slate-800"
+                      : "bg-slate-100 border-outline-variant/20 text-slate-800";
+
                     return (
-                      <th key={dayNum} className={`px-1 py-3 text-center min-w-[46px] border-r transition-colors ${isToday ? "bg-amber-100 border-amber-300" : "border-outline-variant/10"}`}>
-                        <div className="flex flex-col items-center">
-                          <span className={`text-[12px] font-extrabold leading-none ${isToday ? "text-amber-700" : "text-slate-800"}`}>{dayNum}</span>
-                          <span className={`text-[9px] font-bold uppercase tracking-tighter mt-1 block leading-none ${isToday ? "text-amber-500" : "text-slate-400"}`}>{getDayName(dayNum)}</span>
-                          {isToday && <span className="mt-0.5 w-1 h-1 rounded-full bg-amber-700 block"></span>}
+                      <th
+                        key={dayNum}
+                        className={`px-1 py-2.5 text-center w-[46px] min-w-[46px] max-w-[46px] border-b border-r border-slate-200 ${headerBg}`}
+                        title={isHoliday ? "🎉 Feriado Legal en Chile" : isWeekend ? "🏖️ Fin de semana (Descanso)" : ""}
+                      >
+                        <div className="flex flex-col items-center justify-center">
+                          <span className={`text-[12px] font-black leading-none ${isToday ? "text-amber-950" : isHoliday ? "text-rose-950" : isWeekend ? "text-slate-800" : "text-slate-900"}`}>
+                            {dayNum}
+                          </span>
+                          <span className={`text-[9px] font-extrabold uppercase tracking-tighter mt-1 block leading-none ${isToday ? "text-amber-900 font-black" : isHoliday ? "text-rose-800 font-black" : isWeekend ? "text-slate-600 font-bold" : "text-slate-500"}`}>
+                            {getDayName(dayNum)}
+                          </span>
+                          {/* Contenedor de altura fija reservada para que todos los días tengan la misma altura y se alineen perfectamente */}
+                          <div className="h-2 mt-1 flex items-center justify-center">
+                            {isToday ? (
+                              <span className="w-2 h-2 rounded-full bg-amber-800 block shadow-xs" title="Hoy"></span>
+                            ) : isHoliday ? (
+                              <span className="w-2 h-2 rounded-full bg-rose-600 block shadow-xs" title="Feriado Legal"></span>
+                            ) : isWeekend ? (
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400 block" title="Fin de semana"></span>
+                            ) : null}
+                          </div>
                         </div>
                       </th>
                     );
                   })}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-outline-variant/60">
+              <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={daysInMonth + 2} className="px-6 py-12 text-center text-secondary text-sm font-medium">
+                    <td colSpan={daysInMonth + 2} className="px-6 py-12 text-center text-secondary text-sm font-medium border-b border-slate-200">
                       <div className="flex items-center justify-center gap-2">
                         <span className="material-symbols-outlined animate-spin">sync</span>
                         Cargando matriz de asistencia...
@@ -454,7 +534,7 @@ export default function AsistenciaMensualPage() {
                   </tr>
                 ) : empleadosData.length === 0 ? (
                   <tr>
-                    <td colSpan={daysInMonth + 2} className="px-6 py-12 text-center text-secondary text-sm font-medium">
+                    <td colSpan={daysInMonth + 2} className="px-6 py-12 text-center text-secondary text-sm font-medium border-b border-slate-200">
                       No se encontraron registros de empleados que coincidan con la búsqueda.
                     </td>
                   </tr>
@@ -463,22 +543,22 @@ export default function AsistenciaMensualPage() {
                     const formattedName = formatEmployeeName(emp.nombre);
                     const initials = formattedName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
                     return (
-                      <tr key={emp.empleadoId} className="hover:bg-slate-50/50 transition-colors">
+                      <tr key={emp.empleadoId} className="group hover:bg-slate-50">
                         {/* Sticky employee details */}
-                        <td className="sticky left-0 bg-white hover:bg-slate-50/90 z-10 px-6 py-4 border-r border-slate-100">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-900 flex items-center justify-center font-bold text-sm shrink-0 uppercase">
+                        <td className="sticky left-0 bg-white group-hover:bg-slate-50 z-20 px-5 py-3.5 border-b border-r border-slate-200 w-[260px] min-w-[260px] max-w-[260px]">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-900 flex items-center justify-center font-bold text-sm shrink-0 uppercase shadow-xs">
                               {initials}
                             </div>
-                            <div className="min-w-0">
-                              <p className="font-semibold text-sm text-on-surface truncate">{formattedName}</p>
-                              <p className="text-[10px] text-secondary truncate">{emp.correo}</p>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-sm text-on-surface truncate" title={formattedName}>{formattedName}</p>
+                              <p className="text-[10px] text-secondary truncate" title={emp.correo}>{emp.correo}</p>
                             </div>
                           </div>
                         </td>
 
-                        <td className="sticky left-[200px] bg-white hover:bg-slate-50/90 z-10 px-6 py-4 text-xs font-bold text-secondary border-r border-slate-200 truncate max-w-[150px]">
-                          {emp.cargo}
+                        <td className="sticky left-[260px] bg-white group-hover:bg-slate-50 z-20 px-4 py-3.5 text-xs font-bold text-secondary border-b border-r-2 border-slate-300 w-[170px] min-w-[170px] max-w-[170px]">
+                          <span className="truncate block" title={emp.cargo || ""}>{emp.cargo || "—"}</span>
                         </td>
 
                         {/* Dynamic Cell Generation */}
@@ -492,36 +572,57 @@ export default function AsistenciaMensualPage() {
                           const estado = record?.estado || "AUSENTE";
                           const ob = record?.observacion || "";
 
+                          const dateObj = new Date(Date.UTC(anio, mes - 1, dayNum));
+                          const dayOfWeek = dateObj.getUTCDay();
+                          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                          const isHoliday = isFeriadoChile(dateObj);
+                          const isToday = currentDayNum === dayNum && currentMonthNum === mes && currentYearNum === anio;
+
                           // Resolve badge styling safely with defensive fallbacks for unmapped/legacy statuses
                           const style = (hasRecord && ESTADOS_MAP[estado])
                             ? ESTADOS_MAP[estado]
                             : (hasRecord
                               ? { label: estado, abbr: estado.slice(0, 2).toUpperCase(), color: "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200", icon: "help" }
-                              : { label: "Sin registro", abbr: "-", color: "bg-slate-50 text-slate-400 border-slate-100 hover:bg-slate-200/50", icon: "help" });
+                              : isHoliday
+                              ? { label: "Feriado", abbr: "F", color: "bg-rose-100/70 text-rose-500 border-rose-200/80 hover:bg-rose-200 hover:text-rose-900", icon: "flag" }
+                              : isWeekend
+                              ? { label: "Descanso", abbr: "-", color: "bg-slate-200/60 text-slate-500 border-slate-300/80 hover:bg-slate-300/70 hover:text-slate-800", icon: "weekend" }
+                              : { label: "Sin registro", abbr: "-", color: "bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-200/60", icon: "help" });
 
-                          const isToday = currentDayNum === dayNum && currentMonthNum === mes && currentYearNum === anio;
+                          const tdBg = isToday
+                            ? "bg-amber-100/50"
+                            : isHoliday
+                            ? "bg-rose-100/40"
+                            : isWeekend
+                            ? "bg-slate-100"
+                            : "bg-white";
+
                           return (
-                            <td key={dayNum} className={`p-1 text-center overflow-visible border-r transition-colors ${isToday ? "bg-amber-100 border-amber-200/50" : "border-outline-variant/10"}`}>
+                            <td key={dayNum} className={`p-1 text-center w-[46px] min-w-[46px] max-w-[46px] border-b border-r border-slate-200 ${tdBg}`}>
                               <div className="relative group flex items-center justify-center">
                                 <button
                                   onClick={() => handleOpenModal(emp, dayNum)}
-                                  className={`peer w-8 h-8 flex items-center justify-center rounded-lg border transition-all duration-150 scale-100 hover:scale-125 cursor-pointer z-10 shadow-sm ${style.color}`}
+                                  className={`peer w-8 h-8 flex items-center justify-center rounded-lg border transition-transform duration-75 hover:scale-110 active:scale-95 cursor-pointer ${style.color}`}
                                 >
                                   {hasRecord ? (
                                     <span className="material-symbols-outlined text-[16px] block" style={{ fontVariationSettings: "'FILL' 1" }}>
                                       {style.icon}
                                     </span>
+                                  ) : isHoliday ? (
+                                    <span className="text-[11px] font-black text-rose-500">F</span>
                                   ) : (
-                                    <span className="text-[12px] font-bold text-slate-400">—</span>
+                                    <span className="text-[11px] font-bold text-slate-400 opacity-80">—</span>
                                   )}
                                 </button>
 
                                 {/* CSS Tooltip on cell hover */}
-                                <div className="absolute bottom-full mb-2 hidden peer-hover:flex flex-col items-center z-50 pointer-events-none transition-all duration-200">
-                                  <div className="relative z-50 p-2 text-[10px] leading-relaxed text-white whitespace-nowrap bg-slate-900 rounded-md shadow-lg font-bold flex flex-col items-start gap-0.5">
-                                    <span>Día {dayNum}: {style.label}</span>
+                                <div className="absolute bottom-full mb-2 hidden peer-hover:flex flex-col items-center z-50 pointer-events-none">
+                                  <div className="p-2 text-[10px] leading-relaxed text-white whitespace-nowrap bg-slate-900 rounded-md shadow-md font-bold flex flex-col items-start gap-0.5">
+                                    <span>
+                                      Día {dayNum} ({getDayName(dayNum)}): {style.label} {isHoliday ? "🎉 (Feriado Legal)" : isWeekend ? "🏖️ (Fin de semana)" : ""}
+                                    </span>
                                     {ob && <span className="text-[9px] font-normal text-slate-300 max-w-[180px] truncate">Nota: "{ob}"</span>}
-                                    <span className="text-[8px] font-medium text-blue-400 mt-0.5 italic">Hacer clic para corregir</span>
+                                    <span className="text-[8px] font-medium text-blue-400 mt-0.5 italic">Hacer clic para registrar / corregir</span>
                                   </div>
                                   <div className="w-2 h-2 -mt-1 rotate-45 bg-slate-900"></div>
                                 </div>
@@ -538,18 +639,31 @@ export default function AsistenciaMensualPage() {
           </div>
 
           {/* Matrix Footer Legend */}
-          <div className="px-6 py-4 bg-slate-50 border-t border-outline-variant flex flex-wrap gap-4 items-center justify-between text-xs text-secondary">
-            <div className="flex items-center gap-1">
-              <span className="font-semibold text-slate-700">Doble clic o clic en celda para corregir.</span>
+          <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-wrap gap-4 items-center justify-between text-xs text-secondary">
+            <div className="flex items-center gap-3">
+              <span className="font-semibold text-slate-700">Clic en celda para corregir / registrar turno.</span>
+              <span className="text-slate-300">|</span>
+              <span className="flex items-center gap-1.5 text-slate-700 font-bold">
+                <span className="w-4 h-4 rounded bg-slate-200 border border-slate-300 inline-block"></span>
+                Fin de semana
+              </span>
+              <span className="flex items-center gap-1.5 text-rose-800 font-bold">
+                <span className="w-4 h-4 rounded bg-rose-200 border border-rose-300 inline-block"></span>
+                Feriado Legal
+              </span>
+              <span className="flex items-center gap-1.5 text-amber-900 font-bold">
+                <span className="w-4 h-4 rounded bg-amber-300 border border-amber-400 inline-block"></span>
+                Día de Hoy
+              </span>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1.5 items-center">
-              <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px] mr-2">Leyenda:</span>
+              <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px] mr-2">Leyenda de Estados:</span>
               {Object.entries(ESTADOS_MAP).map(([key, s]) => (
                 <span key={key} className="flex items-center gap-1.5">
-                  <span className={`w-6 h-6 flex items-center justify-center rounded-md border shadow-sm ${s.color}`}>
+                  <span className={`w-6 h-6 flex items-center justify-center rounded-md border shadow-xs ${s.color}`}>
                     <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>{s.icon}</span>
                   </span>
-                  <span className="text-slate-600 text-[11px]">{s.label}</span>
+                  <span className="text-slate-700 text-[11px] font-semibold">{s.label}</span>
                 </span>
               ))}
             </div>

@@ -3,6 +3,8 @@
 import { useEffect, useState, useMemo } from "react";
 import Modal from "@/components/ui/Modal";
 import { makeHeaders } from "@/lib/api";
+import { Palmtree, User } from "lucide-react";
+import EmpleadoVacacionesTab from "./EmpleadoVacacionesTab";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -58,6 +60,7 @@ export default function EmpleadoFormModal({
   const [newPassword, setNewPassword] = useState("");
 
   const [jefesDisponibles, setJefesDisponibles] = useState([]);
+  const [formTab, setFormTab] = useState("general"); // "general" | "vacaciones"
 
   const hasUsuario = Boolean(currentEmp?.usuario?.id);
 
@@ -86,6 +89,7 @@ export default function EmpleadoFormModal({
     if (!open) return;
 
     setUserErr("");
+    setFormTab("general");
 
     // editar usuario existente
     setPassword("");
@@ -264,22 +268,67 @@ export default function EmpleadoFormModal({
     >
       {currentEmp && (
         <div className="space-y-4">
-          {currentEmp.usuario ? (
-            <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-gray-600">
-              <div className="font-medium text-gray-800">
-                {currentEmp.usuario.nombre}
-              </div>
-              <div>{currentEmp.usuario.correo}</div>
-              {currentEmp.usuario.rol && (
-                <div className="mt-1">
-                  Rol actual:{" "}
-                  <span className="font-semibold">
-                    {currentEmp.usuario.rol.nombre}
-                  </span>
-                </div>
-              )}
+          {/* Selector de Pestañas en modo Edición */}
+          {mode === "edit" && (
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+              <button
+                type="button"
+                onClick={() => setFormTab("general")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  formTab === "general"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                }`}
+              >
+                <User className="w-4 h-4" />
+                Datos & Cargo
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormTab("vacaciones")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  formTab === "vacaciones"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                }`}
+              >
+                <Palmtree className="w-4 h-4" />
+                Vacaciones & Permisos
+              </button>
             </div>
-          ) : null}
+          )}
+
+          {formTab === "vacaciones" && mode === "edit" ? (
+            <div className="pt-1">
+              <EmpleadoVacacionesTab empleado={currentEmp} session={session} />
+              <div className="mt-6 flex justify-end">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {currentEmp.usuario ? (
+                <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-gray-600">
+                  <div className="font-medium text-gray-800">
+                    {currentEmp.usuario.nombre}
+                  </div>
+                  <div>{currentEmp.usuario.correo}</div>
+                  {currentEmp.usuario.rol && (
+                    <div className="mt-1">
+                      Rol actual:{" "}
+                      <span className="font-semibold">
+                        {currentEmp.usuario.rol.nombre}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : null}
 
           {/* ✅ CREATE usuario nuevo */}
           {showCreateUserBox ? (
@@ -478,10 +527,15 @@ export default function EmpleadoFormModal({
               </select>
             </div>
 
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">
-                Sede / Ciudad Base
-              </label>
+            <div className="sm:col-span-2 bg-gradient-to-r from-blue-50/70 to-indigo-50/50 p-3.5 rounded-xl border border-blue-200">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-800">
+                  🏢 Sede / Sucursal Asignada *
+                </label>
+                <span className="text-[10px] font-bold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full border border-blue-200">
+                  Multiplicador Vacaciones
+                </span>
+              </div>
               <select
                 value={currentEmp.sede || "PMC"}
                 onChange={(e) =>
@@ -490,11 +544,14 @@ export default function EmpleadoFormModal({
                     sede: e.target.value,
                   }))
                 }
-                className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                className="block w-full rounded-lg border border-blue-300 px-3 py-2 text-sm font-semibold text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white cursor-pointer"
               >
-                <option value="PMC">Puerto Montt (PMC)</option>
-                <option value="PUQ">Punta Arenas (PUQ)</option>
+                <option value="PMC">Puerto Montt (PMC) — 1.25 días / mes (15 días al año)</option>
+                <option value="PUQ">Punta Arenas (PUQ) — 1.75 días / mes (21 días al año)</option>
               </select>
+              <p className="mt-1 text-[11px] text-slate-600">
+                Determina la tasa de acumulación de vacaciones de este trabajador.
+              </p>
             </div>
 
             <div>
@@ -586,6 +643,8 @@ export default function EmpleadoFormModal({
               Guardar
             </button>
           </div>
+          </>
+          )}
         </div>
       )}
     </Modal>
