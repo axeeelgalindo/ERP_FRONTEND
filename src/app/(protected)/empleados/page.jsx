@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import EmpleadoFormModal from "@/components/empleados/EmpleadoFormModal";
 import EmpleadoDetailDrawer from "@/components/empleados/EmpleadoDetailDrawer";
 import VacacionesGeneralView from "@/components/empleados/VacacionesGeneralView";
+import CartolaVacacionesModal from "@/components/empleados/CartolaVacacionesModal";
 import { Eye, Users, Palmtree } from "lucide-react";
 import { makeHeaders } from "@/lib/api";
 
@@ -53,6 +54,8 @@ export default function EmpleadosPage() {
 
   const [openDrawer, setOpenDrawer] = useState(false);
   const [currentViewEmp, setCurrentViewEmp] = useState(null);
+
+  const [openCartolaModal, setOpenCartolaModal] = useState(false);
 
   // ✅ Redirect sin romper hooks
   useEffect(() => {
@@ -275,20 +278,28 @@ export default function EmpleadosPage() {
             <h2 className="font-semibold text-3xl text-on-surface tracking-tight">Empleados</h2>
             <p className="text-secondary text-base mt-1">Gestión de RRHH: empleados, cargos y actividad.</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => setOpenCartolaModal(true)}
+              className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-lg shadow-sm hover:shadow-md transition-all active:scale-[0.98] cursor-pointer text-sm"
+              title="Descargar Cartola de Vacaciones por mes o rango"
+            >
+              <Palmtree className="w-4 h-4 mr-2" />
+              Cartola vacaciones
+            </button>
             <button
               onClick={fetchEmpleados}
               disabled={loading}
-              className="flex items-center px-6 py-2 bg-surface-container-highest text-primary font-bold rounded-lg hover:bg-surface-variant transition-all disabled:opacity-50"
+              className="flex items-center px-4 py-2 bg-surface-container-highest text-primary font-bold rounded-lg hover:bg-surface-variant transition-all disabled:opacity-50 text-sm cursor-pointer"
             >
-              <span className="material-symbols-outlined mr-2">refresh</span>
+              <span className="material-symbols-outlined mr-2 text-base">refresh</span>
               {loading ? "Cargando..." : "Recargar"}
             </button>
             <button
               onClick={openCreate}
-              className="flex items-center px-6 py-2 bg-primary text-on-primary font-bold rounded-lg hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-[0.98]"
+              className="flex items-center px-4 py-2 bg-primary text-on-primary font-bold rounded-lg hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-[0.98] text-sm cursor-pointer"
             >
-              <span className="material-symbols-outlined mr-2">add</span>
+              <span className="material-symbols-outlined mr-2 text-base">add</span>
               Nuevo empleado
             </button>
           </div>
@@ -329,6 +340,7 @@ export default function EmpleadosPage() {
         {mainTab === "vacaciones" ? (
           <VacacionesGeneralView
             session={session}
+            onOpenCartola={() => setOpenCartolaModal(true)}
             onSelectEmpleado={(empId) => {
               const found = empleados.find((e) => e.id === empId);
               if (found) {
@@ -608,6 +620,13 @@ export default function EmpleadosPage() {
           open={openDrawer}
           onClose={closeDetail}
           empleado={currentViewEmp}
+        />
+
+        <CartolaVacacionesModal
+          open={openCartolaModal}
+          onClose={() => setOpenCartolaModal(false)}
+          session={session}
+          empleados={empleados}
         />
       </div>
     </div>

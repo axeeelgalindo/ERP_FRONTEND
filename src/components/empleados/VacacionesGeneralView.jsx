@@ -17,10 +17,14 @@ import {
   Building,
   ChevronLeft,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  FileSpreadsheet,
+  FileText,
 } from "lucide-react";
 import { makeHeaders } from "@/lib/api";
 import { calcularDiasHabilesVacaciones } from "@/lib/diasHabiles";
+import { assignComprobanteToEmpleado } from "@/lib/comprobanteVacacionesPDF";
+import ComprobanteVacacionesModal from "@/components/empleados/ComprobanteVacacionesModal";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -57,7 +61,7 @@ function getNombreMes(mNum) {
   return found ? found.label.toUpperCase() : "—";
 }
 
-export default function VacacionesGeneralView({ session, onSelectEmpleado }) {
+export default function VacacionesGeneralView({ session, onSelectEmpleado, onOpenCartola }) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState({ saldos: [], vacaciones: [] });
   const [error, setError] = useState("");
@@ -68,6 +72,9 @@ export default function VacacionesGeneralView({ session, onSelectEmpleado }) {
   const [filtroAno, setFiltroAno] = useState(String(new Date().getFullYear()));
   const [filtroMes, setFiltroMes] = useState("");
   const [filtroQ, setFiltroQ] = useState("");
+
+  // Modal para Comprobante de Vacaciones PDF
+  const [comprobanteModalData, setComprobanteModalData] = useState(null);
 
   // Modal para registrar o editar vacación general
   const [showModal, setShowModal] = useState(false);
@@ -208,18 +215,73 @@ export default function VacacionesGeneralView({ session, onSelectEmpleado }) {
         body: JSON.stringify(formData),
       });
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.error || errJson.message || "Error al guardar vacación");
-      }
+      const savedVac = await res.json().catch(() => ({}));
 
       setShowModal(false);
       await fetchGeneralVacaciones();
+
+      // Si fue una nueva vacación, auto-asignar PDF y abrir modal de comprobante
+      if (!editingVacacion) {
+        const empSaldo = data.saldos?.find((s) => s.empleado_id === formData.empleado_id) || {};
+        const empPayload = {
+          id: formData.empleado_id,
+          nombre: savedVac.empleado?.nombre || empSaldo.nombre || "Funcionario",
+          rut: savedVac.empleado?.rut || empSaldo.rut,
+          cargo: savedVac.empleado?.cargo || empSaldo.cargo,
+          sede: savedVac.empleado?.sede || empSaldo.sede || "PMC",
+          fecha_ingreso: savedVac.empleado?.fecha_ingreso || empSaldo.fecha_ingreso,
+        };
+        const vacPayload = {
+          ...savedVac,
+          desde: formData.desde,
+          hasta: formData.hasta,
+          dias: Number(formData.dias),
+          saldo_anterior: savedVac.saldo_anterior ?? empSaldo.saldo_disponible,
+          saldo_pendiente: savedVac.saldo_pendiente ?? ((empSaldo.saldo_disponible ?? 0) - Number(formData.dias)),
+        };
+
+        // Asignar en segundo plano a documentos del empleado (carpeta Vacaciones)
+        assignComprobanteToEmpleado({
+          session,
+          empleadoId: formData.empleado_id,
+          vacacion: vacPayload,
+          empleado: empPayload,
+        }).catch((err) => console.error("Error auto-asignando PDF a documentos:", err));
+
+        // Abrir modal listo para imprimir o descargar
+        setComprobanteModalData({
+          vacacion: vacPayload,
+          empleado: empPayload,
+          isNewlyCreated: true,
+        });
+      }
     } catch (err) {
       setFormError(err.message || "Error al guardar");
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleOpenComprobante = (v) => {
+    const empSaldo = data.saldos?.find((s) => s.empleado_id === v.empleado_id) || {};
+    const empPayload = {
+      id: v.empleado_id,
+      nombre: v.nombre || empSaldo.nombre || "Funcionario",
+      rut: v.rut || empSaldo.rut,
+      cargo: v.cargo || empSaldo.cargo,
+      sede: v.sede || empSaldo.sede || "PMC",
+      fecha_ingreso: v.fecha_ingreso || empSaldo.fecha_ingreso,
+    };
+    const vacPayload = {
+      ...v,
+      saldo_anterior: v.saldo_anterior ?? (v.saldo_disponible != null ? Number(v.saldo_disponible) + Number(v.dias) : empSaldo.saldo_disponible),
+      saldo_pendiente: v.saldo_pendiente ?? (v.saldo_disponible ?? empSaldo.saldo_disponible),
+    };
+    setComprobanteModalData({
+      vacacion: vacPayload,
+      empleado: empPayload,
+      isNewlyCreated: false,
+    });
   };
 
   const handleDelete = async (vacacionId) => {
@@ -352,6 +414,17 @@ export default function VacacionesGeneralView({ session, onSelectEmpleado }) {
               📅 Calendario
             </button>
           </div>
+
+          {onOpenCartola && (
+            <button
+              onClick={onOpenCartola}
+              className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-xs font-bold rounded-xl border border-slate-200 transition-all cursor-pointer shadow-2xs"
+              title="Abrir modal para filtrar y descargar cartola de vacaciones"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              Cartola vacaciones
+            </button>
+          )}
 
           <button
             onClick={handleOpenCreate}
@@ -568,6 +641,13 @@ export default function VacacionesGeneralView({ session, onSelectEmpleado }) {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handleOpenComprobante(v)}
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                            title="Comprobante de Vacaciones (PDF para imprimir y firmar)"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             onClick={() => handleOpenEdit(v)}
                             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
@@ -921,6 +1001,18 @@ export default function VacacionesGeneralView({ session, onSelectEmpleado }) {
             </form>
           </div>
         </div>
+      )}
+
+      {/* MODAL DE COMPROBANTE DE VACACIONES PDF */}
+      {comprobanteModalData && (
+        <ComprobanteVacacionesModal
+          isOpen={Boolean(comprobanteModalData)}
+          onClose={() => setComprobanteModalData(null)}
+          vacacion={comprobanteModalData.vacacion}
+          empleado={comprobanteModalData.empleado}
+          session={session}
+          isNewlyCreated={comprobanteModalData.isNewlyCreated}
+        />
       )}
     </div>
   );

@@ -13,9 +13,12 @@ import {
   Palmtree,
   Info,
   ChevronRight,
-  HelpCircle
+  HelpCircle,
+  FileText,
 } from "lucide-react";
 import { makeHeaders } from "@/lib/api";
+import { assignComprobanteToEmpleado } from "@/lib/comprobanteVacacionesPDF";
+import ComprobanteVacacionesModal from "@/components/empleados/ComprobanteVacacionesModal";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -37,6 +40,9 @@ export default function EmpleadoVacacionesTab({ empleado, session }) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
+
+  // Modal para Comprobante de Vacaciones PDF
+  const [comprobanteModalData, setComprobanteModalData] = useState(null);
 
   // Modal / Form para crear o editar
   const [showModal, setShowModal] = useState(false);
@@ -154,18 +160,71 @@ export default function EmpleadoVacacionesTab({ empleado, session }) {
         body: JSON.stringify(formData)
       });
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.error || errJson.message || "Error al guardar vacación");
-      }
+      const savedVac = await res.json().catch(() => ({}));
 
       setShowModal(false);
       await fetchVacaciones();
+
+      // Si fue un registro nuevo, auto-asignar PDF a documentos del empleado y abrir comprobante
+      if (!editingVacacion) {
+        const empPayload = {
+          id: empleado.id,
+          nombre: empleado?.usuario?.nombre || data?.nombre || "Funcionario",
+          rut: empleado?.rut || data?.rut,
+          cargo: empleado?.cargo || data?.cargo,
+          sede: empleado?.sede || data?.sede || "PMC",
+          fecha_ingreso: empleado?.fecha_ingreso || data?.fecha_ingreso,
+        };
+        const vacPayload = {
+          ...savedVac,
+          desde: formData.desde,
+          hasta: formData.hasta,
+          dias: Number(formData.dias),
+          saldo_anterior: savedVac.saldo_anterior ?? saldoDisponible,
+          saldo_pendiente: savedVac.saldo_pendiente ?? (saldoDisponible - Number(formData.dias)),
+        };
+
+        // Asignar en segundo plano a documentos (carpeta Vacaciones)
+        assignComprobanteToEmpleado({
+          session,
+          empleadoId: empleado.id,
+          vacacion: vacPayload,
+          empleado: empPayload,
+        }).catch((err) => console.error("Error auto-asignando PDF a documentos:", err));
+
+        // Abrir modal de comprobante listo para imprimir o descargar
+        setComprobanteModalData({
+          vacacion: vacPayload,
+          empleado: empPayload,
+          isNewlyCreated: true,
+        });
+      }
     } catch (err) {
       setFormError(err.message || "Error al guardar");
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleOpenComprobante = (v) => {
+    const empPayload = {
+      id: empleado.id,
+      nombre: empleado?.usuario?.nombre || data?.nombre || "Funcionario",
+      rut: empleado?.rut || data?.rut,
+      cargo: empleado?.cargo || data?.cargo,
+      sede: empleado?.sede || data?.sede || "PMC",
+      fecha_ingreso: empleado?.fecha_ingreso || data?.fecha_ingreso,
+    };
+    const vacPayload = {
+      ...v,
+      saldo_anterior: v.saldo_anterior ?? (saldoDisponible != null ? Number(saldoDisponible) + Number(v.dias) : null),
+      saldo_pendiente: v.saldo_pendiente ?? saldoDisponible,
+    };
+    setComprobanteModalData({
+      vacacion: vacPayload,
+      empleado: empPayload,
+      isNewlyCreated: false,
+    });
   };
 
   // Eliminar vacación
@@ -388,6 +447,13 @@ export default function EmpleadoVacacionesTab({ empleado, session }) {
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
+                          onClick={() => handleOpenComprobante(v)}
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                          title="Comprobante de Vacaciones (PDF para imprimir y firmar)"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                        </button>
+                        <button
                           onClick={() => handleOpenEdit(v)}
                           className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
                           title="Editar periodo"
@@ -567,6 +633,18 @@ export default function EmpleadoVacacionesTab({ empleado, session }) {
             </form>
           </div>
         </div>
+      )}
+
+      {/* MODAL DE COMPROBANTE DE VACACIONES PDF */}
+      {comprobanteModalData && (
+        <ComprobanteVacacionesModal
+          isOpen={Boolean(comprobanteModalData)}
+          onClose={() => setComprobanteModalData(null)}
+          vacacion={comprobanteModalData.vacacion}
+          empleado={comprobanteModalData.empleado}
+          session={session}
+          isNewlyCreated={comprobanteModalData.isNewlyCreated}
+        />
       )}
     </div>
   );
