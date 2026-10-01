@@ -863,10 +863,10 @@ export default function CotizacionesPage() {
 
           <button
             onClick={() => setOpenReport(true)}
-            disabled={filtered.length === 0}
+            disabled={loading || Boolean(err) || cotizaciones.length === 0}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg text-sm font-medium transition-colors shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <span>📊</span> Reporte General
+            <span>📊</span> Generar reporte
           </button>
 
           <button
@@ -1289,7 +1289,7 @@ export default function CotizacionesPage() {
       <ReporteCotizacionesModal
         open={openReport}
         onClose={() => setOpenReport(false)}
-        cotizaciones={filtered}
+        cotizaciones={cotizaciones}
         session={session}
       />
 

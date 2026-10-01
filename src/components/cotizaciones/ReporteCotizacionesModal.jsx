@@ -1,7 +1,10 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import ModalBase from "@/components/compras/ModalBase";
+import ReporteFiltros from "./ReporteFiltros";
+import { ESTADOS_REPORTE, fechaReporte, errorFiltros, filtrarReporte } from "./reporteFiltros.mjs";
+import { Dialog } from "@mui/material";
+import { FileBarChart2, Download, X, LoaderCircle, ChartNoAxesCombined, ChevronDown, FileText, Banknote, TrendingUp, CircleCheck } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -85,8 +88,21 @@ const getImageDimensions = (dataUrl) => {
   });
 };
 
-export default function ReporteCotizacionesModal({ open, onClose, cotizaciones, session }) {
+export default function ReporteCotizacionesModal({ open, onClose, cotizaciones: todasCotizaciones = [], session }) {
   const [busy, setBusy] = useState(false);
+
+  const hoy = fechaReporte({ creada_en: new Date().toISOString() });
+  const [filtros, setFiltros] = useState(() => ({
+    estados: ["COTIZACION"], periodo: "total", mes: hoy.slice(0, 7),
+    anio: hoy.slice(0, 4), desde: `${hoy.slice(0, 7)}-01`, hasta: hoy, cliente: "",
+  }));
+  const [exportError, setExportError] = useState("");
+  const cambiar = (key, value) => { setFiltros((f) => ({ ...f, [key]: value })); setExportError(""); };
+  const filterError = errorFiltros(filtros);
+  const cotizaciones = useMemo(() => filtrarReporte(todasCotizaciones, filtros), [todasCotizaciones, filtros]);
+  const clientes = useMemo(() => [...new Map(todasCotizaciones.filter(c => !c.es_suscripcion && (c.cliente_id || c.cliente?.id)).map(c => [String(c.cliente_id || c.cliente.id), c.cliente?.nombre || "Sin nombre"])).entries()].sort((a,b) => a[1].localeCompare(b[1])), [todasCotizaciones]);
+  const periodoTexto = filtros.periodo === "total" ? "Todo el historial" : filtros.periodo === "mensual" ? `Mes: ${filtros.mes}` : filtros.periodo === "anual" ? `Año: ${filtros.anio}` : `Desde ${filtros.desde} hasta ${filtros.hasta} (inclusive)`;
+  const criterios = `${periodoTexto} | Estados: ${filtros.estados.map(e => ESTADOS_REPORTE[e]).join(", ")} | Cliente: ${clientes.find(([id]) => id === filtros.cliente)?.[1] || "Todos"}`;
 
   // 1. Torta de Conversión (Total de cotizaciones)
   const conversionData = useMemo(() => {
@@ -291,7 +307,9 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones, 
   };
 
   const handleExportPDF = async () => {
+    if (busy || filterError || !cotizaciones.length) return;
     try {
+      setExportError("");
       setBusy(true);
 
       // 1. Load Logo
@@ -301,9 +319,9 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones, 
       let logoY = 14;
 
       const empId = session?.user?.empresa?.id || session?.user?.empresaId || null;
-      const empNombre = session?.user?.empresa?.nombre || session?.user?.empresaNombre || "Blue Ingeniería";
-      const empRut = session?.user?.empresa?.rut || "RUT 76.123.456-7";
-      const empCorreo = session?.user?.empresa?.correo || "administracion@blueinge.com";
+      const empNombre = session?.user?.empresa?.nombre || session?.user?.empresaNombre || "Empresa";
+      const empRut = session?.user?.empresa?.rut || "";
+      const empCorreo = session?.user?.empresa?.correo || "";
       const isBlue = String(empNombre).toLowerCase().includes("blue");
 
       try {
@@ -340,7 +358,7 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones, 
               // try next
             }
           }
-        } else {
+        } else if (isBlue) {
           logo = await loadImageDataURL("/Logo_blue.png");
         }
 
@@ -377,7 +395,7 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones, 
       const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",
-        format: "letter",
+        format: "a4",
       });
 
       // Colors Palette
@@ -409,11 +427,11 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones, 
           doc.setFont("helvetica", "bold");
           doc.setFontSize(18);
           doc.setTextColor(...colorsPalette.blue);
-          doc.text("BLUE", mx, 22);
+          doc.text(doc.splitTextToSize(empNombre, 75), mx, 22);
           doc.setFont("helvetica", "normal");
           doc.setFontSize(9);
           doc.setTextColor(...colorsPalette.blueDark);
-          doc.text("Ingeniería SPA", mx, 26);
+
         }
 
         doc.setFont("helvetica", "normal");
@@ -429,26 +447,25 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones, 
       const drawFooter = (page, pages) => {
         doc.setPage(page);
         doc.setFillColor(...colorsPalette.blueSoft2);
-        doc.moveTo(0, 264);
-        doc.curveTo(35, 266, 70, 260, 105, 262);
-        doc.curveTo(140, 264, 175, 267, 210, 265);
-        doc.lineTo(210, 279);
-        doc.lineTo(0, 279);
+        doc.moveTo(0, H - 15);
+        doc.curveTo(35, H - 13, 70, H - 19, 105, H - 17);
+        doc.curveTo(140, H - 15, 175, H - 12, W, H - 14);
+        doc.lineTo(W, H);
+        doc.lineTo(0, H);
         doc.close();
         doc.fill();
 
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8.5);
         doc.setTextColor(38, 51, 63);
-        doc.text(empCorreo, W / 2, 271, { align: "center" });
+        doc.text(empCorreo, W / 2, H - 8, { align: "center" });
 
         doc.setTextColor(140, 153, 163);
         doc.setFontSize(7.5);
-        doc.text(`Página ${page} / ${pages}`, W / 2, 276, { align: "center" });
+        doc.text(`Página ${page} / ${pages}`, W / 2, H - 3, { align: "center" });
       };
 
       // Draw Page 1
-      drawHeader();
       let y = 48;
 
       // Title
@@ -462,7 +479,13 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones, 
       doc.setFontSize(10);
       doc.setTextColor(...colorsPalette.text);
       doc.text(`Fecha de Emisión: ${new Date().toLocaleDateString("es-CL")}`, mx, y);
-      y += 10;
+      y += 6;
+      doc.setFontSize(8);
+      const criteriaLines = doc.splitTextToSize(criterios, W - mx * 2);
+      doc.text(criteriaLines, mx, y);
+      y += criteriaLines.length * 4 + 2;
+      doc.text("Fecha del documento o creación (Chile). Montos en CLP, IVA incluido.", mx, y);
+      y += 7;
 
       // Financial KPIs (Stats Blocks)
       doc.setFont("helvetica", "bold");
@@ -574,7 +597,6 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones, 
 
       // Add Page 2 (Details Table)
       doc.addPage();
-      drawHeader();
       y = 48;
 
       doc.setFont("helvetica", "bold");
@@ -589,8 +611,8 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones, 
         String(c.numero || "-"),
         c.asunto || c.descripcion || "-",
         c.cliente?.nombre || "-",
-        fmtDate(c.creada_en),
-        String(c.estado || "-"),
+        fechaReporte(c).split("-").reverse().join("/") || "-",
+        ESTADOS_REPORTE[c.estado] || c.estado || "-",
         clp(c.total),
       ]);
 
@@ -612,18 +634,21 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones, 
         },
         columnStyles: {
           0: { cellWidth: 15 },
-          1: { cellWidth: 50 },
+          1: { cellWidth: 48 },
           2: { cellWidth: 50 },
           3: { cellWidth: 22 },
           4: { cellWidth: 25 },
           5: { cellWidth: 26, halign: "right" },
         },
-        margin: { left: mx, right: mx },
+        margin: { left: mx, right: mx, top: 44, bottom: 24 },
+        rowPageBreak: "avoid",
       });
 
       // Page numbering footer on all pages
       const pageCount = doc.internal.getNumberOfPages();
       for (let p = 1; p <= pageCount; p++) {
+        doc.setPage(p);
+        drawHeader();
         drawFooter(p, pageCount);
       }
 
@@ -631,7 +656,7 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones, 
       doc.save(fileName);
     } catch (err) {
       console.error("Error generating PDF:", err);
-      alert("Error al generar reporte PDF: " + err.message);
+      setExportError("No se pudo generar el PDF. " + err.message);
     } finally {
       setBusy(false);
     }
@@ -640,68 +665,25 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones, 
   if (!open) return null;
 
   return (
-    <ModalBase open={open} onClose={onClose} title="" hideHeader={true}>
-      <link
-        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
-        rel="stylesheet"
-      />
-      <link
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-        rel="stylesheet"
-      />
-
-      <div style={{ fontFamily: "'Outfit', sans-serif" }} className="flex flex-col text-slate-800">
-        {/* Header */}
-        <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between bg-gradient-to-r from-blue-950 via-slate-900 to-blue-950 text-white rounded-t-2xl gap-4">
-          <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-blue-400 bg-blue-500/10 p-2.5 rounded-xl text-3xl">
-              bar_chart_4_bars
-            </span>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">
-                Análisis de Cotizaciones y Conversión
-              </h1>
-              <p className="text-slate-400 text-xs mt-0.5 max-w-lg">
-                Reporte corporativo de tasas de aceptación, rechazo y progreso de flujo comercial.
-              </p>
-            </div>
+    <Dialog open={open} onClose={busy ? undefined : onClose} maxWidth="md" fullWidth aria-labelledby="reporte-title"
+      sx={{ zIndex: 10000 }}
+      slotProps={{ paper: { sx: { borderRadius: "20px", margin: { xs: 1, sm: 3 }, width: { xs: "calc(100% - 16px)", sm: "calc(100% - 48px)" }, maxHeight: "calc(100dvh - 32px)", overflow: "hidden" } } }}>
+      <div className="flex min-h-0 min-w-0 flex-col text-slate-800">
+        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 bg-white px-4 py-5 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600"><FileBarChart2 size={23} aria-hidden="true" /></span>
+            <div className="min-w-0"><h2 id="reporte-title" className="text-lg font-bold tracking-tight text-slate-900">Reporte de cotizaciones</h2><p className="mt-0.5 text-xs text-slate-500">Configura tu selección y descarga el PDF corporativo.</p></div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleExportPDF}
-              disabled={busy}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800/80 text-white font-semibold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-blue-950/20 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-            >
-              {busy ? (
-                <>
-                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                  Generando...
-                </>
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-sm">download</span>
-                  Descargar Reporte PDF
-                </>
-              )}
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer"
-              title="Cerrar modal"
-            >
-              <span className="material-symbols-outlined text-xl">close</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Modal content body */}
-        <div className="max-h-[75vh] overflow-y-auto p-6 bg-slate-50/50 flex flex-col gap-6">
+          <button type="button" onClick={onClose} disabled={busy} aria-label="Cerrar reporte" className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-40"><X size={20} /></button>
+        </header>
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-slate-50 p-4 sm:p-6 space-y-5">
+          <ReporteFiltros filtros={filtros} cambiar={cambiar} clientes={clientes} busy={busy} error={filterError || exportError} cantidad={cotizaciones.length} />
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-800"><ChartNoAxesCombined size={18} className="text-blue-600" aria-hidden="true" /> Resumen de tu selección</div>
           {/* Financial Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="p-4 bg-slate-100 border border-slate-200 rounded-xl shadow-sm">
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                Total Cotizadas
+                <FileText size={16} className="mb-2" aria-hidden="true" />Total Cotizadas
               </span>
               <span className="text-base font-bold text-slate-800 mt-1 block">
                 {totalCotizaciones}
@@ -710,7 +692,7 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones, 
 
             <div className="p-4 bg-blue-50/60 border border-blue-100 rounded-xl shadow-sm">
               <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">
-                Monto Cotizado
+                <Banknote size={16} className="mb-2" aria-hidden="true" />Monto Cotizado
               </span>
               <span className="text-base font-bold text-blue-900 mt-1 block">
                 {clp(kpis.totalMontoCotizado)}
@@ -719,7 +701,7 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones, 
 
             <div className="p-4 bg-emerald-50/60 border border-emerald-100 rounded-xl shadow-sm">
               <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">
-                Tasa de Conversión
+                <TrendingUp size={16} className="mb-2" aria-hidden="true" />Tasa de Conversión
               </span>
               <span className="text-base font-bold text-emerald-900 mt-1 block">
                 {kpis.conversionRate.toFixed(1)}%
@@ -728,7 +710,7 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones, 
 
             <div className="p-4 bg-indigo-50/60 border border-indigo-100 rounded-xl shadow-sm">
               <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider block">
-                Monto Aceptado
+                <CircleCheck size={16} className="mb-2" aria-hidden="true" />Monto Aceptado
               </span>
               <span className="text-base font-bold text-indigo-900 mt-1 block">
                 {clp(kpis.totalMontoAceptado)}
@@ -737,8 +719,10 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones, 
           </div>
 
           {/* SVG Pie/Donut Charts (Stacked rows) */}
-          <div className="grid grid-cols-1 gap-6">
-            
+          <details className="group rounded-2xl border border-slate-200 bg-white">
+            <summary className="flex cursor-pointer list-none items-center gap-2 p-4 text-sm font-semibold text-slate-700 focus-visible:outline-2 focus-visible:outline-blue-600"><ChartNoAxesCombined size={18} className="text-blue-600" aria-hidden="true" /> Ver análisis de conversión y avance<ChevronDown size={18} className="ml-auto shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" /></summary>
+          <div className="grid grid-cols-1 gap-4 p-3 pt-0 sm:p-4">
+
             {/* Chart 1: Conversión */}
             <div className="p-5 bg-white border border-slate-200 rounded-2xl shadow-sm">
               <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4">
@@ -850,9 +834,16 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones, 
             </div>
 
           </div>
-
+          </details>
         </div>
+        <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-4 sm:px-6">
+          <div role="status" aria-live="polite" className="min-w-0"><p className="text-sm font-semibold text-slate-900">{totalCotizaciones} cotizaciones</p><p className="text-xs text-slate-500">{clp(kpis.totalMontoCotizado)} · IVA incluido</p></div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={onClose} disabled={busy} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40">Cancelar</button>
+            <button type="button" onClick={handleExportPDF} disabled={busy || Boolean(filterError) || !cotizaciones.length} className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-40">{busy ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Download size={17} aria-hidden="true" />}{busy ? "Generando…" : "Descargar PDF"}</button>
+          </div>
+        </footer>
       </div>
-    </ModalBase>
+    </Dialog>
   );
 }
