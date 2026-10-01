@@ -4,7 +4,7 @@ import React, { useMemo, useState } from "react";
 import ReporteFiltros from "./ReporteFiltros";
 import { ESTADOS_REPORTE, fechaReporte, errorFiltros, filtrarReporte } from "./reporteFiltros.mjs";
 import { Dialog } from "@mui/material";
-import { FileBarChart2, Download, X, LoaderCircle, ChartNoAxesCombined, ChevronDown, FileText, Banknote, TrendingUp, CircleCheck } from "lucide-react";
+import { FileBarChart2, FileSpreadsheet, Download, X, LoaderCircle, ChartNoAxesCombined, ChevronDown, FileText, Banknote, TrendingUp, CircleCheck } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -90,6 +90,7 @@ const getImageDimensions = (dataUrl) => {
 
 export default function ReporteCotizacionesModal({ open, onClose, cotizaciones: todasCotizaciones = [], session }) {
   const [busy, setBusy] = useState(false);
+  const [exportFormat, setExportFormat] = useState(null);
 
   const hoy = fechaReporte({ creada_en: new Date().toISOString() });
   const [filtros, setFiltros] = useState(() => ({
@@ -306,11 +307,41 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones: 
     ctx.fill();
   };
 
+  const handleExportExcel = async () => {
+    if (busy || filterError || !cotizaciones.length) return;
+    setBusy(true);
+    setExportFormat("xlsx");
+    setExportError("");
+    try {
+      const { crearReporteExcel } = await import("./reporteExcel.mjs");
+      const empresa = session?.user?.empresa?.nombre || session?.user?.empresaNombre || "Empresa";
+      const workbook = await crearReporteExcel({
+        cotizaciones, empresa, periodo: periodoTexto, estados: filtros.estados,
+        cliente: clientes.find(([id]) => id === filtros.cliente)?.[1] || "Todos los clientes",
+      });
+      const buffer = await workbook.xlsx.writeBuffer();
+      const url = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Reporte_Cotizaciones_${safeName(empresa)}_${hoy}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      setExportError("No se pudo generar el Excel. " + err.message);
+    } finally {
+      setBusy(false);
+      setExportFormat(null);
+    }
+  };
+
   const handleExportPDF = async () => {
     if (busy || filterError || !cotizaciones.length) return;
     try {
       setExportError("");
       setBusy(true);
+      setExportFormat("pdf");
 
       // 1. Load Logo
       let logo = null;
@@ -659,6 +690,7 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones: 
       setExportError("No se pudo generar el PDF. " + err.message);
     } finally {
       setBusy(false);
+      setExportFormat(null);
     }
   };
 
@@ -672,7 +704,7 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones: 
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 bg-white px-4 py-5 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600"><FileBarChart2 size={23} aria-hidden="true" /></span>
-            <div className="min-w-0"><h2 id="reporte-title" className="text-lg font-bold tracking-tight text-slate-900">Reporte de cotizaciones</h2><p className="mt-0.5 text-xs text-slate-500">Configura tu selección y descarga el PDF corporativo.</p></div>
+            <div className="min-w-0"><h2 id="reporte-title" className="text-lg font-bold tracking-tight text-slate-900">Reporte de cotizaciones</h2><p className="mt-0.5 text-xs text-slate-500">Configura tu selección y descarga en PDF o Excel.</p></div>
           </div>
           <button type="button" onClick={onClose} disabled={busy} aria-label="Cerrar reporte" className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-40"><X size={20} /></button>
         </header>
@@ -838,9 +870,10 @@ export default function ReporteCotizacionesModal({ open, onClose, cotizaciones: 
         </div>
         <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-4 sm:px-6">
           <div role="status" aria-live="polite" className="min-w-0"><p className="text-sm font-semibold text-slate-900">{totalCotizaciones} cotizaciones</p><p className="text-xs text-slate-500">{clp(kpis.totalMontoCotizado)} · IVA incluido</p></div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={onClose} disabled={busy} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40">Cancelar</button>
-            <button type="button" onClick={handleExportPDF} disabled={busy || Boolean(filterError) || !cotizaciones.length} className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-40">{busy ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Download size={17} aria-hidden="true" />}{busy ? "Generando…" : "Descargar PDF"}</button>
+            <button type="button" onClick={handleExportExcel} disabled={busy || Boolean(filterError) || !cotizaciones.length} className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-40">{busy && exportFormat === "xlsx" ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <FileSpreadsheet size={17} aria-hidden="true" />}{busy && exportFormat === "xlsx" ? "Generando…" : "Excel (.xlsx)"}</button>
+            <button type="button" onClick={handleExportPDF} disabled={busy || Boolean(filterError) || !cotizaciones.length} className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-40">{busy && exportFormat === "pdf" ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Download size={17} aria-hidden="true" />}{busy && exportFormat === "pdf" ? "Generando…" : "Descargar PDF"}</button>
           </div>
         </footer>
       </div>
