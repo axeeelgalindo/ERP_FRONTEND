@@ -233,7 +233,7 @@ export default function EmpleadoVacacionesTab({ empleado, session }) {
     try {
       const res = await fetch(`${API_URL}/empleados/vacaciones/${vacacionId}`, {
         method: "DELETE",
-        headers: makeHeaders(session)
+        headers: makeHeaders(session, { skipContentType: true })
       });
       if (res.ok) {
         await fetchVacaciones();
